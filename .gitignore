@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+web/node_modules/
+
+# Secrets — NEVER commit
+wallets.json
+
+# Runtime data
+purchases.json
+tx-log.json
+services.json.backup*
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+.DS_Store
+.DS_Store

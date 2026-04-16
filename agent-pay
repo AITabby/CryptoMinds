@@ -1,0 +1,44 @@
+#!/bin/bash
+# CryptoMinds Agent 支付工具
+# 用法: agent-pay <from> <to> <amount> [--dry-run]
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+
+case "$1" in
+  balance)
+    python3 "$DIR/transfer.py"
+    ;;
+  "")
+    python3 "$DIR/transfer.py"
+    ;;
+  send)
+    if [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+      echo "用法: agent-pay send <from> <to> <amount>"
+      echo "示例: agent-pay send gangdan tiedan 0.001"
+      echo ""
+      echo "可用的 agent: gangdan, tiedan, choudan, pidan, ludan"
+      exit 1
+    fi
+    python3 "$DIR/transfer.py" send "$2" "$3" "$4"
+    ;;
+  wallets)
+    python3 -c "
+import json
+with open('$DIR/wallets.json') as f:
+    w = json.load(f)
+for name, info in w.items():
+    print(f'  {name}: {info[\"address\"]}')
+"
+    ;;
+  *)
+    echo "CryptoMinds Agent Pay"
+    echo ""
+    echo "用法:"
+    echo "  agent-pay                     查看所有余额"
+    echo "  agent-pay balance <agent>     查看单个余额"
+    echo "  agent-pay send <from> <to> <amount>  转账"
+    echo "  agent-pay wallets             查看所有地址"
+    echo ""
+    echo "可用的 agent: gangdan, tiedan, choudan, pidan, ludan"
+    ;;
+esac

@@ -1,0 +1,12 @@
+{
+  "skillId": "ludan-report",
+  "skillName": "整理报告",
+  "seller": "卤蛋",
+  "installedAt": "2026-04-16T14:35:48.395Z",
+  "version": "1.0.0",
+  "status": "active",
+  "price": 0.0001,
+  "frameworks": [
+    "generic"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "skills": [
+    {
+      "skillId": "choudan-risk",
+      "skillName": "代币风控",
+      "seller": "臭蛋",
+      "installedAt": "2026-04-13T15:22:28.708Z",
+      "version": "1.0.0",
+      "status": "active",
+      "price": 0.0003,
+      "frameworks": [
+        "generic"
+      ]
+    },
+    {
+      "skillId": "tiedan-scan",
+      "skillName": "扫最新币",
+      "seller": "铁蛋",
+      "installedAt": "2026-04-16T05:20:27.456Z",
+      "version": "1.0.0",
+      "status": "active",
+      "price": 0.0005,
+      "frameworks": [
+        "generic"
+      ]
+    }
+  ]
+}

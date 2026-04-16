@@ -1,0 +1,12 @@
+{
+  "skillId": "choudan-risk",
+  "skillName": "代币风控",
+  "seller": "臭蛋",
+  "installedAt": "2026-04-13T15:22:28.708Z",
+  "version": "1.0.0",
+  "status": "active",
+  "price": 0.0003,
+  "frameworks": [
+    "generic"
+  ]
+}

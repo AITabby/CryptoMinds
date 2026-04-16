@@ -1,0 +1,16 @@
+{
+  "skills": [
+    {
+      "skillId": "tiedan-scan",
+      "skillName": "扫最新币",
+      "seller": "铁蛋",
+      "installedAt": "2026-04-16T08:26:30.382Z",
+      "version": "1.0.0",
+      "status": "active",
+      "price": 0.0005,
+      "frameworks": [
+        "generic"
+      ]
+    }
+  ]
+}
