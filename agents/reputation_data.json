@@ -83,10 +83,10 @@
       "last_active": 1776317781.585033
     },
     "ludan": {
-      "total_requests": 18,
-      "successful_requests": 17,
+      "total_requests": 19,
+      "successful_requests": 18,
       "failed_requests": 1,
-      "total_response_time": 2.406330966949463,
+      "total_response_time": 2.4066211223602294,
       "response_times": [
         1.2,
         0.0017011165618896484,
@@ -104,7 +104,8 @@
         0.0005059242248535156,
         0.0003650188446044922,
         0.00023221969604492188,
-        0.0004661083221435547
+        0.0004661083221435547,
+        0.00029015541076660156
       ],
       "exceptions": [
         {
@@ -113,9 +114,9 @@
           "request_id": "req-ludan-1775880001"
         }
       ],
-      "reputation_score": 97.78,
+      "reputation_score": 97.89,
       "created_at": 1775879809.268654,
-      "last_active": 1776366784.0560188
+      "last_active": 1776408910.4172318
     },
     "four_meme": {
       "total_requests": 6,
@@ -614,7 +615,14 @@
       "success": true,
       "response_time": 0.0004661083221435547,
       "request_id": "demo-019"
+    },
+    {
+      "agent": "ludan",
+      "timestamp": 1776408910.417233,
+      "success": true,
+      "response_time": 0.00029015541076660156,
+      "request_id": "demo-020"
     }
   ],
-  "last_updated": 1776366784.056043
+  "last_updated": 1776408910.417253
 }
