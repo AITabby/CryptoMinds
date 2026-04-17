@@ -14,6 +14,23 @@ const app = express();
 const BSC_RPC = process.env.BSC_RPC || 'https://bsc-dataseed1.binance.org/';
 const w3 = new Web3(BSC_RPC);
 
+// BNB 价格缓存
+let bnbPriceUsd = 600; // 默认值
+let bnbPriceLastFetch = 0;
+async function fetchBnbPrice() {
+  const now = Date.now();
+  if (now - bnbPriceLastFetch < 60000) return bnbPriceUsd; // 1分钟缓存
+  try {
+    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd');
+    const data = await res.json();
+    if (data.binancecoin?.usd) {
+      bnbPriceUsd = data.binancecoin.usd;
+      bnbPriceLastFetch = now;
+    }
+  } catch(e) {}
+  return bnbPriceUsd;
+}
+
 const PORT = 3456;
 const DEMO_WALLET = '0xd2f899ce74320aef9d8f2359183232a554f4c0e1';
 // 押金池地址（获奖后替换为Four.meme地址或合约地址）
@@ -913,9 +930,11 @@ app.get('/api/orders/:orderId/result', (req, res) => {
 });
 
 // 服务目录
-app.get('/api/services', (req, res) => {
-  const services = getServices().filter(s => s.active);
-  res.json(services);
+app.get('/api/services', async (req, res) => {
+  const services = getServices().filter(s => s.active && s.status === 'approved');
+  const bnbPrice = await fetchBnbPrice();
+  const withUsd = services.map(s => ({ ...s, price_usdc: +(s.price * bnbPrice).toFixed(2) }));
+  res.json(withUsd);
 });
 
 // 专家入驻
