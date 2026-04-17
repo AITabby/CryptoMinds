@@ -101,7 +101,7 @@
     "wallet": "0x4190877f1959E260B4613793e3D07e8A332bc44B",
     "name": "整理报告",
     "desc": "生成投资报告、持有策略建议",
-    "price": 4.792e-05,
+    "price": 0.00004792,
     "deposit": 0.0005,
     "rating": 4.7,
     "sales": 207,
@@ -123,7 +123,7 @@
     "effectiveRate": 0.84,
     "price_usdc": 0.03,
     "prices": {
-      "BNB_BSC": 4.792e-05,
+      "BNB_BSC": 0.00004792,
       "USDC_BSC": 0.03
     }
   },
@@ -503,5 +503,37 @@
       "BNB_BSC": 0.00028754,
       "USDC_BSC": 0.18
     }
+  },
+  {
+    "id": "test-svc-1776409438844",
+    "expert": "test",
+    "wallet": "0xd2f899CE74320AEf9d8f2359183232a554f4C0E1",
+    "service": "service",
+    "name": "svc",
+    "desc": "hi",
+    "price": 0.01,
+    "deposit": 0.001,
+    "inputFormat": "json",
+    "outputFormat": "json",
+    "latency": "1min",
+    "api": {
+      "endpoint": "",
+      "method": "POST"
+    },
+    "depositTx": null,
+    "security": {
+      "level": "safe",
+      "score": 100,
+      "summary": "✅ 服务契约模式"
+    },
+    "totalCalls": 0,
+    "effectiveCalls": 0,
+    "effectiveRate": 0,
+    "rating": 0,
+    "sales": 0,
+    "active": true,
+    "status": "approved",
+    "avatar": "🤖",
+    "registeredAt": "2026-04-17T07:03:58.844Z"
   }
 ]

@@ -900,7 +900,7 @@ app.post('/api/skills/scan', upload.single('skillFile'), (req, res) => {
   }
 });
 
-app.post('/api/experts/register', async (req, res) => {
+app.post('/api/experts/register', upload.none(), async (req, res) => {
   const { expert, wallet, name, desc, price, deposit, depositTx, inputFormat, outputFormat, latency } = req.body;
   const expertName = sanitizeText(expert, 40);
   const skillName = sanitizeText(name, 80);
