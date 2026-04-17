@@ -320,6 +320,11 @@
           </div>
         </div>
         <div class="my-stats">
+          <div class="stat-card" style="cursor:pointer;position:relative;" onclick="toggleNotificationPanel()">
+            <div class="label" data-i18n="notifications">通知</div>
+            <div class="value" id="myUnread">🔔 0</div>
+            <div id="notifBadge" style="display:none;position:absolute;top:8px;right:8px;width:10px;height:10px;background:#ef4444;border-radius:50%;"></div>
+          </div>
           <div class="stat-card">
             <div class="label" data-i18n="walletBalance">钱包余额</div>
             <div class="value" id="myBalance">--</div>
@@ -332,6 +337,15 @@
             <div class="label" data-i18n="servicesBought">购买服务</div>
             <div class="value" id="myTasks">--</div>
           </div>
+        </div>
+
+        <!-- 通知面板 -->
+        <div id="notifPanel" style="display:none;margin-top:12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:12px;padding:16px;max-height:400px;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="color:#a78bfa;font-weight:600;font-size:14px;">📋 通知中心</div>
+            <button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button>
+          </div>
+          <div id="notifList" style="color:#94a3b8;font-size:13px;">暂无通知</div>
         </div>
         <!-- 我的消费记录 -->
         <div class="txs" style="margin-top:16px;">
@@ -1375,6 +1389,10 @@
           const data = await res.json();
           const agent = Object.values(data).find(a => a.addr.toLowerCase() === currentAccount);
           document.getElementById('myBalance').textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
+
+          // 加载通知
+          loadNotifications();
+          setInterval(loadNotifications, 10000); // 10秒轮询
         } catch(e) {
           document.getElementById('myBalance').textContent = '加载失败';
         }
@@ -1645,7 +1663,84 @@
     }
       lucide.createIcons();
     
-	    async function executePayment(serviceId, route) {
+	    // ===== 通知系统 =====
+    let notifPanelOpen = false;
+
+    function toggleNotificationPanel() {
+      notifPanelOpen = !notifPanelOpen;
+      document.getElementById('notifPanel').style.display = notifPanelOpen ? 'block' : 'none';
+      if (notifPanelOpen) loadNotifications();
+    }
+
+    async function loadNotifications() {
+      if (!currentAccount) return;
+      try {
+        const res = await fetch(`/api/notifications?wallet=${currentAccount}`);
+        const data = await res.json();
+        if (!data.ok) return;
+
+        document.getElementById('myUnread').textContent = `🔔 ${data.unread}`;
+        document.getElementById('notifBadge').style.display = data.unread > 0 ? 'block' : 'none';
+
+        const list = document.getElementById('notifList');
+        if (data.notifications.length === 0) {
+          list.innerHTML = '<div style="color:#475569;text-align:center;padding:20px;">暂无通知</div>';
+          return;
+        }
+
+        list.innerHTML = data.notifications.map(n => {
+          const time = new Date(n.createdAt).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+          let icon = '', content = '';
+          if (n.type === 'new_order') {
+            icon = '🛒';
+            content = `新订单：<strong style="color:#a78bfa">${n.serviceName}</strong> — 买家 ${n.buyerWallet?.slice(0,8)}...`;
+          } else if (n.type === 'order_confirmed') {
+            icon = '✅';
+            content = `订单确认：<strong style="color:#34d399">${n.serviceName}</strong> — 卖家 ${n.sellerName || n.sellerWallet?.slice(0,8)}...`;
+          } else if (n.type === 'order_result') {
+            icon = '📦';
+            content = `结果已出：<strong style="color:#34d399">${n.serviceName}</strong> — <a href="#" onclick=\"viewOrderResult('${n.orderId}');return false;\" style=\"color:#8b5cf6;\">查看结果</a>`;
+          }
+          return `<div style="padding:10px 0;border-bottom:1px solid rgba(139,92,246,0.08);${n.read ? 'opacity:0.5' : ''}">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span>${icon}</span>
+              <span>${content}</span>
+              <span style="margin-left:auto;font-size:11px;color:#475569;">${time}</span>
+            </div>
+          </div>`;
+        }).join('');
+      } catch(e) {
+        console.error('通知加载失败', e);
+      }
+    }
+
+    async function markAllRead() {
+      if (!currentAccount) return;
+      try {
+        await fetch('/api/notifications/read-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallet: currentAccount })
+        });
+        loadNotifications();
+      } catch(e) {}
+    }
+
+    async function viewOrderResult(orderId) {
+      try {
+        const res = await fetch(`/api/orders/${orderId}/result`);
+        const data = await res.json();
+        if (data.ok && data.result) {
+          alert(`服务结果：${JSON.stringify(data.result)}`);
+        } else {
+          alert('结果暂未提交，请稍后再试');
+        }
+      } catch(e) {
+        alert('查询失败');
+      }
+    }
+
+    async function executePayment(serviceId, route) {
       if (isPaymentInProgress) {
         showNotice('<i data-lucide="loader" class="icon-inline spin"></i> 上一笔支付正在处理中，请等待完成...');
         return;
