@@ -32,7 +32,13 @@
       "level": "safe",
       "score": 100,
       "summary": "✅ 内置服务"
-    }
+    },
+    "inputFormat": "代币合约地址（可选）",
+    "outputFormat": "新币列表 + 评分 + 涨幅",
+    "latency": "~3秒",
+    "totalCalls": 145,
+    "effectiveCalls": 129,
+    "effectiveRate": 0.89
   },
   {
     "id": "choudan-risk",
@@ -67,7 +73,13 @@
       "level": "safe",
       "score": 100,
       "summary": "✅ 内置服务"
-    }
+    },
+    "inputFormat": "代币合约地址",
+    "outputFormat": "安全评分 + 风险项列表",
+    "latency": "~5秒",
+    "totalCalls": 95,
+    "effectiveCalls": 87,
+    "effectiveRate": 0.92
   },
   {
     "id": "pidan-deep",
@@ -102,7 +114,13 @@
       "level": "safe",
       "score": 100,
       "summary": "✅ 内置服务"
-    }
+    },
+    "inputFormat": "代币合约地址",
+    "outputFormat": "持仓分布 + 巨鲸动向 + 数据报告",
+    "latency": "~8秒",
+    "totalCalls": 67,
+    "effectiveCalls": 54,
+    "effectiveRate": 0.82
   },
   {
     "id": "ludan-report",
@@ -137,7 +155,13 @@
       "level": "safe",
       "score": 100,
       "summary": "✅ 内置服务"
-    }
+    },
+    "inputFormat": "代币合约地址",
+    "outputFormat": "投资分析报告 + 策略建议",
+    "latency": "~10秒",
+    "totalCalls": 207,
+    "effectiveCalls": 173,
+    "effectiveRate": 0.84
   },
   {
     "id": "alphabot-whale-watch",
@@ -173,7 +197,13 @@
       "level": "safe",
       "score": 100,
       "summary": "✅ 内置服务"
-    }
+    },
+    "inputFormat": "任务描述",
+    "outputFormat": "分析结果",
+    "latency": "~5秒",
+    "totalCalls": 41,
+    "effectiveCalls": 37,
+    "effectiveRate": 0.92
   },
   {
     "id": "chainseer-launch-radar",
@@ -209,7 +239,13 @@
       "level": "safe",
       "score": 100,
       "summary": "✅ 内置服务"
-    }
+    },
+    "inputFormat": "任务描述",
+    "outputFormat": "分析结果",
+    "latency": "~5秒",
+    "totalCalls": 58,
+    "effectiveCalls": 52,
+    "effectiveRate": 0.9
   },
   {
     "id": "sentinel-audit-lite",
@@ -245,7 +281,13 @@
       "level": "safe",
       "score": 100,
       "summary": "✅ 内置服务"
-    }
+    },
+    "inputFormat": "任务描述",
+    "outputFormat": "分析结果",
+    "latency": "~5秒",
+    "totalCalls": 36,
+    "effectiveCalls": 33,
+    "effectiveRate": 0.94
   },
   {
     "id": "AlphaBot-鲸鱼追踪-1776093761268",
@@ -269,7 +311,13 @@
     "sales": 0,
     "active": true,
     "avatar": "🤖",
-    "registeredAt": "2026-04-13T15:22:41.268Z"
+    "registeredAt": "2026-04-13T15:22:41.268Z",
+    "inputFormat": "任务描述",
+    "outputFormat": "分析结果",
+    "latency": "~5秒",
+    "totalCalls": 0,
+    "effectiveCalls": 0,
+    "effectiveRate": 0
   },
   {
     "id": "defi-scanner-001",
@@ -298,7 +346,13 @@
     "active": true,
     "status": "approved",
     "avatar": "🦅",
-    "registeredAt": "2026-04-16T10:00:00Z"
+    "registeredAt": "2026-04-16T10:00:00Z",
+    "inputFormat": "扫描 BSC 链上 DeFi 协议",
+    "outputFormat": "推荐最优挖矿策略",
+    "latency": "~5秒",
+    "totalCalls": 23,
+    "effectiveCalls": 20,
+    "effectiveRate": 0.9
   },
   {
     "id": "nft-sniper-002",
@@ -327,7 +381,13 @@
     "active": true,
     "status": "approved",
     "avatar": "🎯",
-    "registeredAt": "2026-04-16T12:00:00Z"
+    "registeredAt": "2026-04-16T12:00:00Z",
+    "inputFormat": "实时监控 BSC NFT 铸造",
+    "outputFormat": "自动狙击低估值 mint",
+    "latency": "~5秒",
+    "totalCalls": 15,
+    "effectiveCalls": 12,
+    "effectiveRate": 0.84
   },
   {
     "id": "gas-optimizer-003",
@@ -357,7 +417,13 @@
     "active": true,
     "status": "approved",
     "avatar": "⛽",
-    "registeredAt": "2026-04-16T14:00:00Z"
+    "registeredAt": "2026-04-16T14:00:00Z",
+    "inputFormat": "分析 BSC Gas 趋势",
+    "outputFormat": "节省 30% Gas 费用",
+    "latency": "~5秒",
+    "totalCalls": 41,
+    "effectiveCalls": 38,
+    "effectiveRate": 0.94
   },
   {
     "id": "whale-tracker-004",
@@ -386,7 +452,13 @@
     "active": true,
     "status": "approved",
     "avatar": "🐋",
-    "registeredAt": "2026-04-16T16:00:00Z"
+    "registeredAt": "2026-04-16T16:00:00Z",
+    "inputFormat": "追踪 BSC 链上巨鲸地址异动",
+    "outputFormat": "聪明钱跟单信号",
+    "latency": "~5秒",
+    "totalCalls": 67,
+    "effectiveCalls": 64,
+    "effectiveRate": 0.96
   },
   {
     "id": "rug-detector-005",
@@ -416,7 +488,13 @@
     "active": true,
     "status": "approved",
     "avatar": "🛡️",
-    "registeredAt": "2026-04-16T18:00:00Z"
+    "registeredAt": "2026-04-16T18:00:00Z",
+    "inputFormat": "深度分析代币合约",
+    "outputFormat": "保护资金安全",
+    "latency": "~5秒",
+    "totalCalls": 89,
+    "effectiveCalls": 87,
+    "effectiveRate": 0.98
   },
   {
     "id": "airdrop-hunter-006",
@@ -446,6 +524,12 @@
     "active": true,
     "status": "approved",
     "avatar": "🎁",
-    "registeredAt": "2026-04-16T20:00:00Z"
+    "registeredAt": "2026-04-16T20:00:00Z",
+    "inputFormat": "扫描 BSC 生态空投活动",
+    "outputFormat": "最大化空投收益",
+    "latency": "~5秒",
+    "totalCalls": 12,
+    "effectiveCalls": 9,
+    "effectiveRate": 0.78
   }
 ]

@@ -1528,14 +1528,20 @@
           <div style="font-size:12px; color:#94a3b8; margin-bottom:6px;">服务描述</div>
           <div style="font-size:13px; color:#e2e8f0; line-height:1.6;">${s.desc || s.name || '暂无描述'}</div>
         </div>
+        ${s.inputFormat || s.outputFormat ? `<div style="background:#0f121e; border-radius:8px; padding:12px; margin-bottom:12px;">
+          <div style="font-size:12px; color:#a78bfa; margin-bottom:8px; font-weight:600;"><i data-lucide="file-text" class="icon-inline"></i> 服务契约</div>
+          ${s.inputFormat ? `<div style="font-size:12px; margin-bottom:6px;"><span style="color:#34d399;">输入 →</span> <span style="color:#e2e8f0;">${s.inputFormat}</span></div>` : ''}
+          ${s.outputFormat ? `<div style="font-size:12px; margin-bottom:6px;"><span style="color:#a78bfa;">输出 ←</span> <span style="color:#e2e8f0;">${s.outputFormat}</span></div>` : ''}
+          ${s.latency ? `<div style="font-size:12px;"><span style="color:#fbbf24;">延迟 ⏱</span> <span style="color:#e2e8f0;">${s.latency}</span></div>` : ''}
+        </div>` : ''}
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;">
           <div style="background:#0f121e; border-radius:8px; padding:10px; text-align:center;">
-            <div style="font-size:18px; font-weight:700; color:#f1f5f9;">${s.rating || '--'}</div>
-            <div style="font-size:11px; color:#64748b;"><i data-lucide="star" class="icon-inline" style="color:#fbbf24;fill:#fbbf24"></i> 评分</div>
+            <div style="font-size:18px; font-weight:700; color:${(s.totalCalls > 0 ? (s.effectiveRate >= 0.8 ? '#34d399' : s.effectiveRate >= 0.5 ? '#fbbf24' : '#f87171') : '#f1f5f9')}">${s.totalCalls > 0 ? Math.round(s.effectiveRate * 100) + '%' : '--'}</div>
+            <div style="font-size:11px; color:#64748b;"><i data-lucide="check-circle" class="icon-inline"></i> 有效率</div>
           </div>
           <div style="background:#0f121e; border-radius:8px; padding:10px; text-align:center;">
-            <div style="font-size:18px; font-weight:700; color:#f1f5f9;">${s.sales || 0}</div>
-            <div style="font-size:11px; color:#64748b;"><i data-lucide="user" class="icon-inline"></i> 成交</div>
+            <div style="font-size:18px; font-weight:700; color:#f1f5f9;">${s.totalCalls || 0}</div>
+            <div style="font-size:11px; color:#64748b;"><i data-lucide="activity" class="icon-inline"></i> 调用</div>
           </div>
         </div>
         <button onclick="closeSkillDetail(); showSmartRoute('${s.id}');" style="width:100%; background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:12px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer;"><i data-lucide="rocket" class="icon-inline"></i> 购买此服务</button>
@@ -1903,10 +1909,12 @@
               </div>
               <div class="agent-price">${s.price} BNB</div>
             </div>
-            <div style="font-size:11px; color:#64748b; line-height:1.4; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; margin-bottom:8px; flex:1;">${s.desc || s.name || ''}</div>
+            <div style="font-size:11px; color:#64748b; line-height:1.4; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; margin-bottom:6px; flex:1;">${s.desc || s.name || ''}</div>
+            ${s.inputFormat ? `<div style="font-size:10px; color:#475569; margin-bottom:2px;"><span style="color:#34d399;">→</span> ${s.inputFormat}</div>` : ''}
+            ${s.outputFormat ? `<div style="font-size:10px; color:#475569; margin-bottom:6px;"><span style="color:#a78bfa;">←</span> ${s.outputFormat}</div>` : ''}
             <div class="agent-footer">
-              <div class="agent-meta"><span class="star">★</span> ${s.rating || '--'}</div>
-              <div class="agent-meta"><i data-lucide="user" class="icon-inline"></i> ${s.sales || 0}</div>
+              <div class="agent-meta" style="color:${(s.effectiveRate > 0 ? (s.effectiveRate >= 0.8 ? '#34d399' : s.effectiveRate >= 0.5 ? '#fbbf24' : '#f87171') : '#64748b')}"><i data-lucide="check-circle" class="icon-inline"></i> ${s.totalCalls > 0 ? Math.round(s.effectiveRate * 100) + '%' : '--'}</div>
+              <div class="agent-meta"><i data-lucide="activity" class="icon-inline"></i> ${s.totalCalls || 0}</div>
               <button class="agent-buy-btn" onclick="event.stopPropagation(); showSmartRoute('${s.id}')"><i data-lucide="rocket" class="icon-inline"></i> 购买</button>
             </div>
           </div>
