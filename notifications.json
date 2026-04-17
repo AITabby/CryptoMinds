@@ -13,7 +13,7 @@
   },
   {
     "id": "ntf-1776422134944-h5m0",
-    "read": false,
+    "read": true,
     "createdAt": "2026-04-17T10:35:34.944Z",
     "type": "new_order",
     "targetWallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
@@ -38,7 +38,7 @@
   },
   {
     "id": "ntf-1776421903261-axpl",
-    "read": false,
+    "read": true,
     "createdAt": "2026-04-17T10:31:43.261Z",
     "type": "new_order",
     "targetWallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",

@@ -253,14 +253,14 @@
       <div id="sellerDashboard" style="display:none; margin-bottom:16px;">
         <!-- 顶部: 卖家工作台 + 铃铛订单 -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <h2 style="color:#a78bfa;font-size:18px;">📦 卖家工作台</h2>
+          <h2 style="color:#a78bfa;font-size:18px;"><i data-lucide="briefcase" class="icon-inline"></i> 卖家工作台</h2>
           <div style="display:flex;gap:8px;">
             <div style="cursor:pointer;padding:6px 12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleSellerOrders()">
-              <span style="font-size:14px;">📋</span>
+              <i data-lucide="clipboard-list" class="icon-inline" style="font-size:14px;"></i>
               <span style="color:#a78bfa;font-size:12px;font-weight:600;">收到的订单</span>
             </div>
             <div style="cursor:pointer;position:relative;padding:6px 12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleSellerNotif()">
-              <span style="font-size:14px;">🔔</span>
+              <i data-lucide="bell" class="icon-inline" style="font-size:14px;"></i>
               <span id="sellerUnread" style="color:#a78bfa;font-size:12px;font-weight:600;">0</span>
             </div>
           </div>
@@ -293,7 +293,7 @@
           </div>
           <!-- 右边: 收支记录 -->
           <div style="flex:1;background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;display:flex;flex-direction:column;max-height:300px;">
-            <div style="color:#a78bfa;font-weight:600;font-size:13px;margin-bottom:8px;">💰 收支记录</div>
+            <div style="color:#a78bfa;font-weight:600;font-size:13px;margin-bottom:8px;"><i data-lucide="coins" class="icon-inline"></i> 收支记录</div>
             <div id="sellerTxList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div>
           </div>
         </div>
@@ -301,7 +301,7 @@
 
       <!-- 审核中页面（替代入驻指南） -->
       <div id="pendingReviewPage" style="display:none; background:linear-gradient(135deg,#1e1b4b,#312e81); border:2px solid rgba(139,92,246,0.4); border-radius:20px; padding:48px; text-align:center; margin-bottom:16px;">
-        <div style="font-size:64px; margin-bottom:20px;">🎉</div>
+        <div style="font-size:64px; margin-bottom:20px;"><i data-lucide="sparkles" style="width:64px;height:64px;color:#a78bfa;"></i></div>
         <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;">入驻申请已提交</h2>
         <p style="color:#94a3b8; font-size:15px; margin-bottom:24px; line-height:1.6;">
           押金已缴纳成功！<br>
@@ -309,7 +309,7 @@
         </p>
         <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:16px; margin-bottom:24px;">
           <div id="pendingServiceName" style="color:#e2e8f0; font-size:14px; margin-bottom:8px;">服务名称: --</div>
-          <div style="color:#10b981; font-size:14px; font-weight:600;">✅ 待审核</div>
+          <div style="color:#10b981; font-size:14px; font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> 待审核</div>
           <div style="color:#64748b; font-size:12px; margin-top:4px;">预计 1-3 个工作日</div>
         </div>
         <p style="color:#64748b; font-size:13px; margin-top:16px;">
@@ -405,11 +405,11 @@
             </div>
           </div>
           <div style="cursor:pointer;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;margin-left:auto;" onclick="toggleMyOrders()">
-            <span style="font-size:16px;">📋</span>
+            <i data-lucide="clipboard-list" class="icon-inline" style="font-size:16px;"></i>
             <span style="color:#a78bfa;font-size:13px;font-weight:600;" data-i18n="myOrders">我的订单</span>
           </div>
           <div style="cursor:pointer;position:relative;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleNotificationPanel()">
-            <span style="font-size:16px;">🔔</span>
+            <i data-lucide="bell" class="icon-inline" style="font-size:16px;"></i>
             <span id="myUnread" style="color:#a78bfa;font-size:13px;font-weight:600;">0</span>
             <div id="notifBadge" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;"></div>
           </div>
@@ -631,7 +631,7 @@
           <div style="color:#64748b; font-size:11px; margin-bottom:10px;">声明你的服务接收什么、返回什么，买家 Agent 依此判断是否匹配需求</div>
           
           <div style="background:#161b2e; border:1px solid rgba(52,211,153,0.2); border-radius:8px; padding:12px; margin-bottom:12px;">
-            <div style="color:#34d399; font-size:11px; font-weight:600; margin-bottom:6px;">📋 服务流程</div>
+            <div style="color:#34d399; font-size:11px; font-weight:600; margin-bottom:6px;"><i data-lucide="clipboard-list" class="icon-inline"></i> 服务流程</div>
             <div style="color:#94a3b8; font-size:11px; line-height:1.8;">
               <div>1. 买家付款 → 服务提供方 Agent 执行任务</div>
               <div>2. 买家发送 <span style="color:#34d399; font-family:'SF Mono',monospace;">{输入参数}</span></div>
@@ -769,16 +769,16 @@
                 <span style="color:#a78bfa;font-weight:600;font-size:16px;">${s.expert}</span>
                 <span style="color:#64748b;margin:0 6px;">→</span>
                 <span style="color:#e2e8f0;font-size:15px;">${s.name}</span>
-                <span style="color:#059669;font-size:12px;margin-left:8px;">✅ 已上架</span>
+                <span style="color:#059669;font-size:12px;margin-left:8px;"><i data-lucide="check-circle" class="icon-inline"></i> 已上架</span>
               </div>
-              <button onclick="deregisterService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🚪 退出市场</button>
+              <button onclick="deregisterService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;"><i data-lucide="door-open" class="icon-inline"></i> 退出市场</button>
             </div>
             <div style="color:#94a3b8;font-size:13px;margin-bottom:8px;">${s.desc || ''}</div>
             <div style="display:flex;gap:16px;font-size:12px;color:#64748b;">
-              <span>💰 ${s.price} BNB</span>
-              <span>📥 ${s.inputFormat}</span>
-              <span>📤 ${s.outputFormat}</span>
-              <span>📊 有效率 ${s.effectiveRate}%</span>
+              <span><i data-lucide="coins" class="icon-inline"></i> ${s.price} BNB</span>
+              <span><i data-lucide="download" class="icon-inline"></i> ${s.inputFormat}</span>
+              <span><i data-lucide="upload" class="icon-inline"></i> ${s.outputFormat}</span>
+              <span><i data-lucide="bar-chart-2" class="icon-inline"></i> 有效率 ${s.effectiveRate}%</span>
             </div>
           `;
 
@@ -799,7 +799,7 @@
       modal.id = 'deregisterModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="font-size:48px;margin-bottom:16px;">🚪</div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出市场？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:24px;line-height:1.6;">退出后服务将下架，押金退还由质押方处理。<br>可随时重新入驻（需重新质押）。</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('deregisterModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doDeregister('${id}')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出市场？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:24px;line-height:1.6;">退出后服务将下架，押金退还由质押方处理。<br>可随时重新入驻（需重新质押）。</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('deregisterModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doDeregister('${id}')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
       document.body.appendChild(modal);
     }
 
@@ -1794,7 +1794,7 @@
           <div style="font-size:12px; color:#a78bfa; margin-bottom:8px; font-weight:600;"><i data-lucide="file-text" class="icon-inline"></i> 服务契约</div>
           ${s.inputFormat ? `<div style="font-size:12px; margin-bottom:6px;"><span style="color:#34d399;">输入 →</span> <span style="color:#e2e8f0;">${s.inputFormat}</span></div>` : ''}
           ${s.outputFormat ? `<div style="font-size:12px; margin-bottom:6px;"><span style="color:#a78bfa;">输出 ←</span> <span style="color:#e2e8f0;">${s.outputFormat}</span></div>` : ''}
-          ${s.latency ? `<div style="font-size:12px;"><span style="color:#fbbf24;">延迟 ⏱</span> <span style="color:#e2e8f0;">${s.latency}</span></div>` : ''}
+          ${s.latency ? `<div style="font-size:12px;"><span style="color:#fbbf24;"><i data-lucide="timer" class="icon-inline"></i> 延迟</span> <span style="color:#e2e8f0;">${s.latency}</span></div>` : ''}
         </div>` : ''}
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;">
           <div style="background:#0f121e; border-radius:8px; padding:10px; text-align:center;">
@@ -1891,7 +1891,7 @@
       modal.id = 'notifModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) { notifPanelOpen = false; modal.remove(); } };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;">🔔 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="notifPanelOpen=false;document.getElementById('notifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="notifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="notifPanelOpen=false;document.getElementById('notifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="notifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
       document.body.appendChild(modal);
       loadNotifications();
     }
@@ -1911,7 +1911,7 @@
       modal.onclick = (e) => { if (e.target === modal) { myOrdersOpen = false; modal.remove(); } };
       modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <div style="color:#a78bfa;font-weight:600;font-size:16px;">📋 我的订单</div>
+          <div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的订单</div>
           <button onclick="myOrdersOpen=false;document.getElementById('myOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
         </div>
         <div id="myOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div>
@@ -1936,10 +1936,10 @@
         list.innerHTML = data.orders.map(o => {
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let statusText = '', statusColor = '';
-          if (o.status === 'pending') { statusText = '⏳ 等待确认'; statusColor = '#fbbf24'; }
-          else if (o.status === 'confirmed' || o.status === 'demo-completed') { statusText = '🔄 已确认'; statusColor = '#60a5fa'; }
-          else if (o.status === 'delivered') { statusText = '✅ 已交付'; statusColor = '#34d399'; }
-          else if (o.status === 'completed') { statusText = '✅ 已完成'; statusColor = '#34d399'; }
+          if (o.status === 'pending') { statusText = '<i data-lucide="clock" class="icon-inline"></i> 等待确认'; statusColor = '#fbbf24'; }
+          else if (o.status === 'confirmed' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 已确认'; statusColor = '#60a5fa'; }
+          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已交付'; statusColor = '#34d399'; }
+          else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
           else { statusText = o.status; statusColor = '#94a3b8'; }
 
           const hasResult = o.result || o.report;
@@ -1970,7 +1970,7 @@
         modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
         modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:32px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div style="color:#a78bfa;font-size:16px;font-weight:600;">📦 服务结果</div>
+            <div style="color:#a78bfa;font-size:16px;font-weight:600;"><i data-lucide="package" class="icon-inline"></i> 服务结果</div>
             <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
           </div>
           <div style="color:#e2e8f0;font-size:13px;white-space:pre-wrap;line-height:1.6;">${typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2)}</div>
@@ -1999,13 +1999,13 @@
           const time = new Date(n.createdAt).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let icon = '', content = '';
           if (n.type === 'new_order') {
-            icon = '🛒';
+            icon = 'shopping-cart';
             content = `新订单：<strong style="color:#a78bfa">${n.serviceName}</strong> — 买家 ${n.buyerWallet?.slice(0,8)}...`;
           } else if (n.type === 'order_confirmed') {
-            icon = '✅';
+            icon = 'check-circle';
             content = `订单确认：<strong style="color:#34d399">${n.serviceName}</strong> — 卖家 ${n.sellerName || n.sellerWallet?.slice(0,8)}...`;
           } else if (n.type === 'order_result') {
-            icon = '📦';
+            icon = 'package';
             content = `结果已出：<strong style="color:#34d399">${n.serviceName}</strong> — <a href="#" onclick=\"viewOrderResult('${n.orderId}');return false;\" style=\"color:#8b5cf6;\">查看结果</a>`;
           }
           return `<div style="padding:10px 0;border-bottom:1px solid rgba(139,92,246,0.08);${n.read ? 'opacity:0.5' : ''}">
@@ -2032,7 +2032,7 @@
           return;
         }
         if (data.pending.length === 0) {
-          document.getElementById('pendingList').innerHTML = '<div style="color:#475569;text-align:center;padding:20px;">✅ 暂无待审核服务</div>';
+          document.getElementById('pendingList').innerHTML = '<div style="color:#475569;text-align:center;padding:20px;"><i data-lucide="check-circle" class="icon-inline"></i> 暂无待审核服务</div>';
           return;
         }
         document.getElementById('pendingList').innerHTML = data.pending.map(s => {
@@ -2048,15 +2048,15 @@
             </div>
             <div style="color:#94a3b8;font-size:12px;margin-bottom:8px;">${s.desc || '无描述'}</div>
             <div style="display:flex;gap:16px;font-size:12px;color:#64748b;margin-bottom:12px;">
-              <span>💰 ${s.price} BNB</span>
-              <span>📥 ${s.inputFormat}</span>
-              <span>📤 ${s.outputFormat}</span>
-              <span>⏱ ${s.latency || '-'}</span>
+              <span><i data-lucide="coins" class="icon-inline"></i> ${s.price} BNB</span>
+              <span><i data-lucide="download" class="icon-inline"></i> ${s.inputFormat}</span>
+              <span><i data-lucide="upload" class="icon-inline"></i> ${s.outputFormat}</span>
+              <span><i data-lucide="timer" class="icon-inline"></i> ${s.latency || '-'}</span>
             </div>
             <div style="color:#475569;font-size:11px;margin-bottom:10px;">钱包: ${s.wallet}</div>
             <div style="display:flex;gap:8px;">
-              <button onclick="approveService('${s.id}')" style="background:#059669;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✅ 通过</button>
-              <button onclick="rejectService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">❌ 拒绝</button>
+              <button onclick="approveService('${s.id}')" style="background:#059669;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> 通过</button>
+              <button onclick="rejectService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;"><i data-lucide="x-circle" class="icon-inline"></i> 拒绝</button>
             </div>
           </div>`;
         }).join('');
@@ -2115,7 +2115,7 @@
       modal.id = 'sellerOrdersModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) { sellerOrdersOpen = false; modal.remove(); } };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:600px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;">📦 收到的订单</div><button onclick="sellerOrdersOpen=false;document.getElementById('sellerOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div><div id="sellerOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:600px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="package" class="icon-inline"></i> 收到的订单</div><button onclick="sellerOrdersOpen=false;document.getElementById('sellerOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div><div id="sellerOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
       document.body.appendChild(modal);
       loadSellerOrders();
     }
@@ -2132,7 +2132,7 @@
       modal.id = 'sellerNotifModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) { sellerNotifOpen = false; modal.remove(); } };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;">🔔 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="sellerNotifOpen=false;document.getElementById('sellerNotifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="sellerNotifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="sellerNotifOpen=false;document.getElementById('sellerNotifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="sellerNotifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
       document.body.appendChild(modal);
       loadSellerNotif();
     }
@@ -2152,9 +2152,9 @@
         list.innerHTML = data.orders.map(o => {
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let statusText = '', statusColor = '';
-          if (o.status === 'pending' || o.status === 'demo-completed') { statusText = '🔄 待交付'; statusColor = '#fbbf24'; }
-          else if (o.status === 'delivered') { statusText = '✅ 已交付'; statusColor = '#34d399'; }
-          else if (o.status === 'completed') { statusText = '✅ 已完成'; statusColor = '#34d399'; }
+          if (o.status === 'pending' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 待交付'; statusColor = '#fbbf24'; }
+          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已交付'; statusColor = '#34d399'; }
+          else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
           else { statusText = o.status; statusColor = '#94a3b8'; }
           const needDeliver = (o.status === 'pending' || o.status === 'demo-completed' || o.status === 'confirmed') && !o.result;
           return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
@@ -2180,7 +2180,7 @@
       const modal = document.createElement('div');
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100000;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:500px;max-width:90vw;"><div style="color:#a78bfa;font-weight:600;font-size:16px;margin-bottom:16px;">📦 提交服务结果</div><textarea id="deliverOutput" rows="8" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;resize:vertical;" placeholder="输入服务执行结果..."></textarea><div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;"><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:8px;padding:8px 20px;cursor:pointer;">取消</button><button onclick="submitDeliverResult('${orderId}')" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-weight:600;">提交</button></div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:500px;max-width:90vw;"><div style="color:#a78bfa;font-weight:600;font-size:16px;margin-bottom:16px;"><i data-lucide="package" class="icon-inline"></i> 提交服务结果</div><textarea id="deliverOutput" rows="8" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;resize:vertical;" placeholder="输入服务执行结果..."></textarea><div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;"><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:8px;padding:8px 20px;cursor:pointer;">取消</button><button onclick="submitDeliverResult('${orderId}')" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-weight:600;">提交</button></div></div>`;
       document.body.appendChild(modal);
     }
 
@@ -2223,11 +2223,11 @@
           const time = new Date(n.createdAt).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let icon = '', content = '';
           if (n.type === 'new_order') {
-            icon = '🛒'; content = `新订单：<strong style="color:#a78bfa">${n.serviceName}</strong> — 买家 ${n.buyerName || n.buyerWallet?.slice(0,8)+'...'}`;
+            icon = 'shopping-cart'; content = `新订单：<strong style="color:#a78bfa">${n.serviceName}</strong> — 买家 ${n.buyerName || n.buyerWallet?.slice(0,8)+'...'}`;
           } else if (n.type === 'order_confirmed') {
-            icon = '✅'; content = `订单确认：<strong style="color:#34d399">${n.serviceName}</strong>`;
+            icon = 'check-circle'; content = `订单确认：<strong style="color:#34d399">${n.serviceName}</strong>`;
           } else if (n.type === 'order_result') {
-            icon = '📦'; content = `结果已出：<strong style="color:#34d399">${n.serviceName}</strong>`;
+            icon = 'package'; content = `结果已出：<strong style="color:#34d399">${n.serviceName}</strong>`;
           }
           return `<div style="padding:10px 0;border-bottom:1px solid rgba(139,92,246,0.08);${n.read ? 'opacity:0.5' : ''}"><div style="display:flex;align-items:center;gap:8px;"><span>${icon}</span><span>${content}</span><span style="margin-left:auto;font-size:11px;color:#475569;">${time}</span></div></div>`;
         }).join('');
@@ -2343,9 +2343,9 @@
 	            }))
 	          ]);
 	          if (!walletIsDemo && window.ethereum) {
-	            showNotice(`🧪 ${routeLabel} 当前仍走 Demo 订单，但会校验所选路由并记录下来`);
+	            showNotice(`<i data-lucide="flask-conical" class="icon-inline"></i> ${routeLabel} 当前仍走 Demo 订单，但会校验所选路由并记录下来`);
 	          } else {
-	            showNotice(`🧪 当前为 Demo 支付，将记录已选择的 ${routeLabel} 路由`);
+	            showNotice(`<i data-lucide="flask-conical" class="icon-inline"></i> 当前为 Demo 支付，将记录已选择的 ${routeLabel} 路由`);
 	          }
 	          const response = await fetch('/api/services/buy', {
 	            method: 'POST',
@@ -2412,7 +2412,7 @@
       modal.id = 'exitExpertModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="font-size:48px;margin-bottom:16px;">🚪</div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:16px;line-height:1.6;">退出后押金将退还，服务将下架。</div><input id="exitExpertName" placeholder="输入专家名确认" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px;color:#e2e8f0;font-size:13px;margin-bottom:20px;outline:none;" /><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('exitExpertModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doExitExpert()" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:16px;line-height:1.6;">退出后押金将退还，服务将下架。</div><input id="exitExpertName" placeholder="输入专家名确认" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px;color:#e2e8f0;font-size:13px;margin-bottom:20px;outline:none;" /><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('exitExpertModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doExitExpert()" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
       document.body.appendChild(modal);
     }
 
@@ -2621,14 +2621,14 @@ async function confirmDepositModal() {
     }
     
     status.style.color = '#34d399';
-    status.innerHTML = `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;">✅ 押金已缴纳！查看交易</a><br><br><button onclick="goToPendingPage()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">完成</button>`;
+    status.innerHTML = `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;"><i data-lucide="check-circle" class="icon-inline"></i> 押金已缴纳！查看交易</a><br><br><button onclick="goToPendingPage()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">完成</button>`;
     
     // 3秒后自动跳转
     setTimeout(goToPendingPage, 3000);
     
   } catch(e) {
     status.style.color = '#f87171';
-    status.textContent = '❌ ' + (e.message || '交易被取消');
+    status.textContent = '<i data-lucide="x-circle" class="icon-inline"></i> ' + (e.message || '交易被取消');
     btn.disabled = false;
     btn.textContent = '缴纳押金';
     btn.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
@@ -3557,14 +3557,14 @@ async function confirmDepositModal() {
   <!-- 等待审核弹窗 -->
   <div id="pendingReviewModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.9); z-index:99999; justify-content:center; align-items:center;">
     <div style="background:linear-gradient(135deg,#1e1b4b,#312e81); border:2px solid rgba(139,92,246,0.4); border-radius:20px; padding:48px; max-width:450px; width:90%; text-align:center;">
-      <div style="font-size:64px; margin-bottom:20px;">🎉</div>
+      <div style="font-size:64px; margin-bottom:20px;"><i data-lucide="sparkles" style="width:64px;height:64px;color:#a78bfa;"></i></div>
       <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;">入驻申请已提交</h2>
       <p style="color:#94a3b8; font-size:15px; margin-bottom:24px; line-height:1.6;">
         押金已缴纳成功！<br>
         服务正在审核中，管理员审核通过后将自动上架。
       </p>
       <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:16px; margin-bottom:24px;">
-        <div style="color:#10b981; font-size:14px; font-weight:600;">✅ 待审核</div>
+        <div style="color:#10b981; font-size:14px; font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> 待审核</div>
         <div style="color:#64748b; font-size:12px; margin-top:4px;">预计 1-3 个工作日</div>
       </div>
       <button onclick="closePendingReviewModal()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:14px 40px; border-radius:10px; font-weight:600; font-size:15px; cursor:pointer;">
