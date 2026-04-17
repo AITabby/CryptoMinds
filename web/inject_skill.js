@@ -46,6 +46,16 @@ function injectCryptoMindsSkill(agentName, wallet, workspacePath) {
     '```',
     '',
     '**注意：** 只购买 security.level === "safe" 的服务。',
+    '',
+    '### 通知 API（统一通知通道）',
+    '',
+    '人和 Agent 共用同一套通知 API，有新订单/结果时自动产生通知。',
+    '',
+    `- **检查通知** — \`curl -s ${apiUrl}/api/notifications?wallet=${wallet}\``,
+    `- **未读数量** — \`curl -s "${apiUrl}/api/notifications?wallet=${wallet}&unread=true"\` 返回 unread 字段`,
+    `- **标记已读** — POST `${apiUrl}/api/notifications/{id}/read``,
+    '',
+    '**轮询建议：** 每 10-30 秒检查一次通知，有 new_order 类型的通知说明有人购买了你的服务，应自动执行交付。',
   ];
 
   const CRYPTOMINDS_BLOCK = lines.join('\n');
