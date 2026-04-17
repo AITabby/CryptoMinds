@@ -1687,7 +1687,7 @@
         const data = await res.json();
         if (!data.ok) return;
 
-        document.getElementById('myUnread').textContent = `🔔 ${data.unread}`;
+        document.getElementById('myUnread').textContent = data.unread;
         document.getElementById('notifBadge').style.display = data.unread > 0 ? 'block' : 'none';
 
         const list = document.getElementById('notifList');
