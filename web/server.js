@@ -1935,6 +1935,15 @@ app.get('/api/purchases', (req, res) => {
   res.json(getPurchases());
 });
 
+// 买家查询自己的订单
+app.get('/api/my-orders', (req, res) => {
+  const wallet = (req.query.wallet || '').trim().toLowerCase();
+  if (!wallet) return res.json({ ok: false, error: '缺少 wallet' });
+  const purchases = getPurchases();
+  const mine = purchases.filter(p => p.buyerWallet?.toLowerCase() === wallet);
+  res.json({ ok: true, total: mine.length, orders: mine });
+});
+
 app.get('/api/txs', (req, res) => {
   res.json(getTxs());
 });

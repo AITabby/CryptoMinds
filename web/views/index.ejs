@@ -354,6 +354,10 @@
             <span id="myUnread" style="color:#a78bfa;font-size:13px;font-weight:600;">0</span>
             <div id="notifBadge" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;"></div>
           </div>
+          <div style="cursor:pointer;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleMyOrders()">
+            <span style="font-size:16px;">📋</span>
+            <span style="color:#a78bfa;font-size:13px;font-weight:600;" data-i18n="myOrders">我的订单</span>
+          </div>
         </div>
         <div class="my-stats">
           <div class="stat-card">
@@ -381,6 +385,15 @@
             <button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button>
           </div>
           <div id="notifList" style="color:#94a3b8;font-size:13px;">暂无通知</div>
+        </div>
+
+        <!-- 我的订单面板 -->
+        <div id="myOrdersPanel" style="display:none;margin-top:12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:12px;padding:16px;max-height:500px;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="color:#a78bfa;font-weight:600;font-size:14px;">📋 我的订单</div>
+            <button onclick="toggleMyOrders()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">关闭</button>
+          </div>
+          <div id="myOrdersList" style="color:#94a3b8;font-size:13px;">暂无订单</div>
         </div>
         <!-- 我的消费记录 -->
         <div class="txs" style="margin-top:16px;">
@@ -1816,6 +1829,72 @@
       notifPanelOpen = !notifPanelOpen;
       document.getElementById('notifPanel').style.display = notifPanelOpen ? 'block' : 'none';
       if (notifPanelOpen) loadNotifications();
+    }
+
+    let myOrdersOpen = false;
+    function toggleMyOrders() {
+      myOrdersOpen = !myOrdersOpen;
+      document.getElementById('myOrdersPanel').style.display = myOrdersOpen ? 'block' : 'none';
+      if (myOrdersOpen) loadMyOrders();
+    }
+
+    async function loadMyOrders() {
+      if (!currentAccount) return;
+      try {
+        const res = await fetch(`/api/my-orders?wallet=${currentAccount}`);
+        const data = await res.json();
+        if (!data.ok) return;
+
+        const list = document.getElementById('myOrdersList');
+        if (data.orders.length === 0) {
+          list.innerHTML = '<div style="color:#475569;text-align:center;padding:20px;">暂无订单</div>';
+          return;
+        }
+
+        list.innerHTML = data.orders.map(o => {
+          const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+          let statusText = '', statusColor = '';
+          if (o.status === 'pending') { statusText = '⏳ 等待确认'; statusColor = '#fbbf24'; }
+          else if (o.status === 'confirmed' || o.status === 'demo-completed') { statusText = '🔄 已确认'; statusColor = '#60a5fa'; }
+          else if (o.status === 'delivered') { statusText = '✅ 已交付'; statusColor = '#34d399'; }
+          else if (o.status === 'completed') { statusText = '✅ 已完成'; statusColor = '#34d399'; }
+          else { statusText = o.status; statusColor = '#94a3b8'; }
+
+          const hasResult = o.result || o.report;
+          return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="color:#e2e8f0;font-weight:600;">${o.serviceName || '服务'}</div>
+                <div style="color:#64748b;font-size:11px;margin-top:4px;">卖家: ${o.expert || '未知'} | ${time}</div>
+                <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="color:${statusColor};font-size:12px;font-weight:600;">${statusText}</div>
+                ${hasResult ? `<button onclick="viewOrderResult('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">查看结果</button>` : ''}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      } catch(e) {
+        console.error('订单加载失败', e);
+      }
+    }
+
+    function viewOrderResult(orderId) {
+      fetch(`/api/orders/${orderId}/result`).then(r => r.json()).then(data => {
+        if (!data.ok || !data.result) { alert('结果暂不可用'); return; }
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;justify-content:center;align-items:center;';
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:32px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div style="color:#a78bfa;font-size:16px;font-weight:600;">📦 服务结果</div>
+            <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
+          </div>
+          <div style="color:#e2e8f0;font-size:13px;white-space:pre-wrap;line-height:1.6;">${typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2)}</div>
+        </div>`;
+        document.body.appendChild(modal);
+      });
     }
 
     async function loadNotifications() {
