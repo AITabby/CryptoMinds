@@ -1175,7 +1175,7 @@ app.get('/api/purchases/pending', (req, res) => {
   res.json({ ok: true, count: pending.length, purchases: pending });
 });
 
-// 专家退出（退还押金）
+// 专家退出（标记退出，退款由质押方处理）
 app.post('/api/experts/exit', (req, res) => {
   const { expert, serviceId } = req.body;
   if (!expert) return res.json({ ok: false, error: '缺少专家名' });
@@ -1191,19 +1191,30 @@ app.post('/api/experts/exit', (req, res) => {
   if (pending.length > 0) return res.json({ ok: false, error: `有 ${pending.length} 笔订单未完成，无法退出` });
 
   svc.active = false;
+  svc.status = 'deregistered';
   svc.exitedAt = new Date().toISOString();
-  svc.refunded = true;
+  svc.refundStatus = 'pending'; // 待质押方退款
   services[idx] = svc;
   saveServices(services);
 
-  // 记录退还交易
-  addTx({
-    time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
-    from: '押金池', to: expert, amount: svc.deposit || 0.001,
-    reason: `退出退还押金`, tx: `exit-${svc.id}`
-  });
+  res.json({ ok: true, message: '已退出，押金退还由质押方处理', service: svc });
+});
 
-  res.json({ ok: true, message: `已退出，退还押金 ${(svc.deposit || 0.001)} BNB`, service: svc });
+// 质押方退款回调（Four.meme 或合约调用）
+app.post('/api/refund/callback', (req, res) => {
+  const { serviceId, txHash } = req.body;
+  if (!serviceId) return res.json({ ok: false, error: '缺少 serviceId' });
+  const services = getServices();
+  const svc = services.find(s => s.id === serviceId);
+  if (!svc) return res.json({ ok: false, error: '服务不存在' });
+  if (svc.refundStatus !== 'pending') return res.json({ ok: false, error: '该服务不在待退款状态' });
+
+  svc.refundStatus = 'refunded';
+  svc.refundedAt = new Date().toISOString();
+  svc.refundTx = txHash || '';
+  saveServices(services);
+
+  res.json({ ok: true, message: '退款确认成功' });
 });
 
 // 管理员审核服务
