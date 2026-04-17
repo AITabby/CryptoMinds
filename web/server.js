@@ -980,6 +980,7 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
   const inputFmt = sanitizeText(inputFormat, 120);
   const outputFmt = sanitizeText(outputFormat, 120);
   const latencyEst = sanitizeText(latency, 30);
+  const initialStatus = req.body.status === 'pending_deposit' ? 'pending_deposit' : null;
 
   if (!expertName || !normalizedWallet || !skillName || parsedPrice === null || parsedDeposit === null) {
     console.log('Validation failed:', { expertName, normalizedWallet, skillName, parsedPrice, parsedDeposit, rawPrice: price, rawDeposit: deposit });
@@ -992,8 +993,8 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
     return res.json({ ok: false, error: 'wallet 地址格式无效' });
   }
   // 服务契约（不再上传文件）
-  // 验证押金交易（非零地址时需要链上验证）
-  if (DEPOSIT_POOL_ADDRESS !== '0x0000000000000000000000000000000000000000') {
+  // 验证押金交易（非零地址时需要链上验证，pending_deposit 状态跳过验证）
+  if (!initialStatus && DEPOSIT_POOL_ADDRESS !== '0x0000000000000000000000000000000000000000') {
     if (!isChainTxHash(depositTxHash)) {
       return res.json({ ok: false, error: '缺少链上押金交易哈希，请先通过MetaMask缴纳押金' });
     }
@@ -1039,14 +1040,50 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
     security: { level: 'safe', score: 100, summary: '✅ 服务契约模式' },
     totalCalls: 0, effectiveCalls: 0, effectiveRate: 0,
     rating: 0, sales: 0, active: true,
-    status: 'pending',
+    status: initialStatus || 'pending',
     avatar: '🤖',
     registeredAt: new Date().toISOString()
   };
   services.push(newService);
   saveServices(services);
-  addTx({ time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}), from: expertName, to: '押金池', amount: parsedDeposit, reason: `入驻: ${skillName}`, tx: `reg-${id}` });
-  res.json({ ok: true, service: newService });
+  if (!initialStatus) {
+    addTx({ time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}), from: expertName, to: '押金池', amount: parsedDeposit, reason: `入驻: ${skillName}`, tx: `reg-${id}` });
+  }
+  res.json({ ok: true, service: newService, serviceId: id });
+});
+
+// 更新服务押金状态（缴纳押金后调用）
+app.post('/api/services/:id/deposit', async (req, res) => {
+  const { id } = req.params;
+  const { txHash, wallet } = req.body;
+  
+  const services = getServices();
+  const svc = services.find(s => s.id === id);
+  if (!svc) return res.json({ ok: false, error: '服务不存在' });
+  if (svc.status !== 'pending_deposit') return res.json({ ok: false, error: '服务状态不正确' });
+  
+  // 验证押金交易
+  try {
+    const tx = await w3.eth.getTransaction(txHash);
+    if (!tx) return res.json({ ok: false, error: '交易未找到' });
+    if (tx.to && tx.to.toLowerCase() !== DEPOSIT_POOL_ADDRESS.toLowerCase()) {
+      return res.json({ ok: false, error: '押金未发送到正确地址' });
+    }
+    const depositAmount = parseFloat(w3.utils.fromWei(tx.value, 'ether'));
+    if (depositAmount < 0.001) {
+      return res.json({ ok: false, error: '押金金额不足' });
+    }
+    
+    svc.status = 'pending'; // 更新为待审核
+    svc.depositTx = txHash;
+    svc.wallet = tx.from.toLowerCase(); // 用实际付款钱包
+    saveServices(services);
+    
+    addTx({ time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}), from: svc.expert, to: '押金池', amount: depositAmount, reason: `入驻: ${svc.name}`, tx: txHash });
+    res.json({ ok: true });
+  } catch(e) {
+    res.json({ ok: false, error: '交易验证失败: ' + e.message });
+  }
 });
 
 // 确认购买（待确认订单 → 完成）
