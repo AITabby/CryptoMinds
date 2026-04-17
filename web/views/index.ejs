@@ -387,8 +387,16 @@
         </div>
       </div>
 
-      <!-- Right: Recent Transactions Panel -->
+      <!-- Right: Pending Purchases + Transactions Panel -->
       <div style="display:flex; flex-direction:column; min-height:0;">
+        <!-- 待确认订单 -->
+        <div id="pendingConfirmSection" style="display:none; flex-shrink:0; background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.2); border-radius:10px; padding:12px; margin-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+            <span style="color:#fbbf24; font-weight:600; font-size:13px;"><i data-lucide="clock" class="icon-inline"></i> 待确认订单</span>
+            <span id="pendingCount" style="background:#fbbf24; color:#000; border-radius:10px; padding:1px 8px; font-size:11px; font-weight:700;">0</span>
+          </div>
+          <div id="pendingList" style="max-height:160px; overflow-y:auto;"></div>
+        </div>
         <div class="section-header" style="flex-shrink:0;">
           <div class="section-title"><span class="icon"><i data-lucide="clipboard-list" class="icon-md"></i></span> Recent Transactions</div>
         </div>
@@ -2095,7 +2103,57 @@
       }
       // 刷新 metrics 和市场数据
       reloadMarket();
+      loadPendingPurchases();
     }, 15000);
+
+    // 加载待确认订单
+    async function loadPendingPurchases() {
+      try {
+        const res = await fetch('/api/purchases/pending');
+        const data = await res.json();
+        const section = document.getElementById('pendingConfirmSection');
+        const list = document.getElementById('pendingList');
+        const count = document.getElementById('pendingCount');
+        if (!data.ok || data.count === 0) {
+          section.style.display = 'none';
+          return;
+        }
+        section.style.display = 'block';
+        count.textContent = data.count;
+        list.innerHTML = data.purchases.map(p => {
+          return `<div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(251,191,36,0.1);">
+            <div style="flex:1; min-width:0;">
+              <div style="color:#e2e8f0; font-size:12px; font-weight:600;">${p.buyerName || p.buyerWallet.slice(0,10)+'...'} → ${p.expert}</div>
+              <div style="color:#94a3b8; font-size:11px;">${p.serviceName} · ${p.price} BNB</div>
+            </div>
+            <button onclick="confirmPurchase('${p.id}')" style="background:rgba(52,211,153,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.3); border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer;">确认</button>
+            <button onclick="rejectPurchase('${p.id}')" style="background:rgba(248,113,113,0.2); color:#f87171; border:1px solid rgba(248,113,113,0.3); border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer;">拒绝</button>
+          </div>`;
+        }).join('');
+        lucide.createIcons();
+      } catch(e) { console.error('loadPendingPurchases error', e); }
+    }
+
+    async function confirmPurchase(purchaseId) {
+      try {
+        const res = await fetch('/api/purchases/confirm/' + purchaseId, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) { showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 购买已确认'); loadPendingPurchases(); reloadMarket(); }
+        else { showError(data.error); }
+      } catch(e) { showError('确认失败: ' + e.message); }
+    }
+
+    async function rejectPurchase(purchaseId) {
+      try {
+        const res = await fetch('/api/purchases/reject/' + purchaseId, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) { showNotice('<i data-lucide="x-circle" class="icon-inline"></i> 购买已拒绝'); loadPendingPurchases(); }
+        else { showError(data.error); }
+      } catch(e) { showError('拒绝失败: ' + e.message); }
+    }
+
+    // 初始加载
+    loadPendingPurchases();
 
     // 初始化metrics
       lucide.createIcons();

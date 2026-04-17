@@ -855,6 +855,60 @@ app.post('/api/experts/register', async (req, res) => {
   res.json({ ok: true, service: newService });
 });
 
+// 确认购买（待确认订单 → 完成）
+app.post('/api/purchases/confirm/:purchaseId', (req, res) => {
+  const purchases = getPurchases();
+  const purchase = purchases.find(p => p.id === req.params.purchaseId);
+  if (!purchase) return res.json({ ok: false, error: '订单不存在' });
+  if (purchase.status !== 'pending_confirm') return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法确认` });
+
+  purchase.status = purchase.payment?.verified ? 'completed' : 'demo-completed';
+  purchase.confirmedAt = new Date().toISOString();
+  savePurchases(purchases);
+
+  const services = getServices();
+  const service = services.find(s => s.id === purchase.serviceId);
+  if (service) {
+    service.sales += 1;
+    saveServices(services);
+  }
+
+  addTx({
+    time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
+    from: purchase.buyerName || '未知',
+    fromWallet: purchase.buyerWallet,
+    to: purchase.expert,
+    amount: purchase.price,
+    reason: `${purchase.serviceName} [确认购买]`,
+    tx: purchase.txHash || purchase.id,
+    verified: purchase.payment?.verified ? '✅ 已验证' : '🧪 模拟',
+    receipt: purchase.id
+  });
+
+  res.json({ ok: true, purchase });
+});
+
+// 拒绝购买（待确认订单 → 取消）
+app.post('/api/purchases/reject/:purchaseId', (req, res) => {
+  const purchases = getPurchases();
+  const purchase = purchases.find(p => p.id === req.params.purchaseId);
+  if (!purchase) return res.json({ ok: false, error: '订单不存在' });
+  if (purchase.status !== 'pending_confirm') return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法拒绝` });
+
+  purchase.status = 'rejected';
+  purchase.rejectedAt = new Date().toISOString();
+  savePurchases(purchases);
+
+  res.json({ ok: true, purchase });
+});
+
+// 获取待确认订单列表
+app.get('/api/purchases/pending', (req, res) => {
+  const purchases = getPurchases();
+  const pending = purchases.filter(p => p.status === 'pending_confirm');
+  res.json({ ok: true, count: pending.length, purchases: pending });
+});
+
 // 专家退出（退还押金）
 app.post('/api/experts/exit', (req, res) => {
   const { expert, serviceId } = req.body;
@@ -1035,6 +1089,7 @@ app.post('/api/services/buy', async (req, res) => {
   generateReport(reportType, normalizedBuyerWallet, service.wallet).then(r => {
     if (r) { purchase.report = r; savePurchases(getPurchases()); }
   }).catch(() => {});
+  const autoConfirm = req.body.autoConfirm === true;
   const purchase = {
     id: `purchase-${Date.now()}`,
     serviceId: normalizedServiceId,
@@ -1044,45 +1099,50 @@ app.post('/api/services/buy', async (req, res) => {
     buyerWallet: normalizedBuyerWallet,
     buyerName: normalizedBuyerName,
     price: service.price,
-    status: payment.verified ? 'completed' : 'demo-completed',
+    status: autoConfirm ? (payment.verified ? 'completed' : 'demo-completed') : 'pending_confirm',
     payment,
     selectedRoute: route,
     report,
     txHash: txHash || '',
-    time: new Date().toISOString()
+    time: new Date().toISOString(),
+    autoConfirm
   };
   addPurchase(purchase);
-  service.sales += 1;
-  saveServices(services);
 
-  // 自动安装服务到买家 Agent（异步，不阻塞）
-  try {
-    const { installSkill } = require('../security/install');
-    const installResult = installSkill({
-      agentWallet: normalizedBuyerWallet,
-      skillId: service.id,
-      skillName: service.name,
-      seller: service.expert,
-      metadata: { price: service.price, frameworks: service.frameworks || [] }
+  if (autoConfirm) {
+    // 自动确认模式：直接完成购买
+    service.sales += 1;
+    saveServices(services);
+    try {
+      const { installSkill } = require('../security/install');
+      const installResult = installSkill({
+        agentWallet: normalizedBuyerWallet,
+        skillId: service.id,
+        skillName: service.name,
+        seller: service.expert,
+        metadata: { price: service.price, frameworks: service.frameworks || [] }
+      });
+      purchase.installed = installResult.ok;
+    } catch (e) {
+      purchase.installed = false;
+    }
+    addTx({
+      time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
+      from: normalizedBuyerName,
+      fromWallet: normalizedBuyerWallet,
+      to: service.expert,
+      amount: service.price,
+      reason: route ? `${service.name} [${route.route_type}/${route.chain}/${route.symbol}]` : service.name,
+      tx: txHash || purchase.id,
+      route_type: route ? `${route.route_type}/${route.chain}/${route.symbol}` : 'direct',
+      verified: payment.verified ? '✅ 已验证' : '🧪 模拟',
+      receipt: purchase.id
     });
-    purchase.installed = installResult.ok;
-  } catch (e) {
-    purchase.installed = false;
+    res.json({ ok: true, purchase, serviceApi: service.api || null });
+  } else {
+    // 待确认模式：等待人工确认
+    res.json({ ok: true, purchase, needConfirm: true, message: '购买请求已提交，等待确认' });
   }
-
-  addTx({
-    time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
-    from: normalizedBuyerName,
-    fromWallet: normalizedBuyerWallet,
-    to: service.expert,
-    amount: service.price,
-    reason: route ? `${service.name} [${route.route_type}/${route.chain}/${route.symbol}]` : service.name,
-    tx: txHash || purchase.id,
-    route_type: route ? `${route.route_type}/${route.chain}/${route.symbol}` : 'direct',
-    verified: payment.verified ? '✅ 已验证' : '🧪 模拟',
-    receipt: purchase.id
-  });
-  res.json({ ok: true, purchase, serviceApi: service.api || null });
 });
 
 // ============================================
