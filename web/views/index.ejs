@@ -587,30 +587,6 @@
         </div>
 
         <!-- 押金缴纳弹窗（独立） -->
-        <div id="depositModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
-          <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.3); border-radius:16px; padding:32px; max-width:400px; width:90%;">
-            <h3 style="color:#a78bfa; font-size:18px; margin-bottom:20px; text-align:center;">
-              <i data-lucide="shield" class="icon-inline"></i> 缴纳押金
-            </h3>
-            <div style="background:#0f121e; border-radius:10px; padding:16px; margin-bottom:20px;">
-              <div style="color:#64748b; font-size:12px; margin-bottom:8px;">押金金额</div>
-              <div style="color:#fbbf24; font-size:24px; font-weight:700; font-family:'SF Mono',monospace;">0.001 BNB</div>
-            </div>
-            <div style="background:#0f121e; border-radius:10px; padding:16px; margin-bottom:20px;">
-              <div style="color:#64748b; font-size:12px; margin-bottom:8px;">押金池地址</div>
-              <div id="depositPoolAddrModal" style="color:#94a3b8; font-size:11px; font-family:'SF Mono',monospace; word-break:break-all;">--</div>
-            </div>
-            <div id="depositStatusModal" style="margin-bottom:16px; font-size:13px; color:#94a3b8; text-align:center;">
-              请通过 MetaMask 缴纳押金完成入驻
-            </div>
-            <button id="depositBtnModal" onclick="confirmDepositModal()" style="width:100%; background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; border:none; padding:14px; border-radius:10px; font-weight:600; font-size:15px; cursor:pointer;">
-              <i data-lucide="wallet" class="icon-inline"></i> 缴纳押金
-            </button>
-            <button onclick="closeDepositModal()" style="width:100%; margin-top:12px; background:rgba(100,116,139,0.2); color:#94a3b8; border:none; padding:10px; border-radius:8px; cursor:pointer; font-size:13px;">
-              取消（稍后缴纳）
-            </button>
-          </div>
-        </div>
 
         <button id="depositBtn" onclick="payDeposit()" disabled style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:8px 20px; border-radius:8px; font-weight:600; font-size:13px; cursor:not-allowed; transition:all 0.2s; margin-right:10px;">请填写完整表单</button>
         <button onclick="closeRegisterModal()" style="background:rgba(100,116,139,0.15); color:#94a3b8; border:1px solid rgba(100,116,139,0.25); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px;" data-i18n="regModalCancel">取消</button>
@@ -3110,5 +3086,31 @@ async function confirmDepositModal() {
       }, 500);
     });
   </script>
+
+  <!-- 押金缴纳弹窗（独立） -->
+        <div id="depositModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
+          <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.3); border-radius:16px; padding:32px; max-width:400px; width:90%;">
+            <h3 style="color:#a78bfa; font-size:18px; margin-bottom:20px; text-align:center;">
+              <i data-lucide="shield" class="icon-inline"></i> 缴纳押金
+            </h3>
+            <div style="background:#0f121e; border-radius:10px; padding:16px; margin-bottom:20px;">
+              <div style="color:#64748b; font-size:12px; margin-bottom:8px;">押金金额</div>
+              <div style="color:#fbbf24; font-size:24px; font-weight:700; font-family:'SF Mono',monospace;">0.001 BNB</div>
+            </div>
+            <div style="background:#0f121e; border-radius:10px; padding:16px; margin-bottom:20px;">
+              <div style="color:#64748b; font-size:12px; margin-bottom:8px;">押金池地址</div>
+              <div id="depositPoolAddrModal" style="color:#94a3b8; font-size:11px; font-family:'SF Mono',monospace; word-break:break-all;">--</div>
+            </div>
+            <div id="depositStatusModal" style="margin-bottom:16px; font-size:13px; color:#94a3b8; text-align:center;">
+              请通过 MetaMask 缴纳押金完成入驻
+            </div>
+            <button id="depositBtnModal" onclick="confirmDepositModal()" style="width:100%; background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; border:none; padding:14px; border-radius:10px; font-weight:600; font-size:15px; cursor:pointer;">
+              <i data-lucide="wallet" class="icon-inline"></i> 缴纳押金
+            </button>
+            <button onclick="closeDepositModal()" style="width:100%; margin-top:12px; background:rgba(100,116,139,0.2); color:#94a3b8; border:none; padding:10px; border-radius:8px; cursor:pointer; font-size:13px;">
+              取消（稍后缴纳）
+            </button>
+          </div>
+        </div>
 </body>
 </html>
