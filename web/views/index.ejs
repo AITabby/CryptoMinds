@@ -53,6 +53,11 @@
     .agent-grid::-webkit-scrollbar-track, .tx-list::-webkit-scrollbar-track { background: #0f121e; border-radius: 3px; margin: 4px; }
     .agent-grid::-webkit-scrollbar-thumb, .tx-list::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.3); border-radius: 3px; border: 2px solid transparent; background-clip: content-box; }
     .agent-grid::-webkit-scrollbar-thumb:hover, .tx-list::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.5); }
+    /* 全局滚动条 - 细+同色系 */
+    *::-webkit-scrollbar { width: 4px; height: 4px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.2); border-radius: 2px; }
+    *::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.4); }
     @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
 
     /* 我的 Agent 面板（连钱包后显示） */
@@ -349,14 +354,14 @@
               <div class="addr" id="myAddr">--</div>
             </div>
           </div>
-          <div style="cursor:pointer;position:relative;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleNotificationPanel()">
-            <span style="font-size:16px;">🔔</span>
-            <span id="myUnread" style="color:#a78bfa;font-size:13px;font-weight:600;">0</span>
-            <div id="notifBadge" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;"></div>
-          </div>
           <div style="cursor:pointer;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleMyOrders()">
             <span style="font-size:16px;">📋</span>
             <span style="color:#a78bfa;font-size:13px;font-weight:600;" data-i18n="myOrders">我的订单</span>
+          </div>
+          <div style="cursor:pointer;position:relative;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;margin-left:auto;" onclick="toggleNotificationPanel()">
+            <span style="font-size:16px;">🔔</span>
+            <span id="myUnread" style="color:#a78bfa;font-size:13px;font-weight:600;">0</span>
+            <div id="notifBadge" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;"></div>
           </div>
         </div>
         <div class="my-stats">
