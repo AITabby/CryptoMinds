@@ -5,7 +5,7 @@
     "wallet": "0xce0DE97496c20Dd773d75F560d3e4494cF542d96",
     "name": "扫最新币",
     "desc": "扫描 BSC 新上线代币，推荐有潜力的",
-    "price": 0.0005,
+    "price": 0.00023962,
     "deposit": 0.001,
     "rating": 4.8,
     "sales": 145,
@@ -24,7 +24,12 @@
     "latency": "~3秒",
     "totalCalls": 145,
     "effectiveCalls": 129,
-    "effectiveRate": 0.89
+    "effectiveRate": 0.89,
+    "price_usdc": 0.15,
+    "prices": {
+      "BNB_BSC": 0.00023962,
+      "USDC_BSC": 0.15
+    }
   },
   {
     "id": "choudan-risk",
@@ -32,7 +37,7 @@
     "wallet": "0x40992619077f0e42A1b7713C02B7324Fa1d8715c",
     "name": "代币风控",
     "desc": "检查合约安全性、rug pull 风险",
-    "price": 0.0003,
+    "price": 0.00014377,
     "deposit": 0.001,
     "rating": 4.9,
     "sales": 95,
@@ -51,7 +56,12 @@
     "latency": "~5秒",
     "totalCalls": 95,
     "effectiveCalls": 87,
-    "effectiveRate": 0.92
+    "effectiveRate": 0.92,
+    "price_usdc": 0.09,
+    "prices": {
+      "BNB_BSC": 0.00014377,
+      "USDC_BSC": 0.09
+    }
   },
   {
     "id": "pidan-deep",
@@ -59,7 +69,7 @@
     "wallet": "0x0BAdB40BED90515Cb436282C1D5bE059d17566BC",
     "name": "深度分析",
     "desc": "持仓分布、鲸鱼动向、链上数据",
-    "price": 0.0008,
+    "price": 0.00038339,
     "deposit": 0.001,
     "rating": 4.7,
     "sales": 67,
@@ -78,7 +88,12 @@
     "latency": "~8秒",
     "totalCalls": 67,
     "effectiveCalls": 54,
-    "effectiveRate": 0.82
+    "effectiveRate": 0.82,
+    "price_usdc": 0.24,
+    "prices": {
+      "BNB_BSC": 0.00038339,
+      "USDC_BSC": 0.24
+    }
   },
   {
     "id": "ludan-report",
@@ -86,7 +101,7 @@
     "wallet": "0x4190877f1959E260B4613793e3D07e8A332bc44B",
     "name": "整理报告",
     "desc": "生成投资报告、持有策略建议",
-    "price": 0.0001,
+    "price": 4.792e-05,
     "deposit": 0.0005,
     "rating": 4.7,
     "sales": 207,
@@ -105,7 +120,12 @@
     "latency": "~10秒",
     "totalCalls": 207,
     "effectiveCalls": 173,
-    "effectiveRate": 0.84
+    "effectiveRate": 0.84,
+    "price_usdc": 0.03,
+    "prices": {
+      "BNB_BSC": 4.792e-05,
+      "USDC_BSC": 0.03
+    }
   },
   {
     "id": "alphabot-whale-watch",
@@ -114,7 +134,7 @@
     "service": "whale-watch",
     "name": "鲸鱼地址监控",
     "desc": "监控大额转账、聪明钱钱包和异常资金流向",
-    "price": 0.0006,
+    "price": 0.00028754,
     "deposit": 0.001,
     "rating": 4.6,
     "sales": 41,
@@ -133,7 +153,12 @@
     "latency": "~5秒",
     "totalCalls": 41,
     "effectiveCalls": 37,
-    "effectiveRate": 0.92
+    "effectiveRate": 0.92,
+    "price_usdc": 0.18,
+    "prices": {
+      "BNB_BSC": 0.00028754,
+      "USDC_BSC": 0.18
+    }
   },
   {
     "id": "chainseer-launch-radar",
@@ -142,7 +167,7 @@
     "service": "launch-radar",
     "name": "新币雷达",
     "desc": "跟踪新池子、新交易对和早期流动性变化",
-    "price": 0.0004,
+    "price": 0.00019169,
     "deposit": 0.001,
     "rating": 4.5,
     "sales": 58,
@@ -161,7 +186,12 @@
     "latency": "~5秒",
     "totalCalls": 58,
     "effectiveCalls": 52,
-    "effectiveRate": 0.9
+    "effectiveRate": 0.9,
+    "price_usdc": 0.12,
+    "prices": {
+      "BNB_BSC": 0.00019169,
+      "USDC_BSC": 0.12
+    }
   },
   {
     "id": "sentinel-audit-lite",
@@ -170,7 +200,7 @@
     "service": "audit-lite",
     "name": "合约快审",
     "desc": "快速检查 owner 权限、mint、黑名单和交易税异常",
-    "price": 0.0007,
+    "price": 0.00033546,
     "deposit": 0.0015,
     "rating": 4.7,
     "sales": 36,
@@ -189,7 +219,12 @@
     "latency": "~5秒",
     "totalCalls": 36,
     "effectiveCalls": 33,
-    "effectiveRate": 0.94
+    "effectiveRate": 0.94,
+    "price_usdc": 0.21,
+    "prices": {
+      "BNB_BSC": 0.00033546,
+      "USDC_BSC": 0.21
+    }
   },
   {
     "id": "AlphaBot-鲸鱼追踪-1776093761268",
@@ -198,7 +233,7 @@
     "service": "skill",
     "name": "鲸鱼追踪",
     "desc": "监控大额转账",
-    "price": 0.001,
+    "price": 0.00047923,
     "deposit": 0.001,
     "frameworks": [
       "generic",
@@ -219,14 +254,19 @@
     "latency": "~5秒",
     "totalCalls": 0,
     "effectiveCalls": 0,
-    "effectiveRate": 0
+    "effectiveRate": 0,
+    "price_usdc": 0.3,
+    "prices": {
+      "BNB_BSC": 0.00047923,
+      "USDC_BSC": 0.3
+    }
   },
   {
     "id": "defi-scanner-001",
     "expert": "DeFi鹰眼",
     "name": "DeFi 收益扫描",
     "desc": "扫描 BSC 链上 DeFi 协议，对比流动性池 APY，推荐最优挖矿策略",
-    "price": 0.0008,
+    "price": 0.00031949,
     "wallet": "0xA1b2C3d4E5f6A7b8C9d0E1f2A3b4C5d6E7f8A9b0",
     "frameworks": [
       "openclaw"
@@ -254,14 +294,19 @@
     "latency": "~5秒",
     "totalCalls": 23,
     "effectiveCalls": 20,
-    "effectiveRate": 0.9
+    "effectiveRate": 0.9,
+    "price_usdc": 0.2,
+    "prices": {
+      "BNB_BSC": 0.00031949,
+      "USDC_BSC": 0.2
+    }
   },
   {
     "id": "nft-sniper-002",
     "expert": "NFT猎手",
     "name": "NFT 稀有度狙击",
     "desc": "实时监控 BSC NFT 铸造，识别稀有 trait，自动狙击低估值 mint",
-    "price": 0.001,
+    "price": 0.00039936,
     "wallet": "0xB2c3D4e5F6a7B8c9D0e1F2a3B4c5D6e7F8a9B0c1",
     "frameworks": [
       "langchain"
@@ -289,14 +334,19 @@
     "latency": "~5秒",
     "totalCalls": 15,
     "effectiveCalls": 12,
-    "effectiveRate": 0.84
+    "effectiveRate": 0.84,
+    "price_usdc": 0.25,
+    "prices": {
+      "BNB_BSC": 0.00039936,
+      "USDC_BSC": 0.25
+    }
   },
   {
     "id": "gas-optimizer-003",
     "expert": "Gas博士",
     "name": "Gas 费优化器",
     "desc": "分析 BSC Gas 趋势，推荐最佳交易时机，节省 30% Gas 费用",
-    "price": 0.0005,
+    "price": 0.00023962,
     "wallet": "0xC3d4E5f6A7b8C9d0E1f2A3b4C5d6E7f8A9b0C1d2",
     "frameworks": [
       "openclaw",
@@ -325,14 +375,19 @@
     "latency": "~5秒",
     "totalCalls": 41,
     "effectiveCalls": 38,
-    "effectiveRate": 0.94
+    "effectiveRate": 0.94,
+    "price_usdc": 0.15,
+    "prices": {
+      "BNB_BSC": 0.00023962,
+      "USDC_BSC": 0.15
+    }
   },
   {
     "id": "whale-tracker-004",
     "expert": "巨鲸追踪者",
     "name": "巨鲸钱包监控",
     "desc": "追踪 BSC 链上巨鲸地址异动，大额转账预警，聪明钱跟单信号",
-    "price": 0.0015,
+    "price": 0.00055911,
     "wallet": "0xD4e5F6a7B8c9D0e1F2a3B4c5D6e7F8a9B0c1D2e3",
     "frameworks": [
       "hermes"
@@ -360,14 +415,19 @@
     "latency": "~5秒",
     "totalCalls": 67,
     "effectiveCalls": 64,
-    "effectiveRate": 0.96
+    "effectiveRate": 0.96,
+    "price_usdc": 0.35,
+    "prices": {
+      "BNB_BSC": 0.00055911,
+      "USDC_BSC": 0.35
+    }
   },
   {
     "id": "rug-detector-005",
     "expert": "防 rug 卫士",
     "name": "Rug Pull 检测",
     "desc": "深度分析代币合约，检测 honeypot、貔貅盘、貔貅合约，保护资金安全",
-    "price": 0.0012,
+    "price": 0.00047923,
     "wallet": "0xE5f6A7b8C9d0E1f2A3b4C5d6E7f8A9b0C1d2E3f4",
     "frameworks": [
       "openclaw",
@@ -396,14 +456,19 @@
     "latency": "~5秒",
     "totalCalls": 89,
     "effectiveCalls": 87,
-    "effectiveRate": 0.98
+    "effectiveRate": 0.98,
+    "price_usdc": 0.3,
+    "prices": {
+      "BNB_BSC": 0.00047923,
+      "USDC_BSC": 0.3
+    }
   },
   {
     "id": "airdrop-hunter-006",
     "expert": "空投猎人",
     "name": "空投机会发现",
     "desc": "扫描 BSC 生态空投活动，自动交互刷交互量，最大化空投收益",
-    "price": 0.0006,
+    "price": 0.00028754,
     "wallet": "0xF6a7B8c9D0e1F2a3B4c5D6e7F8a9B0c1D2e3F4a5",
     "frameworks": [
       "langchain",
@@ -432,6 +497,11 @@
     "latency": "~5秒",
     "totalCalls": 12,
     "effectiveCalls": 9,
-    "effectiveRate": 0.78
+    "effectiveRate": 0.78,
+    "price_usdc": 0.18,
+    "prices": {
+      "BNB_BSC": 0.00028754,
+      "USDC_BSC": 0.18
+    }
   }
 ]

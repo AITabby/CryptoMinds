@@ -97,8 +97,8 @@ class SmartRouter:
         self.chains = CHAIN_CONFIG
         # 模拟汇率（实际应从API获取）
         self.rates = {
-            "BNB": 300.0,
-            "ETH": 3000.0,
+            "BNB": 626.0,
+            "ETH": 1600.0,
             "SOL": 150.0,
             "USDC": 1.0,
             "USDT": 1.0
@@ -440,14 +440,14 @@ class SmartRouter:
         """
         # 固定汇率（实际应从DEX获取）
         rates = {
-            ("BNB", "USDC"): 300.0,  # 1 BNB = 300 USDC
-            ("BNB", "USDT"): 300.0,
-            ("USDC", "BNB"): 1/300.0,
-            ("USDT", "BNB"): 1/300.0,
+            ("BNB", "USDC"): 626.0,
+            ("BNB", "USDT"): 626.0,
+            ("USDC", "BNB"): 1/626.0,
+            ("USDT", "BNB"): 1/626.0,
             ("SOL", "USDC"): 150.0,
             ("USDC", "SOL"): 1/150.0,
-            ("ETH", "USDC"): 3000.0,  # 1 ETH = 3000 USDC
-            ("USDC", "ETH"): 1/3000.0,
+            ("ETH", "USDC"): 1600.0,
+            ("USDC", "ETH"): 1/1600.0,
         }
         
         rate = rates.get((from_token, to_token))
