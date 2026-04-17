@@ -364,6 +364,35 @@ function getReputationData() {
   return {};
 }
 
+// 通知系统
+const NOTIFICATIONS_FILE = path.join(__dirname, '..', 'notifications.json');
+
+function getNotifications() {
+  try {
+    if (fs.existsSync(NOTIFICATIONS_FILE)) {
+      return JSON.parse(fs.readFileSync(NOTIFICATIONS_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveNotifications(notifications) {
+  fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(notifications, null, 2));
+}
+
+function addNotification(notification) {
+  const notifications = getNotifications();
+  notifications.unshift({
+    id: `ntf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    read: false,
+    createdAt: new Date().toISOString(),
+    ...notification,
+  });
+  if (notifications.length > 500) notifications.length = 500;
+  saveNotifications(notifications);
+  return notifications[0];
+}
+
 // 服务购买记录
 const PURCHASES_FILE = path.join(__dirname, '..', 'purchases.json');
 
@@ -742,6 +771,102 @@ app.get('/api/market', (req, res) => {
   res.json(sorted.map(({ _sort_score, ...rest }) => rest));
 });
 
+// 通知接口
+app.get('/api/notifications', (req, res) => {
+  const wallet = (req.query.wallet || '').trim().toLowerCase();
+  if (!wallet) {
+    return res.json({ ok: false, error: '缺少 wallet 参数' });
+  }
+  const notifications = getNotifications();
+  const mine = notifications.filter(n =>
+    n.targetWallet?.toLowerCase() === wallet
+  );
+  const unread = req.query.unread === 'true' ? mine.filter(n => !n.read) : mine;
+  res.json({ ok: true, total: mine.length, unread: mine.filter(n => !n.read).length, notifications: unread.slice(0, 50) });
+});
+
+app.post('/api/notifications/:id/read', (req, res) => {
+  const notifications = getNotifications();
+  const ntf = notifications.find(n => n.id === req.params.id);
+  if (!ntf) {
+    return res.json({ ok: false, error: '通知不存在' });
+  }
+  ntf.read = true;
+  saveNotifications(notifications);
+  res.json({ ok: true });
+});
+
+app.post('/api/notifications/read-all', (req, res) => {
+  const { wallet } = req.body;
+  if (!wallet) {
+    return res.json({ ok: false, error: '缺少 wallet' });
+  }
+  const notifications = getNotifications();
+  let count = 0;
+  notifications.forEach(n => {
+    if (n.targetWallet?.toLowerCase() === wallet.toLowerCase() && !n.read) {
+      n.read = true;
+      count++;
+    }
+  });
+  saveNotifications(notifications);
+  res.json({ ok: true, marked: count });
+});
+
+// 提交服务结果（卖家调用）
+app.post('/api/orders/:orderId/result', (req, res) => {
+  const { orderId } = req.params;
+  const { output, sellerWallet } = req.body;
+
+  if (!orderId || !output || !sellerWallet) {
+    return res.json({ ok: false, error: '缺少 orderId, output 或 sellerWallet' });
+  }
+
+  const purchases = getPurchases();
+  const purchase = purchases.find(p => p.id === orderId);
+  if (!purchase) {
+    return res.json({ ok: false, error: '订单不存在' });
+  }
+
+  if (purchase.expertWallet?.toLowerCase() !== sellerWallet.toLowerCase()) {
+    return res.json({ ok: false, error: '只有卖家能提交结果' });
+  }
+
+  purchase.result = output;
+  purchase.resultAt = new Date().toISOString();
+  purchase.status = 'delivered';
+  savePurchases(purchases);
+
+  // 通知买家：结果已出
+  addNotification({
+    type: 'order_result',
+    targetWallet: purchase.buyerWallet,
+    orderId: purchase.id,
+    serviceId: purchase.serviceId,
+    serviceName: purchase.serviceName,
+    sellerWallet: purchase.expertWallet,
+    sellerName: purchase.expert,
+  });
+
+  res.json({ ok: true });
+});
+
+// 查询订单结果（买家调用）
+app.get('/api/orders/:orderId/result', (req, res) => {
+  const { orderId } = req.params;
+  const purchases = getPurchases();
+  const purchase = purchases.find(p => p.id === orderId);
+  if (!purchase) {
+    return res.json({ ok: false, error: '订单不存在' });
+  }
+  res.json({
+    ok: true,
+    status: purchase.status,
+    result: purchase.result || null,
+    resultAt: purchase.resultAt || null,
+  });
+});
+
 // 服务目录
 app.get('/api/services', (req, res) => {
   const services = getServices().filter(s => s.active);
@@ -1109,6 +1234,29 @@ app.post('/api/services/buy', async (req, res) => {
   };
   addPurchase(purchase);
 
+  // 通知卖家：有新订单
+  addNotification({
+    type: 'new_order',
+    targetWallet: service.wallet,
+    orderId: purchase.id,
+    serviceId: service.id,
+    serviceName: service.name,
+    buyerWallet: normalizedBuyerWallet,
+    buyerName: normalizedBuyerName,
+    input: purchase.input || '',
+  });
+
+  // 通知买家：订单已确认
+  addNotification({
+    type: 'order_confirmed',
+    targetWallet: normalizedBuyerWallet,
+    orderId: purchase.id,
+    serviceId: service.id,
+    serviceName: service.name,
+    sellerWallet: service.wallet,
+    sellerName: service.expert,
+  });
+
   if (autoConfirm) {
     // 自动确认模式：直接完成购买
     service.sales += 1;
@@ -1352,6 +1500,29 @@ app.post('/api/pay/x402', async (req, res) => {
     };
     
     addPurchase(purchase);
+
+    // 通知卖家：有新订单
+    addNotification({
+      type: 'new_order',
+      targetWallet: service.wallet,
+      orderId: purchase.id,
+      serviceId: service.id,
+      serviceName: service.name,
+      buyerWallet: verifiedBuyerWallet,
+      input: '',
+    });
+
+    // 通知买家：订单已确认
+    addNotification({
+      type: 'order_confirmed',
+      targetWallet: verifiedBuyerWallet,
+      orderId: purchase.id,
+      serviceId: service.id,
+      serviceName: service.name,
+      sellerWallet: service.wallet,
+      sellerName: service.expert,
+    });
+
     service.sales += 1;
     saveServices(services);
 
@@ -1435,6 +1606,27 @@ app.post('/api/pay/x402/split', async (req, res) => {
     };
 
     addPurchase(purchase);
+
+    addNotification({
+      type: 'new_order',
+      targetWallet: service.wallet,
+      orderId: purchase.id,
+      serviceId: service.id,
+      serviceName: service.name,
+      buyerWallet: requestedBuyerWallet,
+      input: '',
+    });
+
+    addNotification({
+      type: 'order_confirmed',
+      targetWallet: requestedBuyerWallet,
+      orderId: purchase.id,
+      serviceId: service.id,
+      serviceName: service.name,
+      sellerWallet: service.wallet,
+      sellerName: service.expert,
+    });
+
     service.sales += 1;
     saveServices(services);
 
