@@ -587,7 +587,7 @@
         </div>
 
         <!-- 押金缴纳弹窗（独立） -->
-        <div id="depositModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; display:none; justify-content:center; align-items:center;">
+        <div id="depositModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
           <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.3); border-radius:16px; padding:32px; max-width:400px; width:90%;">
             <h3 style="color:#a78bfa; font-size:18px; margin-bottom:20px; text-align:center;">
               <i data-lucide="shield" class="icon-inline"></i> 缴纳押金
@@ -2095,19 +2095,12 @@
     function closeRegisterModal() {
       document.getElementById('registerModal').style.display = 'none';
       depositTxHash = '';
-      document.getElementById('depositStatus').style.display = 'none';
     }
 
     async function loadDepositConfig() {
       try {
         const res = await fetch('/api/config/deposit');
         depositConfig = await res.json();
-        if (depositConfig.isOnChain) {
-          document.getElementById('depositSection').style.display = 'block';
-          document.getElementById('depositPoolAddr').textContent = depositConfig.depositPoolAddress;
-        } else {
-          document.getElementById('depositSection').style.display = 'none';
-        }
         lucide.createIcons();
       } catch(e) { console.error('Load deposit config error:', e); }
     }
