@@ -2074,6 +2074,16 @@
       if (!currentAccount) { showError('请先连接钱包'); return; }
       if (!depositConfig.isOnChain) { showError('押金池地址未配置'); return; }
 
+      // 切换到 BSC
+      try {
+        await ensureChain('bsc');
+      } catch(e) {
+        showError('切换到 BSC 链失败');
+        btn.disabled = false;
+        btn.textContent = '缴纳押金 (0.001 BNB)';
+        return;
+      }
+
       const btn = document.getElementById('depositBtn');
       const status = document.getElementById('depositStatus');
       btn.disabled = true;
