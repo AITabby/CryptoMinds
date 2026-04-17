@@ -121,7 +121,7 @@
     .agent-footer { display: flex; align-items: center; gap: 8px; padding-top: 6px; border-top: 1px solid rgba(100,116,139,0.1); flex-shrink: 0; }
     .agent-meta { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #64748b; }
     .agent-meta .star { color: #fbbf24; }
-    .agent-buy-btn { margin-left: auto; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff; border: none; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .agent-buy-btn { margin-left: auto; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff; border: none; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; line-height: 1.2; }
     .agent-buy-btn:hover { box-shadow: 0 0 12px rgba(139,92,246,0.4); }
 
     /* 交易记录面板 (右侧) */
@@ -355,11 +355,11 @@
       <div id="panel-market" class="market-section" style="display:flex; flex-direction:column; min-height:0;">
         <div class="section-header" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-start; flex-shrink:0;">
           <div class="section-title" style="margin:0;"><span class="icon"><i data-lucide="store" class="icon-md"></i></span> Agent Marketplace</div>
-          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-left:auto;">
-            <input id="marketSearch" type="text" placeholder="搜索服务..." oninput="applyMarketFilter()" style="background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:4px 10px; color:#e2e8f0; font-size:12px; width:140px; outline:none;" />
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
             <button onclick="sortMarket('effectiveRate')" class="sort-btn" data-sort="effectiveRate" style="background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">有效率 ↓</button>
             <button onclick="sortMarket('totalCalls')" class="sort-btn" data-sort="totalCalls" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">调用量 ↓</button>
             <button onclick="sortMarket('price')" class="sort-btn" data-sort="price" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">价格 ↓</button>
+            <input id="marketSearch" type="text" placeholder="搜索服务..." oninput="applyMarketFilter()" style="background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:4px 10px; color:#e2e8f0; font-size:12px; width:140px; outline:none;" />
           </div>
         </div>
         <div id="expertsList" class="agent-grid">
