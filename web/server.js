@@ -982,6 +982,7 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
   const latencyEst = sanitizeText(latency, 30);
 
   if (!expertName || !normalizedWallet || !skillName || parsedPrice === null || parsedDeposit === null) {
+    console.log('Validation failed:', { expertName, normalizedWallet, skillName, parsedPrice, parsedDeposit, rawPrice: price, rawDeposit: deposit });
     return res.json({ ok: false, error: `缺少必填字段: ${[!expertName&&'expert',!normalizedWallet&&'wallet',!skillName&&'name',parsedPrice===null&&'price',parsedDeposit===null&&'deposit'].filter(Boolean).join(',')}` });
   }
   if (!inputFmt || !outputFmt) {
@@ -1001,7 +1002,9 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
       const tx = await w3.eth.getTransaction(depositTxHash);
       if (!tx) return res.json({ ok: false, error: '押金交易未找到，请确认交易已上链' });
       if (tx.from.toLowerCase() !== normalizedWallet.toLowerCase()) {
-        return res.json({ ok: false, error: '押金交易发送者与入驻钱包不一致' });
+        // 押金发送者和入驻钱包不一致，自动用押金发送者作为入驻钱包
+        console.log('Auto-correcting wallet:', { txFrom: tx.from, registerWallet: normalizedWallet });
+        normalizedWallet = tx.from.toLowerCase();
       }
       if (tx.to && tx.to.toLowerCase() !== DEPOSIT_POOL_ADDRESS.toLowerCase()) {
         return res.json({ ok: false, error: '押金未发送到正确的押金池地址' });
