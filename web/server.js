@@ -769,8 +769,9 @@ app.get('/api/transactions', (req, res) => {
   res.json({ ok: true, transactions: txs });
 });
 
-app.get('/api/market', (req, res) => {
-  const services = getServices().filter(s => s.active);
+app.get('/api/market', async (req, res) => {
+  const services = getServices().filter(s => s.active && s.status === 'approved');
+  const bnbPrice = await fetchBnbPrice();
   // 按有效率+调用量排序
   const sorted = services.map(s => {
     // 兼容旧数据：sales 映射到 totalCalls
@@ -780,6 +781,7 @@ app.get('/api/market', (req, res) => {
     s.inputFormat = s.inputFormat || '';
     s.outputFormat = s.outputFormat || '';
     s.latency = s.latency || '';
+    s.price_usdc = +(s.price * bnbPrice).toFixed(2);
     // 加权分数：有效率 * 0.5 + 调用量 * 0.3 + 质押 * 0.2
     s._sort_score = (s.totalCalls > 0 ? s.effectiveRate : 0.5) * 50 + Math.min(s.totalCalls, 200) * 0.15 + (s.deposit || 0) * 1000;
     return s;
