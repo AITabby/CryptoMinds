@@ -2995,9 +2995,8 @@ async function confirmDepositModal() {
     function updateMetrics(transactions, services) {
       const now = Date.now();
       const h24 = 24 * 60 * 60 * 1000;
-      const h48 = 48 * 60 * 60 * 1000;
 
-      // --- Agent 总数 + 今日新增 ---
+      // --- Agent 总数 ---
       const totalAgents = (services || []).length;
       document.getElementById('metricAgents').textContent = totalAgents;
       const todayNew = (services || []).filter(s => {
@@ -3014,79 +3013,77 @@ async function confirmDepositModal() {
         trendEl.style.color = '#64748b';
       }
 
-      if (!transactions || transactions.length === 0) {
-        document.getElementById('metricVolume').textContent = '0 BNB';
-        document.getElementById('trendVolume').textContent = '暂无交易';
-        document.getElementById('trendVolume').style.color = '#64748b';
-        document.getElementById('metricTxs').textContent = '0';
-        document.getElementById('trendTxs').textContent = '暂无交易';
-        document.getElementById('trendTxs').style.color = '#64748b';
-        return;
-      }
+      // --- 从真实购买订单计算 ---
+      fetch('/api/purchases').then(r => r.json()).then(purchases => {
+        const allOrders = purchases.filter(p => p.status === 'completed' || p.status === 'delivered' || p.status === 'demo-completed');
 
-      // Split transactions into time windows
-      const recent24h = [];
-      const recent7d = [];
-      transactions.forEach(tx => {
-        if (tx.timestamp) {
-          const age = now - new Date(tx.timestamp).getTime();
-          if (age < h24) recent24h.push(tx);
-          if (age < 7 * h24) recent7d.push(tx);
+        // 24h 订单
+        const recent24h = allOrders.filter(p => {
+          const t = new Date(p.time).getTime();
+          return !isNaN(t) && (now - t) < h24;
+        });
+        // 前24h 订单
+        const prev24h = allOrders.filter(p => {
+          const t = new Date(p.time).getTime();
+          return !isNaN(t) && (now - t) >= h24 && (now - t) < 2 * h24;
+        });
+
+        // 24h 交易额
+        const vol24h = recent24h.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
+        document.getElementById('metricVolume').textContent = vol24h > 0 ? vol24h.toFixed(4) + ' BNB' : '0 BNB';
+
+        // 涨幅：24h vs 前24h
+        const volPrev24h = prev24h.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
+        const trendVol = document.getElementById('trendVolume');
+        let pctVol;
+        if (volPrev24h > 0) {
+          pctVol = ((vol24h - volPrev24h) / volPrev24h * 100).toFixed(1);
         } else {
-          // No timestamp = assume recent (backwards compat)
-          recent24h.push(tx);
-          recent7d.push(tx);
+          pctVol = vol24h > 0 ? null : '0'; // null 表示新币式 N/A
         }
-      });
+        if (pctVol !== null) {
+          const numPct = parseFloat(pctVol);
+          const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
+          const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
+          const sign = numPct > 0 ? '+' : '';
+          trendVol.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctVol}%`;
+          trendVol.className = `trend ${cls}`;
+        } else {
+          trendVol.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
+          trendVol.className = 'trend up';
+        }
 
-      // --- 交易额：显示24h值，趋势为1h vs 前1h（K线式实时） ---
-      const vol24h = recent24h.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
-      const volTotal = transactions.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
-      document.getElementById('metricVolume').textContent = vol24h > 0 ? vol24h.toFixed(4) + ' BNB' : '0 BNB';
+        // 24h 交易笔数
+        document.getElementById('metricTxs').textContent = recent24h.length > 0 ? recent24h.length + ' 笔' : '0 笔';
+        const trendTxs = document.getElementById('trendTxs');
+        let pctTxs;
+        if (prev24h.length > 0) {
+          pctTxs = ((recent24h.length - prev24h.length) / prev24h.length * 100).toFixed(1);
+        } else {
+          pctTxs = recent24h.length > 0 ? null : '0';
+        }
+        if (pctTxs !== null) {
+          const numPct = parseFloat(pctTxs);
+          const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
+          const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
+          const sign = numPct > 0 ? '+' : '';
+          trendTxs.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctTxs}%`;
+          trendTxs.className = `trend ${cls}`;
+        } else {
+          trendTxs.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
+          trendTxs.className = 'trend up';
+        }
 
-      // 1h vs 前1h
-      const h1 = 60 * 60 * 1000;
-      const recent1h = transactions.filter(tx => {
-        if (!tx.timestamp) return false;
-        return (now - new Date(tx.timestamp).getTime()) < h1;
-      });
-      const prev1h = transactions.filter(tx => {
-        if (!tx.timestamp) return false;
-        const age = now - new Date(tx.timestamp).getTime();
-        return age >= h1 && age < 2 * h1;
-      });
-      const vol1h = recent1h.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
-      const volPrev1h = prev1h.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
-      const trendVol = document.getElementById('trendVolume');
-      const pctVol = volPrev1h > 0 ? ((vol1h - volPrev1h) / volPrev1h * 100).toFixed(0) : vol1h > 0 ? '100' : '0';
-      const arrowVol = pctVol > 0 ? 'trending-up' : pctVol < 0 ? 'trending-down' : 'minus';
-      const clsVol = pctVol > 0 ? 'up' : pctVol < 0 ? 'down' : '';
-      const signVol = pctVol > 0 ? '+' : '';
-      trendVol.innerHTML = `<i data-lucide="${arrowVol}" class="icon-inline"></i> ${signVol}${pctVol}%`;
-      trendVol.className = `trend ${clsVol}`;
+        // 总交易额 + 总笔数
+        const totalVol = allOrders.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
+        document.getElementById('metricTotalVolume').textContent = totalVol.toFixed(4) + ' BNB';
+        const trendTotal = document.getElementById('trendTotalVolume');
+        trendTotal.textContent = allOrders.length + ' 笔';
+        trendTotal.className = 'trend';
+        trendTotal.style.color = '#64748b';
 
-      // --- 交易笔数：显示24h值，趋势为1h vs 前1h ---
-      document.getElementById('metricTxs').textContent = recent24h.length > 0 ? recent24h.length + ' 笔' : '0 笔';
-      const tx1h = recent1h.length;
-      const txPrev1h = prev1h.length;
-      const trendTxs = document.getElementById('trendTxs');
-      const pctTxs = txPrev1h > 0 ? ((tx1h - txPrev1h) / txPrev1h * 100).toFixed(0) : tx1h > 0 ? '100' : '0';
-      const arrowTxs = pctTxs > 0 ? 'trending-up' : pctTxs < 0 ? 'trending-down' : 'minus';
-      const clsTxs = pctTxs > 0 ? 'up' : pctTxs < 0 ? 'down' : '';
-      const signTxs = pctTxs > 0 ? '+' : '';
-      trendTxs.innerHTML = `<i data-lucide="${arrowTxs}" class="icon-inline"></i> ${signTxs}${pctTxs}%`;
-      trendTxs.className = `trend ${clsTxs}`;
-
-      // --- 总交易额（全部累计）---
-      const totalVol = transactions.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
-      document.getElementById('metricTotalVolume').textContent = totalVol.toFixed(4) + ' BNB';
-      const trendTotal = document.getElementById('trendTotalVolume');
-      const chainCount = new Set((services || []).flatMap(s => s.accept_chains || ['bsc'])).size;
-      trendTotal.textContent = `${transactions.length} 笔`;
-      trendTotal.className = 'trend';
-      trendTotal.style.color = '#64748b';
-
-      lucide.createIcons();
+        lucide.createIcons();
+      }).catch(() => {});
     }
 
     // ========== 国际化 i18n ==========
