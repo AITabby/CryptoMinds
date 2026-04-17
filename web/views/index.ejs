@@ -196,6 +196,7 @@
         <span class="active" onclick="showTab('market')" data-i18n="tabMarket"><i data-lucide="store" class="icon-inline"></i> 服务市场</span>
         <span onclick="showTab('register')" data-i18n="tabRegister"><i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻</span>
         <span onclick="showTab('myagent')" data-i18n="tabMyAgent"><i data-lucide="bot" class="icon-inline"></i> 我的 Agent</span>
+        <span id="adminTab" style="display:none;" onclick="showTab('admin')"><i data-lucide="shield" class="icon-inline"></i> 审核</span>
       </div>
     </div>
     <div class="header-right">
@@ -234,6 +235,13 @@
 
     <!-- Agent 入驻面板（默认隐藏，点 tab 显示） -->
     <div id="panel-register" style="display:none; max-width:800px; margin:0 auto;">
+      <div id="panel-admin" style="display:none; max-width:900px; margin:0 auto;">
+        <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px;">
+          <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="shield" class="icon-inline"></i> 服务审核</h2>
+          <div id="pendingList" style="color:#94a3b8;">加载中...</div>
+        </div>
+      </div>
+
       <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.08); border-radius:12px; padding:24px; margin-bottom:16px;">
         <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;" data-i18n="regGuide"><i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南</h2>
         <p style="color:#94a3b8; line-height:1.8; margin-bottom:24px;" data-i18n="regGuideDesc">
@@ -651,6 +659,11 @@
         document.querySelector('.nav span:nth-child(3)').classList.add('active');
         document.getElementById('myAgent').style.display = 'block';
         document.querySelector('.main').style.display = 'none';
+      } else if (tab === 'admin') {
+        document.querySelector('#adminTab').classList.add('active');
+        document.getElementById('panel-admin').style.display = 'block';
+        document.querySelector('.main').style.display = 'none';
+        loadPendingServices();
       }
     }
 
@@ -1399,6 +1412,12 @@
           // 加载通知
           loadNotifications();
           setInterval(loadNotifications, 10000); // 10秒轮询
+
+          // 检查管理员权限
+          const ADMIN_WALLETS = ['0xd2f899ce74320aef9d8f2359183232a554f4c0e1'];
+          if (ADMIN_WALLETS.includes(currentAccount.toLowerCase())) {
+            document.getElementById('adminTab').style.display = 'inline';
+          }
         } catch(e) {
           document.getElementById('myBalance').textContent = '加载失败';
         }
@@ -1722,6 +1741,75 @@
       }
     }
 
+    // ===== 管理审核 =====
+    async function loadPendingServices() {
+      if (!currentAccount) return;
+      try {
+        const res = await fetch(`/api/admin/pending?wallet=${currentAccount}`);
+        const data = await res.json();
+        if (!data.ok) {
+          document.getElementById('pendingList').innerHTML = `<div style="color:#ef4444;">${data.error}</div>`;
+          return;
+        }
+        if (data.pending.length === 0) {
+          document.getElementById('pendingList').innerHTML = '<div style="color:#475569;text-align:center;padding:20px;">✅ 暂无待审核服务</div>';
+          return;
+        }
+        document.getElementById('pendingList').innerHTML = data.pending.map(s => {
+          const time = new Date(s.registeredAt).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+          return `<div style="background:#0f121e;border:1px solid rgba(139,92,246,0.1);border-radius:10px;padding:16px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div>
+                <span style="color:#a78bfa;font-weight:600;font-size:15px;">${s.expert}</span>
+                <span style="color:#64748b;margin:0 6px;">→</span>
+                <span style="color:#e2e8f0;font-size:14px;">${s.name}</span>
+              </div>
+              <span style="color:#475569;font-size:11px;">${time}</span>
+            </div>
+            <div style="color:#94a3b8;font-size:12px;margin-bottom:8px;">${s.desc || '无描述'}</div>
+            <div style="display:flex;gap:16px;font-size:12px;color:#64748b;margin-bottom:12px;">
+              <span>💰 ${s.price} BNB</span>
+              <span>📥 ${s.inputFormat}</span>
+              <span>📤 ${s.outputFormat}</span>
+              <span>⏱ ${s.latency || '-'}</span>
+            </div>
+            <div style="color:#475569;font-size:11px;margin-bottom:10px;">钱包: ${s.wallet}</div>
+            <div style="display:flex;gap:8px;">
+              <button onclick="approveService('${s.id}')" style="background:#059669;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✅ 通过</button>
+              <button onclick="rejectService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">❌ 拒绝</button>
+            </div>
+          </div>`;
+        }).join('');
+      } catch(e) {
+        document.getElementById('pendingList').innerHTML = `<div style="color:#ef4444;">加载失败</div>`;
+      }
+    }
+
+    async function approveService(id) {
+      try {
+        const res = await fetch(`/api/admin/approve/${id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallet: currentAccount })
+        });
+        const data = await res.json();
+        if (data.ok) { loadPendingServices(); } else { alert(data.error); }
+      } catch(e) { alert('操作失败'); }
+    }
+
+    async function rejectService(id) {
+      const reason = prompt('拒绝原因：') || '';
+      try {
+        const res = await fetch(`/api/admin/reject/${id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallet: currentAccount, reason })
+        });
+        const data = await res.json();
+        if (data.ok) { loadPendingServices(); } else { alert(data.error); }
+      } catch(e) { alert('操作失败'); }
+    }
+
     async function markAllRead() {
       if (!currentAccount) return;
       try {
@@ -2000,7 +2088,7 @@
         const data = await res.json();
         if (data.ok) {
           closeRegisterModal();
-          showNotice('<i data-lucide="store" class="icon-inline"></i> 入驻成功！欢迎 ' + expert + ' 加入市场');
+          showNotice('<i data-lucide="clock" class="icon-inline"></i> 入驻成功！服务正在审核中，通过后将自动上架');
           reloadMarket();
           uploadedSkillFile = null;
           document.getElementById('regExpert').value = '';

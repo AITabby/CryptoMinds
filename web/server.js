@@ -17,7 +17,7 @@ const w3 = new Web3(BSC_RPC);
 const PORT = 3456;
 const DEMO_WALLET = '0xd2f899ce74320aef9d8f2359183232a554f4c0e1';
 // 押金池地址（获奖后替换为Four.meme地址或合约地址）
-const DEPOSIT_POOL_ADDRESS = process.env.DEPOSIT_POOL_ADDRESS || '0x0000000000000000000000000000000000000000';
+const DEPOSIT_POOL_ADDRESS = process.env.DEPOSIT_POOL_ADDRESS || '0xd2f899CE74320AEf9d8f2359183232a554f4C0E1';
 const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
 const SDK_DIR = path.join(__dirname, '..', 'agentpay_sdk');
 const X402_VERIFY_SCRIPT = path.join(SDK_DIR, 'x402_verify.py');
@@ -813,6 +813,51 @@ app.post('/api/notifications/read-all', (req, res) => {
   res.json({ ok: true, marked: count });
 });
 
+// ===== 管理后台 =====
+const ADMIN_WALLETS = (process.env.ADMIN_WALLETS || '0xd2f899CE74320AEf9d8f2359183232a554f4C0E1').toLowerCase().split(',');
+
+function isAdmin(wallet) {
+  return ADMIN_WALLETS.includes(wallet.toLowerCase());
+}
+
+// 待审核列表
+app.get('/api/admin/pending', (req, res) => {
+  const wallet = req.query.wallet || '';
+  if (!isAdmin(wallet)) return res.json({ ok: false, error: '无权限' });
+  const services = getServices();
+  const pending = services.filter(s => s.status === 'pending');
+  res.json({ ok: true, pending });
+});
+
+// 审核：通过
+app.post('/api/admin/approve/:id', (req, res) => {
+  const { wallet } = req.body;
+  if (!isAdmin(wallet)) return res.json({ ok: false, error: '无权限' });
+  const services = getServices();
+  const svc = services.find(s => s.id === req.params.id);
+  if (!svc) return res.json({ ok: false, error: '服务不存在' });
+  if (svc.status !== 'pending') return res.json({ ok: false, error: '该服务不在待审核状态' });
+  svc.status = 'approved';
+  svc.approvedAt = new Date().toISOString();
+  saveServices(services);
+  res.json({ ok: true });
+});
+
+// 审核：拒绝
+app.post('/api/admin/reject/:id', (req, res) => {
+  const { wallet, reason } = req.body;
+  if (!isAdmin(wallet)) return res.json({ ok: false, error: '无权限' });
+  const services = getServices();
+  const svc = services.find(s => s.id === req.params.id);
+  if (!svc) return res.json({ ok: false, error: '服务不存在' });
+  if (svc.status !== 'pending') return res.json({ ok: false, error: '该服务不在待审核状态' });
+  svc.status = 'rejected';
+  svc.rejectReason = reason || '';
+  svc.rejectedAt = new Date().toISOString();
+  saveServices(services);
+  res.json({ ok: true });
+});
+
 // 提交服务结果（卖家调用）
 app.post('/api/orders/:orderId/result', (req, res) => {
   const { orderId } = req.params;
@@ -959,7 +1004,7 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
   let securityScan = { level: 'safe', score: 100, issues: [], summary: '✅ 服务契约模式' };
 
   const id = `${expertName}-${skillName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
-  // 直接上架（契约模式无需安全扫描）
+  // 入驻后需审核
 
   const newService = {
     id, expert: expertName, wallet: normalizedWallet, service: 'service', name: skillName,
@@ -970,7 +1015,7 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
     security: { level: 'safe', score: 100, summary: '✅ 服务契约模式' },
     totalCalls: 0, effectiveCalls: 0, effectiveRate: 0,
     rating: 0, sales: 0, active: true,
-    status: 'approved',
+    status: 'pending',
     avatar: '🤖',
     registeredAt: new Date().toISOString()
   };
