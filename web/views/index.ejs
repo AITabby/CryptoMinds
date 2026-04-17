@@ -2231,14 +2231,15 @@ async function confirmDepositModal() {
     }
     
     status.style.color = '#34d399';
-    status.innerHTML = `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;">✅ 押金已缴纳！查看交易</a><br>🎉 入驻成功，等待审核`;
-    btn.textContent = '完成';
-    btn.onclick = () => { 
-      closeDepositModal(); 
-      openPendingReviewModal(); // 显示等待审核弹窗
-    };
-    btn.disabled = false;
-    btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+    status.innerHTML = `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;">✅ 押金已缴纳！查看交易</a><br>⏳ 正在跳转...`;
+    
+    // 直接跳转到审核中页面
+    setTimeout(() => {
+      closeDepositModal();
+      document.getElementById('pendingReviewPage').style.display = 'block';
+      document.getElementById('regFormArea').style.display = 'none';
+      reloadMarket();
+    }, 1500);
     
   } catch(e) {
     status.style.color = '#f87171';
