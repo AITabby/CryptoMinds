@@ -2505,6 +2505,10 @@ async function confirmDepositModal() {
         document.getElementById('myBalance').textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
       } catch(e) {}
 
+      // 加载通知
+      loadNotifications();
+      setInterval(loadNotifications, 10000); // 10秒轮询
+
       try {
         const svcRes = await fetch('/api/services');
         const allServices = await svcRes.json();
