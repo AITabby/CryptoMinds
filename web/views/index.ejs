@@ -266,33 +266,36 @@
           </div>
         </div>
 
-        <!-- 收支统计卡片 -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">
-          <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
-            <div style="color:#64748b;font-size:11px;margin-bottom:4px;">总收入</div>
-            <div id="sellerIncome" style="color:#34d399;font-size:16px;font-weight:600;">--</div>
+        <!-- 左右布局 -->
+        <div style="display:flex;gap:12px;">
+          <!-- 左边: 收支卡片 + 我的服务 -->
+          <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+                <div style="color:#64748b;font-size:11px;margin-bottom:4px;">总收入</div>
+                <div id="sellerIncome" style="color:#34d399;font-size:16px;font-weight:600;">--</div>
+              </div>
+              <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+                <div style="color:#64748b;font-size:11px;margin-bottom:4px;">押金</div>
+                <div id="sellerDeposit" style="color:#fbbf24;font-size:16px;font-weight:600;">--</div>
+              </div>
+              <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+                <div style="color:#64748b;font-size:11px;margin-bottom:4px;">净收入</div>
+                <div id="sellerNet" style="color:#a78bfa;font-size:16px;font-weight:600;">--</div>
+              </div>
+              <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+                <div style="color:#64748b;font-size:11px;margin-bottom:4px;">已完成订单</div>
+                <div id="sellerCompleted" style="color:#60a5fa;font-size:16px;font-weight:600;">--</div>
+              </div>
+            </div>
+            <!-- 我发布的服务 -->
+            <div id="sellerMyService" style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;"></div>
           </div>
-          <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
-            <div style="color:#64748b;font-size:11px;margin-bottom:4px;">押金</div>
-            <div id="sellerDeposit" style="color:#fbbf24;font-size:16px;font-weight:600;">--</div>
+          <!-- 右边: 收支记录 -->
+          <div style="flex:1;background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;display:flex;flex-direction:column;max-height:300px;">
+            <div style="color:#a78bfa;font-weight:600;font-size:13px;margin-bottom:8px;">💰 收支记录</div>
+            <div id="sellerTxList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div>
           </div>
-          <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
-            <div style="color:#64748b;font-size:11px;margin-bottom:4px;">净收入</div>
-            <div id="sellerNet" style="color:#a78bfa;font-size:16px;font-weight:600;">--</div>
-          </div>
-          <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
-            <div style="color:#64748b;font-size:11px;margin-bottom:4px;">已完成订单</div>
-            <div id="sellerCompleted" style="color:#60a5fa;font-size:16px;font-weight:600;">--</div>
-          </div>
-        </div>
-
-        <!-- 我发布的服务 -->
-        <div id="sellerMyService" style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:12px;padding:16px;margin-bottom:12px;"></div>
-
-        <!-- 收支记录 -->
-        <div style="margin-top:12px;">
-          <div style="color:#a78bfa;font-weight:600;font-size:14px;margin-bottom:8px;">💰 收支记录</div>
-          <div id="sellerTxList" style="color:#94a3b8;font-size:13px;">加载中...</div>
         </div>
       </div>
 
