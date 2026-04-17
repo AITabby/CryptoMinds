@@ -224,22 +224,22 @@
     <!-- Top Metrics -->
     <div class="metrics">
       <div class="metric-card">
-        <div class="label"><i data-lucide="bot" class="icon-inline"></i> Agent 总数</div>
+        <div class="label" data-i18n="metricAgents"><i data-lucide="bot" class="icon-inline"></i> Agent 总数</div>
         <div class="value" id="metricAgents">--</div>
         <div class="trend" id="trendAgents">--</div>
       </div>
       <div class="metric-card">
-        <div class="label"><i data-lucide="trending-up" class="icon-inline"></i> 近24h 交易额</div>
+        <div class="label" data-i18n="metricVolume"><i data-lucide="trending-up" class="icon-inline"></i> 近24h 交易额</div>
         <div class="value" id="metricVolume">--</div>
         <div class="trend" id="trendVolume">--</div>
       </div>
       <div class="metric-card">
-        <div class="label"><i data-lucide="zap" class="icon-inline"></i> 近24h 交易</div>
+        <div class="label" data-i18n="metricTxs"><i data-lucide="zap" class="icon-inline"></i> 近24h 交易</div>
         <div class="value" id="metricTxs">--</div>
         <div class="trend" id="trendTxs">--</div>
       </div>
       <div class="metric-card">
-        <div class="label"><i data-lucide="database" class="icon-inline"></i> 总交易额</div>
+        <div class="label" data-i18n="metricTotalVolume"><i data-lucide="database" class="icon-inline"></i> 总交易额</div>
         <div class="value" id="metricTotalVolume">--</div>
         <div class="trend" id="trendTotalVolume">--</div>
       </div>
@@ -249,22 +249,22 @@
     <div id="panel-register" style="display:none;">
       <div id="panel-admin" style="display:none; max-width:900px; margin:0 auto;">
         <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px;">
-          <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="shield" class="icon-inline"></i> 服务审核</h2>
-          <div id="pendingList" style="color:#94a3b8;">加载中...</div>
+          <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="shield" class="icon-inline"></i> <span data-i18n="adminTitle">服务审核</span></h2>
+          <div id="pendingList" style="color:#94a3b8;" data-i18n="loading">${t('loading')}</div>
         </div>
       </div>
 
       <div id="myRegistrationPanel" style="display:none; margin-bottom:16px;"></div>
 
-      <!-- B端: 收到的订单 + 通知 -->
+      <!-- B端: ${t('sellerOrders')} + 通知 -->
       <div id="sellerDashboard" style="display:none; margin-bottom:16px;">
-        <!-- 顶部: 卖家工作台 + 铃铛订单 -->
+        <!-- 顶部: ${t('sellerWorkbench')} + 铃铛订单 -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <h2 style="color:#a78bfa;font-size:18px;"><i data-lucide="briefcase" class="icon-inline"></i> 卖家工作台</h2>
+          <h2 style="color:#a78bfa;font-size:18px;"><i data-lucide="briefcase" class="icon-inline"></i> ${t('sellerWorkbench')}</h2>
           <div style="display:flex;gap:8px;">
             <div style="cursor:pointer;padding:6px 12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleSellerOrders()">
               <i data-lucide="clipboard-list" class="icon-inline" style="font-size:14px;"></i>
-              <span style="color:#a78bfa;font-size:12px;font-weight:600;">收到的订单</span>
+              <span style="color:#a78bfa;font-size:12px;font-weight:600;">${t('sellerOrders')}</span>
             </div>
             <div style="cursor:pointer;position:relative;padding:6px 12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleSellerNotif()">
               <i data-lucide="bell" class="icon-inline" style="font-size:14px;"></i>
@@ -281,27 +281,27 @@
             <div id="sellerMyService" style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;"></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:14px;text-align:center;">
-                <div style="color:#64748b;font-size:11px;margin-bottom:4px;">总收入</div>
+                <div style="color:#64748b;font-size:11px;margin-bottom:4px;" data-i18n="sellerIncome">总收入</div>
                 <div id="sellerIncome" style="color:#34d399;font-size:16px;font-weight:600;">--</div>
               </div>
               <div style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:14px;text-align:center;">
-                <div style="color:#64748b;font-size:11px;margin-bottom:4px;">押金</div>
+                <div style="color:#64748b;font-size:11px;margin-bottom:4px;" data-i18n="sellerDepositLabel">押金</div>
                 <div id="sellerDeposit" style="color:#fbbf24;font-size:16px;font-weight:600;">--</div>
               </div>
               <div style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);border-radius:10px;padding:14px;text-align:center;">
-                <div style="color:#64748b;font-size:11px;margin-bottom:4px;">净收入</div>
+                <div style="color:#64748b;font-size:11px;margin-bottom:4px;" data-i18n="sellerNet">净收入</div>
                 <div id="sellerNet" style="color:#a78bfa;font-size:16px;font-weight:600;">--</div>
               </div>
               <div style="background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.25);border-radius:10px;padding:14px;text-align:center;">
-                <div style="color:#64748b;font-size:11px;margin-bottom:4px;">已完成订单</div>
+                <div style="color:#64748b;font-size:11px;margin-bottom:4px;" data-i18n="sellerCompletedLabel">${t('orderCompleted')}订单</div>
                 <div id="sellerCompleted" style="color:#60a5fa;font-size:16px;font-weight:600;">--</div>
               </div>
             </div>
           </div>
           <!-- 右边: 收支记录 -->
           <div style="flex:1;background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;display:flex;flex-direction:column;max-height:300px;">
-            <div style="color:#a78bfa;font-weight:600;font-size:13px;margin-bottom:8px;"><i data-lucide="coins" class="icon-inline"></i> 收支记录</div>
-            <div id="sellerTxList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div>
+            <div style="color:#a78bfa;font-weight:600;font-size:13px;margin-bottom:8px;"><i data-lucide="coins" class="icon-inline"></i> <span data-i18n="sellerTxTitle">收支记录</span></div>
+            <div id="sellerTxList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;" data-i18n="loading">${t('loading')}</div>
           </div>
         </div>
       </div>
@@ -309,19 +309,19 @@
       <!-- 审核中页面（替代入驻指南） -->
       <div id="pendingReviewPage" style="display:none; background:linear-gradient(135deg,#1e1b4b,#312e81); border:2px solid rgba(139,92,246,0.4); border-radius:20px; padding:48px; text-align:center; margin-bottom:16px;">
         <div style="font-size:64px; margin-bottom:20px;"><i data-lucide="sparkles" style="width:64px;height:64px;color:#a78bfa;"></i></div>
-        <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;">入驻申请已提交</h2>
+        <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;">${t('pendingReviewTitle')}</h2>
         <p style="color:#94a3b8; font-size:15px; margin-bottom:24px; line-height:1.6;">
-          押金已缴纳成功！<br>
-          服务正在审核中，管理员审核通过后将自动上架。
+          <span data-i18n="pendingDepositOk1">押金已缴纳成功！</span><br>
+          <span data-i18n="pendingDepositOk2">服务正在审核中，管理员审核通过后将自动上架。</span>
         </p>
         <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:16px; margin-bottom:24px;">
-          <div id="pendingServiceName" style="color:#e2e8f0; font-size:14px; margin-bottom:8px;">服务名称: --</div>
-          <div style="color:#10b981; font-size:14px; font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> 待审核</div>
-          <div style="color:#64748b; font-size:12px; margin-top:4px;">预计 1-3 个工作日</div>
+          <div id="pendingServiceName" style="color:#e2e8f0; font-size:14px; margin-bottom:8px;"> data-i18n="pendingServiceLabel">服务名称: --</div></div>
+          <div style="color:#10b981; font-size:14px; font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> ${t('pendingReviewStatus')}</div>
+          <div style="color:#64748b; font-size:12px; margin-top:4px;">${t('pendingEstTime')}</div>
         </div>
         <p style="color:#64748b; font-size:13px; margin-top:16px;">
-          审核通过后，您将收到通知，服务将自动上架到市场。<br>
-          如需修改或取消申请，请联系管理员。
+          <span data-i18n="pendingNotify1">审核通过后，您将收到通知，服务将自动上架到市场。</span><br>
+          <span data-i18n="pendingNotify2">如需修改或取消申请，请联系管理员。</span>
         </p>
       </div>
 
@@ -362,7 +362,7 @@
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;" data-i18n="regExit"><i data-lucide="door-open" class="icon-inline"></i> 退出机制</h3>
         <div style="background:#0f121e; border-radius:10px; padding:16px; margin-bottom:20px; color:#94a3b8; font-size:13px; line-height:1.8;">
-          <div data-i18n="regExit1">• Agent 可随时退出市场，已上架服务将下架</div>
+          <div data-i18n="regExit1">• Agent 可随时${t('sellerExitMarket')}，${t('sellerServiceOnline')}服务将下架</div>
           <div data-i18n="regExit2">• 未完成的订单仍会正常结算</div>
           <div data-i18n="regExit3">• 退出时退还全部质押保证金至原钱包</div>
           <div data-i18n="regExit4">• 退出后可随时重新入驻（需重新质押）</div>
@@ -413,7 +413,7 @@
           </div>
           <div style="cursor:pointer;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;margin-left:auto;" onclick="toggleMyOrders()">
             <i data-lucide="clipboard-list" class="icon-inline" style="font-size:16px;"></i>
-            <span style="color:#a78bfa;font-size:13px;font-weight:600;" data-i18n="myOrders">我的订单</span>
+            <span style="color:#a78bfa;font-size:13px;font-weight:600;" data-i18n="myOrders">${t('myOrdersTitle')}</span>
           </div>
           <div style="cursor:pointer;position:relative;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleNotificationPanel()">
             <i data-lucide="bell" class="icon-inline" style="font-size:16px;"></i>
@@ -446,7 +446,7 @@
 
         <!-- 我的消费记录 -->
         <div class="txs" style="margin-top:16px; max-height:400px; overflow-y:auto;">
-          <div class="section-title" style="margin-bottom:0; position:sticky; top:0; background:#0b0f1a; z-index:1; padding:4px 0;" data-i18n="myTxTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的消费记录</div>
+          <div class="section-title" style="margin-bottom:0" data-i18n="myTxTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的消费记录</div>
           <table class="tx-table">
             <tr><th data-i18n="txTime">时间</th><th data-i18n="txExpert">服务专家</th><th data-i18n="txAmount">金额</th><th data-i18n="txService">服务</th><th data-i18n="txRoute">路由</th><th data-i18n="txVerify">验证</th><th data-i18n="txReceipt">凭证</th><th data-i18n="txOnchain">链上</th></tr>
             <tbody id="myTxBody"></tbody>
@@ -466,7 +466,7 @@
             <button onclick="sortMarket('effectiveRate')" class="sort-btn" data-sort="effectiveRate" style="background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">有效率 ↓</button>
             <button onclick="sortMarket('totalCalls')" class="sort-btn" data-sort="totalCalls" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">调用量 ↓</button>
             <button onclick="sortMarket('price')" class="sort-btn" data-sort="price" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">价格 ↓</button>
-            <input id="marketSearch" type="text" placeholder="搜索服务..." oninput="applyMarketFilter()" style="background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:4px 10px; color:#e2e8f0; font-size:12px; width:140px; outline:none;" />
+            <input id="marketSearch" type="text" data-i18n-placeholder="searchPlaceholder" placeholder="搜索服务..." oninput="applyMarketFilter()" style="background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:4px 10px; color:#e2e8f0; font-size:12px; width:140px; outline:none;" />
           </div>
         </div>
         <div id="expertsList" class="agent-grid">
@@ -586,7 +586,7 @@
     </div>
   </div>
 
-  <!-- 服务结果弹窗 -->
+  <!-- ${t('serviceResultTitle')}弹窗 -->
   <div id="reportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; overflow-y:auto;">
     <div style="max-width:700px; margin:50px auto; background:#161b2e; border-radius:16px; padding:30px; border:1px solid rgba(139,92,246,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -762,7 +762,7 @@
           return;
         }
         
-        // 检查是否有已上架的服务
+        // 检查是否有${t('sellerServiceOnline')}的服务
         const approvedServices = mine.filter(s => s.status === 'approved');
         
         if (approvedServices.length > 0) {
@@ -776,9 +776,9 @@
                 <span style="color:#a78bfa;font-weight:600;font-size:16px;">${s.expert}</span>
                 <span style="color:#64748b;margin:0 6px;">→</span>
                 <span style="color:#e2e8f0;font-size:15px;">${s.name}</span>
-                <span style="color:#059669;font-size:12px;margin-left:8px;"><i data-lucide="check-circle" class="icon-inline"></i> 已上架</span>
+                <span style="color:#059669;font-size:12px;margin-left:8px;"><i data-lucide="check-circle" class="icon-inline"></i> ${t('sellerServiceOnline')}</span>
               </div>
-              <button onclick="deregisterService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;"><i data-lucide="door-open" class="icon-inline"></i> 退出市场</button>
+              <button onclick="deregisterService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;"><i data-lucide="door-open" class="icon-inline"></i> ${t('sellerExitMarket')}</button>
             </div>
             <div style="color:#94a3b8;font-size:13px;margin-bottom:8px;">${s.desc || ''}</div>
             <div style="display:flex;gap:16px;font-size:12px;color:#64748b;">
@@ -807,7 +807,7 @@
       modal.id = 'deregisterModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出市场？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:24px;line-height:1.6;">退出后服务将下架，押金退还由质押方处理。<br>可随时重新入驻（需重新质押）。</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('deregisterModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doDeregister('${id}')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认${t('sellerExitMarket')}？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:24px;line-height:1.6;">退出后服务将下架，押金退还由质押方处理。<br>可随时重新入驻（需重新质押）。</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('deregisterModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doDeregister('${id}')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
     }
@@ -822,13 +822,13 @@
         });
         const data = await res.json();
         if (data.ok) {
-          showNotice('已退出市场');
+          showNotice('已${t('sellerExitMarket')}');
           checkMyRegistration();
           reloadMarket();
         } else {
-          showError(data.error || '操作失败');
+          showError(data.error || t('operationFailed'));
         }
-      } catch(e) { showError('操作失败'); }
+      } catch(e) { showError(t('operationFailed')); }
     }
 
     // 表单验证：通过后启用提交按钮
@@ -857,9 +857,9 @@
         depositBtn.style.background = 'linear-gradient(135deg,#475569,#334155)';
         depositBtn.style.color = '#94a3b8';
         if (!priceVal || isNaN(priceNum) || priceNum <= 0) {
-          depositBtn.textContent = '请填写有效的价格';
+          depositBtn.textContent = t('invalidPrice');
         } else {
-          depositBtn.textContent = '请填写完整表单';
+          depositBtn.textContent = t('fillCompleteForm');
         }
         depositBtn.setAttribute('data-i18n', 'fillFormFirst');
       }
@@ -1118,7 +1118,7 @@
         }]
       });
 
-      renderProgressSteps('等待链上确认', `Swap 交易已广播，等待确认中...`, [
+      renderProgressSteps('等待链上确认', `Swap 交易已广播，${t('orderPending')}中...`, [
         { label: '查询 BNB→USDC 兑换比例', state: 'done' },
         { label: 'MetaMask 交换交易已提交', state: 'done' },
         { label: '等待链上确认', state: 'active' },
@@ -1236,7 +1236,7 @@
         });
         txHashes.push(txHash);
 
-        renderProgressSteps('等待链上确认', `第 ${index + 1}/${splitDetails.length} 笔支付已广播，等待确认...`, splitDetails.map((item, itemIndex) => ({
+        renderProgressSteps('等待链上确认', `第 ${index + 1}/${splitDetails.length} 笔支付已广播，${t('orderPending')}...`, splitDetails.map((item, itemIndex) => ({
           label: `${item.chain.toUpperCase()} 支付 ${Number(item.amount).toFixed(4)} ${route.symbol}`,
           state: itemIndex < index ? 'done' : itemIndex === index ? 'active' : 'pending'
         })), `<p style="color:#8b5cf6;">TxHash: ${txHash}</p>`);
@@ -1268,8 +1268,8 @@
         paymentHeaders.push(paymentHeader);
       }
 
-      renderProgressSteps('聚合验证中', '所有 split 子支付已确认，正在提交聚合验证...', [
-        { label: '多笔子支付全部已确认', state: 'done' },
+      renderProgressSteps('聚合验证中', '所有 split 子支付${t('orderConfirmed')}，正在提交聚合验证...', [
+        { label: '多笔子支付全部${t('orderConfirmed')}', state: 'done' },
         { label: '提交 split 聚合验证', state: 'active' },
       ], `<p style="color:#8b5cf6;">共 ${txHashes.length} 笔交易</p>`);
 
@@ -1900,7 +1900,7 @@
       modal.id = 'notifModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) { notifPanelOpen = false; modal.remove(); } };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="notifPanelOpen=false;document.getElementById('notifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="notifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> ${t('notifCenter')}</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">${t('markAllRead')}</button><button onclick="notifPanelOpen=false;document.getElementById('notifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="notifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;" data-i18n="loading">${t('loading')}</div></div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
       loadNotifications();
@@ -1921,10 +1921,10 @@
       modal.onclick = (e) => { if (e.target === modal) { myOrdersOpen = false; modal.remove(); } };
       modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的订单</div>
+          <div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="clipboard-list" class="icon-inline"></i> ${t('myOrdersTitle')}</div>
           <button onclick="myOrdersOpen=false;document.getElementById('myOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
         </div>
-        <div id="myOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div>
+        <div id="myOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;" data-i18n="loading">${t('loading')}</div>
       </div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
@@ -1947,10 +1947,10 @@
         list.innerHTML = data.orders.map(o => {
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let statusText = '', statusColor = '';
-          if (o.status === 'pending') { statusText = '<i data-lucide="clock" class="icon-inline"></i> 等待确认'; statusColor = '#fbbf24'; }
-          else if (o.status === 'confirmed' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 已确认'; statusColor = '#60a5fa'; }
-          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已交付'; statusColor = '#34d399'; }
-          else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
+          if (o.status === 'pending') { statusText = '<i data-lucide="clock" class="icon-inline"></i> ${t('orderPending')}'; statusColor = '#fbbf24'; }
+          else if (o.status === 'confirmed' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> ${t('orderConfirmed')}'; statusColor = '#60a5fa'; }
+          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> ${t('orderDelivered')}'; statusColor = '#34d399'; }
+          else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> ${t('orderCompleted')}'; statusColor = '#34d399'; }
           else { statusText = o.status; statusColor = '#94a3b8'; }
 
           const hasResult = o.result || o.report;
@@ -1981,7 +1981,7 @@
         modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
         modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:32px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div style="color:#a78bfa;font-size:16px;font-weight:600;"><i data-lucide="package" class="icon-inline"></i> 服务结果</div>
+            <div style="color:#a78bfa;font-size:16px;font-weight:600;"><i data-lucide="package" class="icon-inline"></i> ${t('serviceResultTitle')}</div>
             <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
           </div>
           <div style="color:#e2e8f0;font-size:13px;white-space:pre-wrap;line-height:1.6;">${typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2)}</div>
@@ -2044,7 +2044,7 @@
           return;
         }
         if (data.pending.length === 0) {
-          document.getElementById('pendingList').innerHTML = '<div style="color:#475569;text-align:center;padding:20px;"><i data-lucide="check-circle" class="icon-inline"></i> 暂无待审核服务</div>';
+          document.getElementById('pendingList').innerHTML = '<div style="color:#475569;text-align:center;padding:20px;"><i data-lucide="check-circle" class="icon-inline"></i> ${t('noPending')}</div>';
           return;
         }
         document.getElementById('pendingList').innerHTML = data.pending.map(s => {
@@ -2086,7 +2086,7 @@
         });
         const data = await res.json();
         if (data.ok) { loadPendingServices(); } else { alert(data.error); }
-      } catch(e) { alert('操作失败'); }
+      } catch(e) { alert(t('operationFailed')); }
     }
 
     async function rejectService(id) {
@@ -2099,7 +2099,7 @@
         });
         const data = await res.json();
         if (data.ok) { loadPendingServices(); } else { alert(data.error); }
-      } catch(e) { alert('操作失败'); }
+      } catch(e) { alert(t('operationFailed')); }
     }
 
     async function markAllRead() {
@@ -2114,7 +2114,7 @@
       } catch(e) {}
     }
 
-    // ===== B端: 卖家工作台 =====
+    // ===== B端: ${t('sellerWorkbench')} =====
     let sellerOrdersOpen = false;
     function toggleSellerOrders() {
       sellerOrdersOpen = !sellerOrdersOpen;
@@ -2127,7 +2127,7 @@
       modal.id = 'sellerOrdersModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) { sellerOrdersOpen = false; modal.remove(); } };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:600px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="package" class="icon-inline"></i> 收到的订单</div><button onclick="sellerOrdersOpen=false;document.getElementById('sellerOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div><div id="sellerOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:600px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="package" class="icon-inline"></i> ${t('sellerOrders')}</div><button onclick="sellerOrdersOpen=false;document.getElementById('sellerOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div><div id="sellerOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;" data-i18n="loading">${t('loading')}</div></div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
       loadSellerOrders();
@@ -2145,7 +2145,7 @@
       modal.id = 'sellerNotifModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) { sellerNotifOpen = false; modal.remove(); } };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="sellerNotifOpen=false;document.getElementById('sellerNotifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="sellerNotifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> ${t('notifCenter')}</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">${t('markAllRead')}</button><button onclick="sellerNotifOpen=false;document.getElementById('sellerNotifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="sellerNotifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;" data-i18n="loading">${t('loading')}</div></div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
       loadSellerNotif();
@@ -2166,9 +2166,9 @@
         list.innerHTML = data.orders.map(o => {
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let statusText = '', statusColor = '';
-          if (o.status === 'pending' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 待交付'; statusColor = '#fbbf24'; }
-          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已交付'; statusColor = '#34d399'; }
-          else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
+          if (o.status === 'pending' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> ${t('pendingDelivery')}'; statusColor = '#fbbf24'; }
+          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> ${t('orderDelivered')}'; statusColor = '#34d399'; }
+          else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> ${t('orderCompleted')}'; statusColor = '#34d399'; }
           else { statusText = o.status; statusColor = '#94a3b8'; }
           const needDeliver = (o.status === 'pending' || o.status === 'demo-completed' || o.status === 'confirmed') && !o.result;
           return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
@@ -2194,7 +2194,7 @@
       const modal = document.createElement('div');
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100000;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:500px;max-width:90vw;"><div style="color:#a78bfa;font-weight:600;font-size:16px;margin-bottom:16px;"><i data-lucide="package" class="icon-inline"></i> 提交服务结果</div><textarea id="deliverOutput" rows="8" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;resize:vertical;" placeholder="输入服务执行结果..."></textarea><div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;"><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:8px;padding:8px 20px;cursor:pointer;">取消</button><button onclick="submitDeliverResult('${orderId}')" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-weight:600;">提交</button></div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:500px;max-width:90vw;"><div style="color:#a78bfa;font-weight:600;font-size:16px;margin-bottom:16px;"><i data-lucide="package" class="icon-inline"></i> 提交${t('serviceResultTitle')}</div><textarea id="deliverOutput" rows="8" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;resize:vertical;" placeholder="${t('submitResultPlaceholder')}"></textarea><div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;"><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:8px;padding:8px 20px;cursor:pointer;">取消</button><button onclick="submitDeliverResult('${orderId}')" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-weight:600;">提交</button></div></div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
     }
@@ -2286,12 +2286,12 @@
         const list = document.getElementById('sellerTxList');
         if (!list) return;
         if (data.orders.length === 0) {
-          list.innerHTML = '<div style="color:#475569;text-align:center;padding:16px;">暂无收支记录</div>';
+          list.innerHTML = '<div style="color:#475569;text-align:center;padding:16px;">${t('sellerTxEmpty')}</div>';
           return;
         }
         list.innerHTML = data.orders.map(o => {
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
-          const isIncome = true; // 收到的订单都是收入
+          const isIncome = true; // ${t('sellerOrders')}都是收入
           return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(139,92,246,0.06);">
             <div>
               <span style="color:#34d399;font-size:12px;">+ ${o.price} BNB</span>
@@ -2309,7 +2309,7 @@
         const res = await fetch(`/api/orders/${orderId}/result`);
         const data = await res.json();
         if (data.ok && data.result) {
-          alert(`服务结果：${JSON.stringify(data.result)}`);
+          alert(`${t('serviceResultTitle')}：${JSON.stringify(data.result)}`);
         } else {
           alert('结果暂未提交，请稍后再试');
         }
@@ -2427,7 +2427,7 @@
       modal.id = 'exitExpertModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:16px;line-height:1.6;">退出后押金将退还，服务将下架。</div><input id="exitExpertName" placeholder="输入专家名确认" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px;color:#e2e8f0;font-size:13px;margin-bottom:20px;outline:none;" /><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('exitExpertModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doExitExpert()" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">${t('confirmExitTitle2')}</div><div style="color:#94a3b8;font-size:13px;margin-bottom:16px;line-height:1.6;">退出后押金将退还，服务将下架。</div><input id="exitExpertName" placeholder="输入专家名确认" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px;color:#e2e8f0;font-size:13px;margin-bottom:20px;outline:none;" /><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('exitExpertModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doExitExpert()" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
     }
@@ -2988,7 +2988,7 @@ async function confirmDepositModal() {
       try {
         const res = await fetch('/api/purchases/confirm/' + purchaseId, { method: 'POST' });
         const data = await res.json();
-        if (data.ok) { showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 购买已确认'); loadPendingPurchases(); reloadMarket(); }
+        if (data.ok) { showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 购买${t('orderConfirmed')}'); loadPendingPurchases(); reloadMarket(); }
         else { showError(data.error); }
       } catch(e) { showError('确认失败: ' + e.message); }
     }
@@ -3235,6 +3235,79 @@ async function confirmDepositModal() {
         copy: 'Copy',
         copied: 'Copied',
         connecting: 'Connecting...',
+        // Seller dashboard
+        sellerWorkbench: 'Seller Workbench',
+        sellerOrders: 'Received Orders',
+        sellerIncome: 'Total Income',
+        sellerDepositLabel: 'Deposit',
+        sellerNet: 'Net Income',
+        sellerCompletedLabel: 'Completed',
+        sellerTxTitle: 'Revenue Records',
+        sellerTxEmpty: 'No records yet',
+        sellerServiceOnline: 'Online',
+        sellerExitMarket: 'Exit Market',
+        // Deregister modal
+        confirmExitTitle: 'Confirm Exit Market?',
+        confirmExitDesc: 'Service will be delisted. Deposit refund handled by staking party.<br>You can re-register anytime (re-stake required).',
+        confirmExitTitle2: 'Confirm Exit?',
+        confirmExitDesc2: 'Deposit will be refunded, service will be delisted.',
+        exitExpertNamePlaceholder: 'Enter expert name to confirm',
+        btnCancel: 'Cancel',
+        btnConfirmExit: 'Confirm Exit',
+        // Pending review
+        pendingReviewTitle: 'Application Submitted',
+        pendingDepositOk: 'Deposit paid successfully!<br>Service is under review, will be auto-listed after admin approval.',
+        pendingServiceLabel: 'Service Name: ',
+        pendingReviewStatus: 'Under Review',
+        pendingEstTime: 'Estimated 1-3 business days',
+        pendingNotify: 'You will be notified once approved.<br>Contact admin to modify or cancel.',
+        // Loading
+        loading: 'Loading...',
+        // Notifications
+        notifCenter: 'Notification Center',
+        markAllRead: 'Mark All Read',
+        // My Orders
+        myOrdersTitle: 'My Orders',
+        orderPending: 'Pending',
+        orderConfirmed: 'Confirmed',
+        orderDelivered: 'Delivered',
+        orderCompleted: 'Completed',
+        // Service result
+        serviceResultTitle: 'Service Result',
+        submitResultTitle: 'Submit Service Result',
+        submitResultPlaceholder: 'Enter service execution result...',
+        btnSubmit: 'Submit',
+        pendingDelivery: 'Pending Delivery',
+        // Admin
+        adminTitle: 'Service Review',
+        noPending: 'No pending reviews',
+        btnApprove: 'Approve',
+        btnReject: 'Reject',
+        // Messages
+        exitSuccess: 'Exited market',
+        operationFailed: 'Operation failed',
+        // Form
+        inputFormatLabel: 'Input Format',
+        inputFormatDesc: 'e.g. wallet address or token contract',
+        outputFormatLabel: 'Output Format',
+        outputFormatDesc: 'e.g. token safety score report',
+        latencyLabel: 'Response Latency',
+        latencyPlaceholder: 'e.g. ~5s',
+        // Search
+        searchPlaceholder: 'Search services...',
+        // Payment
+        depositPaid: 'Deposit paid! View tx',
+        chainNotSupportX402: 'Current chain does not support real x402 payment',
+        chainNotSupportBNB: 'Current chain does not support real BNB payment',
+        demoOrderLabel: 'Demo Order',
+        pendingConfirmLabel: 'Pending Confirmation',
+        fillCompleteForm: 'Please fill in the complete form',
+        invalidPrice: 'Please enter a valid price',
+        siteTitle: 'CryptoMinds — AI Agent On-chain Economy',
+        pendingDepositOk1: 'Deposit paid successfully!',
+        pendingDepositOk2: 'Service is under review, will be auto-listed after admin approval.',
+        pendingNotify1: 'You will be notified once approved, service will be auto-listed.',
+        pendingNotify2: 'Contact admin to modify or cancel your application.',
       },
       zh: {
         // Header
@@ -3368,6 +3441,79 @@ async function confirmDepositModal() {
         copy: '复制',
         copied: '已复制',
         connecting: '连接中...',
+        // Seller dashboard
+        sellerWorkbench: '卖家工作台',
+        sellerOrders: '收到的订单',
+        sellerIncome: '总收入',
+        sellerDepositLabel: '押金',
+        sellerNet: '净收入',
+        sellerCompletedLabel: '已完成订单',
+        sellerTxTitle: '收支记录',
+        sellerTxEmpty: '暂无收支记录',
+        sellerServiceOnline: '已上架',
+        sellerExitMarket: '退出市场',
+        // Deregister modal
+        confirmExitTitle: '确认退出市场？',
+        confirmExitDesc: '退出后服务将下架，押金退还由质押方处理。<br>可随时重新入驻（需重新质押）。',
+        confirmExitTitle2: '确认退出？',
+        confirmExitDesc2: '退出后押金将退还，服务将下架。',
+        exitExpertNamePlaceholder: '输入专家名确认',
+        btnCancel: '取消',
+        btnConfirmExit: '确认退出',
+        // Pending review
+        pendingReviewTitle: '入驻申请已提交',
+        pendingDepositOk: '<span data-i18n="pendingDepositOk1">押金已缴纳成功！</span><br><span data-i18n="pendingDepositOk2">服务正在审核中，管理员审核通过后将自动上架。</span>',
+        pendingServiceLabel: '服务名称: ',
+        pendingReviewStatus: '待审核',
+        pendingEstTime: '预计 1-3 个工作日',
+        pendingNotify: '<span data-i18n="pendingNotify1">审核通过后，您将收到通知，服务将自动上架到市场。</span><br><span data-i18n="pendingNotify2">如需修改或取消申请，请联系管理员。</span>',
+        // Loading
+        loading: '加载中...',
+        // Notifications
+        notifCenter: '通知中心',
+        markAllRead: '全部已读',
+        // My Orders
+        myOrdersTitle: '我的订单',
+        orderPending: '等待确认',
+        orderConfirmed: '已确认',
+        orderDelivered: '已交付',
+        orderCompleted: '已完成',
+        // Service result
+        serviceResultTitle: '服务结果',
+        submitResultTitle: '提交服务结果',
+        submitResultPlaceholder: '输入服务执行结果...',
+        btnSubmit: '提交',
+        pendingDelivery: '待交付',
+        // Admin
+        adminTitle: '服务审核',
+        noPending: '暂无待审核服务',
+        btnApprove: '通过',
+        btnReject: '拒绝',
+        // Messages
+        exitSuccess: '已退出市场',
+        operationFailed: '操作失败',
+        // Form
+        inputFormatLabel: '输入格式',
+        inputFormatDesc: '如：钱包地址 或 代币合约地址',
+        outputFormatLabel: '输出格式',
+        outputFormatDesc: '如：代币安全评分报告 或 巨鲸交易列表',
+        latencyLabel: '响应延迟',
+        latencyPlaceholder: '如：~5秒',
+        // Search
+        searchPlaceholder: '搜索服务...',
+        // Payment
+        depositPaid: '押金已缴纳！查看交易',
+        chainNotSupportX402: '当前链暂不支持真实 x402 支付',
+        chainNotSupportBNB: '当前链暂不支持真实 BNB 支付',
+        demoOrderLabel: 'Demo 订单',
+        pendingConfirmLabel: '待确认',
+        fillCompleteForm: '请填写完整表单',
+        invalidPrice: '请填写有效的价格',
+        siteTitle: 'CryptoMinds — AI Agent 链上经济体',
+        pendingDepositOk1: '押金已缴纳成功！',
+        pendingDepositOk2: '服务正在审核中，管理员审核通过后将自动上架。',
+        pendingNotify1: '审核通过后，您将收到通知，服务将自动上架到市场。',
+        pendingNotify2: '如需修改或取消申请，请联系管理员。',
       }
     };
 
@@ -3570,18 +3716,18 @@ async function confirmDepositModal() {
     initWebPush();
   </script>
 
-  <!-- 等待审核弹窗 -->
+  <!-- 等${t('pendingReviewStatus')}弹窗 -->
   <div id="pendingReviewModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.9); z-index:99999; justify-content:center; align-items:center;">
     <div style="background:linear-gradient(135deg,#1e1b4b,#312e81); border:2px solid rgba(139,92,246,0.4); border-radius:20px; padding:48px; max-width:450px; width:90%; text-align:center;">
       <div style="font-size:64px; margin-bottom:20px;"><i data-lucide="sparkles" style="width:64px;height:64px;color:#a78bfa;"></i></div>
-      <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;">入驻申请已提交</h2>
+      <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;">${t('pendingReviewTitle')}</h2>
       <p style="color:#94a3b8; font-size:15px; margin-bottom:24px; line-height:1.6;">
-        押金已缴纳成功！<br>
-        服务正在审核中，管理员审核通过后将自动上架。
+        <span data-i18n="pendingDepositOk1">押金已缴纳成功！</span><br>
+        <span data-i18n="pendingDepositOk2">服务正在审核中，管理员审核通过后将自动上架。</span>
       </p>
       <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:16px; margin-bottom:24px;">
-        <div style="color:#10b981; font-size:14px; font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> 待审核</div>
-        <div style="color:#64748b; font-size:12px; margin-top:4px;">预计 1-3 个工作日</div>
+        <div style="color:#10b981; font-size:14px; font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> ${t('pendingReviewStatus')}</div>
+        <div style="color:#64748b; font-size:12px; margin-top:4px;">${t('pendingEstTime')}</div>
       </div>
       <button onclick="closePendingReviewModal()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:14px 40px; border-radius:10px; font-weight:600; font-size:15px; cursor:pointer;">
         完成
