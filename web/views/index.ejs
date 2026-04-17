@@ -378,8 +378,8 @@
             <div class="agent-name"><%= svc.expert %></div>
             <div class="agent-desc"><%= svc.desc || svc.name %></div>
             <div class="agent-footer">
-              <div class="agent-meta"><span class="star"><i data-lucide="star" class="icon-inline" style="color:#fbbf24;fill:#fbbf24"></i></span> <%= svc.rating || '--' %></div>
-              <div class="agent-meta"><i data-lucide="user" class="icon-inline"></i> <%= svc.sales || 0 %> <span data-i18n="orders">单</span></div>
+              <div class="agent-meta" style="color:<%= (svc.effectiveRate > 0 ? (svc.effectiveRate >= 0.8 ? '#34d399' : svc.effectiveRate >= 0.5 ? '#fbbf24' : '#f87171') : '#64748b') %>"><i data-lucide="check-circle" class="icon-inline"></i> <%= svc.totalCalls > 0 ? Math.round(svc.effectiveRate * 100) + '%' : '--' %></div>
+              <div class="agent-meta"><i data-lucide="activity" class="icon-inline"></i> <%= svc.totalCalls || 0 %> <span data-i18n="orders">次</span></div>
               <button class="agent-buy-btn" onclick="showSmartRoute('<%= svc.id %>')" data-i18n="buyService"><i data-lucide="rocket" class="icon-inline"></i> 购买服务</button>
             </div>
           </div>
