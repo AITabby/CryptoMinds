@@ -1087,6 +1087,12 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
   if (!isValidAddress(normalizedWallet)) {
     return res.json({ ok: false, error: 'wallet 地址格式无效' });
   }
+  // 一号一服务限制
+  const existingServices = getServices();
+  const hasActive = existingServices.find(s => s.wallet?.toLowerCase() === normalizedWallet.toLowerCase() && s.status !== 'deregistered');
+  if (hasActive) {
+    return res.json({ ok: false, error: '该钱包已发布服务，一个钱包只能发布一个服务' });
+  }
   // 服务契约（不再上传文件）
   // 验证押金交易（非零地址时需要链上验证，pending_deposit 状态跳过验证）
   if (!initialStatus && DEPOSIT_POOL_ADDRESS !== '0x0000000000000000000000000000000000000000') {
@@ -1951,6 +1957,20 @@ app.get('/api/received-orders', (req, res) => {
   const purchases = getPurchases();
   const mine = purchases.filter(p => p.expertWallet?.toLowerCase() === wallet);
   res.json({ ok: true, total: mine.length, orders: mine });
+});
+
+// 卖家收支统计
+app.get('/api/seller-stats', (req, res) => {
+  const wallet = (req.query.wallet || '').trim().toLowerCase();
+  if (!wallet) return res.json({ ok: false, error: '缺少 wallet' });
+  const purchases = getPurchases();
+  const mine = purchases.filter(p => p.expertWallet?.toLowerCase() === wallet);
+  const services = getServices().filter(s => s.wallet?.toLowerCase() === wallet);
+  const depositTotal = services.reduce((sum, s) => sum + (s.deposit || 0), 0);
+  const incomeTotal = mine.reduce((sum, p) => sum + (p.price || 0), 0);
+  const completedOrders = mine.filter(p => p.status === 'completed' || p.status === 'delivered').length;
+  const pendingOrders = mine.filter(p => p.status !== 'completed' && p.status !== 'delivered' && p.status !== 'rejected').length;
+  res.json({ ok: true, income: incomeTotal, deposit: depositTotal, net: incomeTotal - depositTotal, completedOrders, pendingOrders, totalOrders: mine.length });
 });
 
 app.get('/api/txs', (req, res) => {

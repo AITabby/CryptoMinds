@@ -251,6 +251,7 @@
 
       <!-- B端: 收到的订单 + 通知 -->
       <div id="sellerDashboard" style="display:none; margin-bottom:16px;">
+        <!-- 顶部: 卖家工作台 + 铃铛订单 -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <h2 style="color:#a78bfa;font-size:18px;">📦 卖家工作台</h2>
           <div style="display:flex;gap:8px;">
@@ -263,6 +264,35 @@
               <span id="sellerUnread" style="color:#a78bfa;font-size:12px;font-weight:600;">0</span>
             </div>
           </div>
+        </div>
+
+        <!-- 收支统计卡片 -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">
+          <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+            <div style="color:#64748b;font-size:11px;margin-bottom:4px;">总收入</div>
+            <div id="sellerIncome" style="color:#34d399;font-size:16px;font-weight:600;">--</div>
+          </div>
+          <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+            <div style="color:#64748b;font-size:11px;margin-bottom:4px;">押金</div>
+            <div id="sellerDeposit" style="color:#fbbf24;font-size:16px;font-weight:600;">--</div>
+          </div>
+          <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+            <div style="color:#64748b;font-size:11px;margin-bottom:4px;">净收入</div>
+            <div id="sellerNet" style="color:#a78bfa;font-size:16px;font-weight:600;">--</div>
+          </div>
+          <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+            <div style="color:#64748b;font-size:11px;margin-bottom:4px;">已完成订单</div>
+            <div id="sellerCompleted" style="color:#60a5fa;font-size:16px;font-weight:600;">--</div>
+          </div>
+        </div>
+
+        <!-- 我发布的服务 -->
+        <div id="sellerMyService" style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:12px;padding:16px;margin-bottom:12px;"></div>
+
+        <!-- 收支记录 -->
+        <div style="margin-top:12px;">
+          <div style="color:#a78bfa;font-weight:600;font-size:14px;margin-bottom:8px;">💰 收支记录</div>
+          <div id="sellerTxList" style="color:#94a3b8;font-size:13px;">加载中...</div>
         </div>
       </div>
 
@@ -727,32 +757,32 @@
         
         if (approvedServices.length > 0) {
           formArea.style.display = 'none';
-          regPanel.style.display = 'block';
-          regPanel.innerHTML = mine.map(s => {
-            const statusMap = { pending: '⏳ 审核中', approved: '✅ 已上架', rejected: '❌ 已拒绝', deregistered: '🚪 已退出' };
-            const statusColor = { pending: '#f59e0b', approved: '#059669', rejected: '#dc2626', deregistered: '#64748b' };
-            return `<div style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:12px;padding:20px;margin-bottom:12px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <div>
-                  <span style="color:#a78bfa;font-weight:600;font-size:16px;">${s.expert}</span>
-                  <span style="color:#64748b;margin:0 6px;">→</span>
-                  <span style="color:#e2e8f0;font-size:15px;">${s.name}</span>
-                </div>
-                <span style="color:${statusColor[s.status] || '#64748b'};font-size:13px;font-weight:600;">${statusMap[s.status] || s.status}</span>
+          regPanel.style.display = 'none'; // 不再用regPanel
+          const s = approvedServices[0]; // 一号一服务，只取第一个
+          const myService = document.getElementById('sellerMyService');
+          myService.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <div>
+                <span style="color:#a78bfa;font-weight:600;font-size:16px;">${s.expert}</span>
+                <span style="color:#64748b;margin:0 6px;">→</span>
+                <span style="color:#e2e8f0;font-size:15px;">${s.name}</span>
+                <span style="color:#059669;font-size:12px;margin-left:8px;">✅ 已上架</span>
               </div>
-              <div style="color:#94a3b8;font-size:13px;margin-bottom:8px;">${s.desc || ''}</div>
-              <div style="display:flex;gap:16px;font-size:12px;color:#64748b;margin-bottom:12px;">
-                <span>💰 ${s.price} BNB</span>
-                <span>📥 ${s.inputFormat}</span>
-                <span>📤 ${s.outputFormat}</span>
-                <span>📊 有效率 ${s.effectiveRate}%</span>
-              </div>
-              ${s.status === 'approved' ? `<button onclick="deregisterService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🚪 退出市场</button>` : ''}
-            </div>`;
-          }).join('');
+              <button onclick="deregisterService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🚪 退出市场</button>
+            </div>
+            <div style="color:#94a3b8;font-size:13px;margin-bottom:8px;">${s.desc || ''}</div>
+            <div style="display:flex;gap:16px;font-size:12px;color:#64748b;">
+              <span>💰 ${s.price} BNB</span>
+              <span>📥 ${s.inputFormat}</span>
+              <span>📤 ${s.outputFormat}</span>
+              <span>📊 有效率 ${s.effectiveRate}%</span>
+            </div>
+          `;
 
-          // 加载收到的订单
+          // 加载卖家数据
           loadSellerOrders();
+          loadSellerStats();
+          loadSellerTx();
           document.getElementById('sellerDashboard').style.display = 'block';
         } else {
           formArea.style.display = 'block';
@@ -2206,6 +2236,46 @@
         }
       } catch(e) {}
     }, 10000);
+
+    async function loadSellerStats() {
+      if (!currentAccount) return;
+      try {
+        const res = await fetch(`/api/seller-stats?wallet=${currentAccount}`);
+        const data = await res.json();
+        if (!data.ok) return;
+        document.getElementById('sellerIncome').textContent = data.income.toFixed(6) + ' BNB';
+        document.getElementById('sellerDeposit').textContent = data.deposit.toFixed(4) + ' BNB';
+        document.getElementById('sellerNet').textContent = data.net.toFixed(6) + ' BNB';
+        document.getElementById('sellerCompleted').textContent = data.completedOrders;
+      } catch(e) {}
+    }
+
+    async function loadSellerTx() {
+      if (!currentAccount) return;
+      try {
+        const res = await fetch(`/api/received-orders?wallet=${currentAccount}`);
+        const data = await res.json();
+        if (!data.ok) return;
+        const list = document.getElementById('sellerTxList');
+        if (!list) return;
+        if (data.orders.length === 0) {
+          list.innerHTML = '<div style="color:#475569;text-align:center;padding:16px;">暂无收支记录</div>';
+          return;
+        }
+        list.innerHTML = data.orders.map(o => {
+          const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+          const isIncome = true; // 收到的订单都是收入
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(139,92,246,0.06);">
+            <div>
+              <span style="color:#34d399;font-size:12px;">+ ${o.price} BNB</span>
+              <span style="color:#64748b;font-size:11px;margin-left:8px;">${o.serviceName}</span>
+              <span style="color:#64748b;font-size:11px;margin-left:4px;">← ${o.buyerName || '买家'}</span>
+            </div>
+            <span style="color:#475569;font-size:11px;">${time}</span>
+          </div>`;
+        }).join('');
+      } catch(e) {}
+    }
 
     async function viewOrderResult(orderId) {
       try {
