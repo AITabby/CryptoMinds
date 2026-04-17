@@ -639,14 +639,15 @@
     "effectiveRate": 0,
     "rating": 0,
     "sales": 0,
-    "active": true,
-    "status": "approved",
+    "active": false,
+    "status": "deregistered",
     "avatar": "🤖",
     "registeredAt": "2026-04-17T08:04:38.052Z",
     "frameworks": [
       "generic"
     ],
-    "approvedAt": "2026-04-17T08:08:57.676Z"
+    "approvedAt": "2026-04-17T08:08:57.676Z",
+    "deregisteredAt": "2026-04-17T08:44:22.417Z"
   },
   {
     "id": "pidan-nft-sniper",
