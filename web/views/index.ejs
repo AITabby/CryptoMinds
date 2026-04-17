@@ -65,7 +65,7 @@
     .my-agent.show { display: block; }
     .my-agent-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
     .my-agent-header .icon { font-size: 32px; }
-    .my-agent-header h2 { color: #a78bfa; font-size: 18px; }
+    .my-agent-header h2 { color: #a78bfa; font-size: 18px; margin-bottom: 6px; }
     .my-agent-header .addr { color: #64748b; font-size: 12px; font-family: monospace; }
     .my-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
     .stat-card { background: #0f121e; border: 1px solid rgba(139,92,246,0.06); border-radius: 12px; padding: 16px; text-align: center; transition: all 0.3s; }
@@ -190,10 +190,10 @@
 
     /* 通用滚动条 - 紫色系 */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: rgba(15,18,30,0.8); border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: rgba(49,46,129,0.3); border-radius: 3px; }
     ::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.55); }
-    * { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.35) rgba(15,18,30,0.8); }
+    * { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.35) rgba(49,46,129,0.3); }
 
   </style>
 </head>
@@ -250,7 +250,7 @@
       <div id="panel-admin" style="display:none; max-width:900px; margin:0 auto;">
         <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px;">
           <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="shield" class="icon-inline"></i> <span data-i18n="adminTitle">服务审核</span></h2>
-          <div id="pendingList" style="color:#94a3b8;" data-i18n="loading">加载中...</div>
+          <div id="pendingList" style="color:#94a3b8;">加载中...</div>
         </div>
       </div>
 
@@ -301,7 +301,7 @@
           <!-- 右边: 收支记录 -->
           <div style="flex:1;background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;display:flex;flex-direction:column;max-height:300px;">
             <div style="color:#a78bfa;font-weight:600;font-size:13px;margin-bottom:8px;"><i data-lucide="coins" class="icon-inline"></i> <span data-i18n="sellerTxTitle">收支记录</span></div>
-            <div id="sellerTxList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;" data-i18n="loading">加载中...</div>
+            <div id="sellerTxList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div>
           </div>
         </div>
       </div>
@@ -1924,7 +1924,7 @@
           <div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的订单</div>
           <button onclick="myOrdersOpen=false;document.getElementById('myOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
         </div>
-        <div id="myOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div>
+        <div id="myOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;padding-right:8px;">加载中...</div>
       </div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
@@ -1961,7 +1961,7 @@
                 <div style="color:#64748b;font-size:11px;margin-top:4px;">卖家: ${o.expert || '未知'} | ${time}</div>
                 <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
               </div>
-              <div style="text-align:right;">
+              <div style="text-align:right;padding-right:4px;">
                 <div style="color:${statusColor};font-size:12px;font-weight:600;">${statusText}</div>
                 ${hasResult ? `<button onclick="viewOrderResult('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">查看结果</button>` : ''}
               </div>
