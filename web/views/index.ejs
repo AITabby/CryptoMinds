@@ -188,6 +188,13 @@
     .spin { animation: spin 1s linear infinite; }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+    /* 通用滚动条 - 紫色系 */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15,18,30,0.8); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.55); }
+    * { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.35) rgba(15,18,30,0.8); }
+
   </style>
 </head>
 <body>
@@ -438,8 +445,8 @@
 
 
         <!-- 我的消费记录 -->
-        <div class="txs" style="margin-top:16px;">
-          <div class="section-title" style="margin-bottom:0" data-i18n="myTxTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的消费记录</div>
+        <div class="txs" style="margin-top:16px; max-height:400px; overflow-y:auto;">
+          <div class="section-title" style="margin-bottom:0; position:sticky; top:0; background:#0b0f1a; z-index:1; padding:4px 0;" data-i18n="myTxTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的消费记录</div>
           <table class="tx-table">
             <tr><th data-i18n="txTime">时间</th><th data-i18n="txExpert">服务专家</th><th data-i18n="txAmount">金额</th><th data-i18n="txService">服务</th><th data-i18n="txRoute">路由</th><th data-i18n="txVerify">验证</th><th data-i18n="txReceipt">凭证</th><th data-i18n="txOnchain">链上</th></tr>
             <tbody id="myTxBody"></tbody>
