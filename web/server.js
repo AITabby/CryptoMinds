@@ -724,17 +724,17 @@ app.get('/api/transactions', (req, res) => {
 
 app.get('/api/market', (req, res) => {
   const services = getServices().filter(s => s.active);
-  // 按声誉加权排序：rating * 0.4 + sales权重 * 0.3 + 声誉分 * 0.3
-  const reputationData = getReputationData();
+  // 按有效率+调用量排序
   const sorted = services.map(s => {
-    const agentName = s.expert === '铁蛋' ? 'tiedan' : s.expert === '臭蛋' ? 'choudan' : s.expert === '卤蛋' ? 'ludan' : s.expert === '钢蛋' ? 'gangdan' : null;
-    const rep = agentName ? reputationData[agentName] : null;
-    const repScore = rep ? rep.reputation_score || 50 : 50;
-    const marketRating = s.rating || 0;
-    const sales = s.sales || 0;
-    // 加权分数
-    s._sort_score = marketRating * 10 * 0.4 + Math.min(sales, 200) * 0.15 + repScore * 0.3;
-    s.reputation = rep ? { score: repScore, grade: rep.grade || 'C' } : null;
+    // 兼容旧数据：sales 映射到 totalCalls
+    s.totalCalls = s.totalCalls || s.sales || 0;
+    s.effectiveCalls = s.effectiveCalls || 0;
+    s.effectiveRate = s.effectiveRate || 0;
+    s.inputFormat = s.inputFormat || '';
+    s.outputFormat = s.outputFormat || '';
+    s.latency = s.latency || '';
+    // 加权分数：有效率 * 0.5 + 调用量 * 0.3 + 质押 * 0.2
+    s._sort_score = (s.totalCalls > 0 ? s.effectiveRate : 0.5) * 50 + Math.min(s.totalCalls, 200) * 0.15 + (s.deposit || 0) * 1000;
     return s;
   }).sort((a, b) => (b._sort_score || 0) - (a._sort_score || 0));
   // 返回时去掉内部排序字段

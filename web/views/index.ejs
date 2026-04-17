@@ -1480,11 +1480,6 @@
       const services = Array.from(marketServices.values());
       const s = services.find(x => x.id === serviceId);
       if (!s) return;
-      const fws = (s.frameworks || ['generic']).map(f => {
-        const labels = { openclaw: 'OpenClaw', langchain: 'LangChain', autogpt: 'AutoGPT', hermes: 'Hermes', generic: '通用' };
-        const colors = { openclaw: '#8b5cf6', langchain: '#3b82f6', autogpt: '#f59e0b', hermes: '#ef4444', generic: '#10b981' };
-        return `<span style="display:inline-block; background:${colors[f] || '#475569'}22; color:${colors[f] || '#475569'}; border:1px solid ${colors[f] || '#475569'}44; border-radius:4px; padding:2px 8px; font-size:11px;">${labels[f] || f}</span>`;
-      }).join('');
       const secBadge = s.security ? (s.security.level === 'safe' ? '<span style="color:#10b981;"><i data-lucide="shield-check" class="icon-inline"></i> 安全检测通过</span>' : s.security.level === 'warning' ? '<span style="color:#f59e0b;"><i data-lucide="alert-triangle" class="icon-inline"></i> 待人工审核</span>' : '<span style="color:#ef4444;"><i data-lucide="shield-x" class="icon-inline"></i> 拒绝上架</span>') : '';
       document.getElementById('skillDetailContent').innerHTML = `
         <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
@@ -1498,7 +1493,7 @@
             <div style="font-size:11px; color:#64748b;">质押 ${s.deposit || 0.001} BNB</div>
           </div>
         </div>
-        <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">${fws} ${secBadge}</div>
+        <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">${secBadge}</div>
         <div style="background:#0f121e; border-radius:8px; padding:12px; margin-bottom:12px;">
           <div style="font-size:12px; color:#94a3b8; margin-bottom:6px;">服务描述</div>
           <div style="font-size:13px; color:#e2e8f0; line-height:1.6;">${s.desc || s.name || '暂无描述'}</div>
@@ -1864,7 +1859,6 @@
         const list = document.getElementById('expertsList');
         const iconColors = ['purple','blue','cyan','green','amber'];
         list.innerHTML = services.map((s, i) => {
-          ).join('');
           return `
           <div class="agent-card" data-id="${s.id}" onclick="showSkillDetail('${s.id}')" style="cursor:pointer;">
             <div class="agent-card-top" style="margin-bottom:6px;">
