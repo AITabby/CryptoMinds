@@ -733,5 +733,37 @@
     "effectiveRate": 0.91,
     "status": "deregistered",
     "deregisteredAt": "2026-04-17T08:30:12.510Z"
+  },
+  {
+    "id": "testAgent-testservice-1776417223837",
+    "expert": "testAgent",
+    "wallet": "0xd2f899CE74320AEf9d8f2359183232a554f4C0E1",
+    "service": "service",
+    "name": "testService",
+    "desc": "",
+    "price": 0.001,
+    "deposit": 0.001,
+    "inputFormat": "json",
+    "outputFormat": "json",
+    "latency": "",
+    "api": {
+      "endpoint": "",
+      "method": "POST"
+    },
+    "depositTx": null,
+    "security": {
+      "level": "safe",
+      "score": 100,
+      "summary": "✅ 服务契约模式"
+    },
+    "totalCalls": 0,
+    "effectiveCalls": 0,
+    "effectiveRate": 0,
+    "rating": 0,
+    "sales": 0,
+    "active": true,
+    "status": "pending_deposit",
+    "avatar": "🤖",
+    "registeredAt": "2026-04-17T09:13:43.837Z"
   }
 ]

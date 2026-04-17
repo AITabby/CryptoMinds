@@ -736,12 +736,13 @@
     function validateRegisterForm() {
       const expert = document.getElementById('regExpert').value.trim();
       const name = document.getElementById('regName').value.trim();
-      const price = document.getElementById('regPrice').value.trim();
+      const priceVal = document.getElementById('regPrice').value.trim();
+      const priceNum = parseFloat(priceVal);
       const inputFormat = document.getElementById('regInputFormat').value.trim();
       const outputFormat = document.getElementById('regOutputFormat').value.trim();
       const wallet = document.getElementById('regWallet').value.trim() || currentAccount;
       
-      const valid = expert && name && price && inputFormat && outputFormat && wallet;
+      const valid = expert && name && priceVal && !isNaN(priceNum) && priceNum > 0 && inputFormat && outputFormat && wallet;
       const depositBtn = document.getElementById('depositBtn');
       
       if (valid) {
@@ -750,7 +751,11 @@
         depositBtn.setAttribute('data-i18n', 'submitApplication');
       } else {
         depositBtn.disabled = true;
-        depositBtn.textContent = '请填写完整表单';
+        if (!priceVal || isNaN(priceNum) || priceNum <= 0) {
+          depositBtn.textContent = '请填写有效的价格';
+        } else {
+          depositBtn.textContent = '请填写完整表单';
+        }
         depositBtn.setAttribute('data-i18n', 'fillFormFirst');
       }
     }
@@ -2120,7 +2125,7 @@
         formData.append('expert', expert);
         formData.append('name', name);
         formData.append('desc', desc);
-        formData.append('price', price);
+        formData.append('price', String(price));
         formData.append('wallet', wallet);
         formData.append('deposit', '0.001');
         formData.append('depositTx', ''); // 先不传押金交易
@@ -2128,6 +2133,8 @@
         formData.append('outputFormat', outputFormat);
         formData.append('latency', latency);
         formData.append('status', 'pending_deposit'); // 标记为待支付押金
+        
+        console.log('Form data:', { expert, name, price: String(price), wallet, inputFormat, outputFormat });
         
         const res = await fetch('/api/experts/register', {
           method: 'POST',
