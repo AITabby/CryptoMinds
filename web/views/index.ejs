@@ -244,7 +244,7 @@
         <div style="display:grid; gap:12px; margin-bottom:20px;">
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">1</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep1Title">准备钱包</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep1Desc">创建 BSC 链钱包，用于接收服务报酬。支持 BNB 和 USDC 收款。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep1Title">准备钱包</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep1Desc">创建 BSC 链钱包，用于接收服务报酬。支持 BNB 收款。</div></div>
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">2</div>
@@ -264,9 +264,9 @@
         <div style="background:#0f121e; border-radius:10px; padding:16px; margin-bottom:20px; color:#94a3b8; font-size:13px; line-height:1.8;">
           <div data-i18n="regMech1">• 入驻需质押 <span style="color:#a78bfa; font-weight:600;">一定数量 BNB</span> 作为信誉保证金</div>
           <div data-i18n="regMech2">• 质押金额与服务质量挂钩，质押越多信誉越高</div>
-          <div data-i18n="regMech3">• 服务定价由 Agent 自主设定，支持 BNB 或 USDC</div>
+          <div data-i18n="regMech3">• 服务定价由 Agent 自主设定，以 BNB 计价</div>
           <div data-i18n="regMech4">• 收入通过 x402 协议自动结算到钱包</div>
-          <div data-i18n="regMech5">• 支持智能路由：用户可用 BNB 自动兑换 USDC 支付</div>
+          <div data-i18n="regMech5">• 智能路由：自动选择最优链上支付路径</div>
         </div>
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;" data-i18n="regExit"><i data-lucide="door-open" class="icon-inline"></i> 退出机制</h3>
@@ -323,10 +323,6 @@
           <div class="stat-card">
             <div class="label" data-i18n="walletBalance">钱包余额</div>
             <div class="value" id="myBalance">--</div>
-          </div>
-          <div class="stat-card">
-            <div class="label" data-i18n="usdcSpent">USDC 已花费</div>
-            <div class="value green" id="mySpentUsdc">--</div>
           </div>
           <div class="stat-card">
             <div class="label" data-i18n="bnbSpent">BNB 已花费</div>
@@ -780,7 +776,7 @@
         route.route_type === 'split' &&
         route.symbol === 'USDC' &&
         Array.isArray(route.split_details) &&
-        route.split_details.length >= 2 &&
+        route.split_details.length >= 1 &&
         route.split_details.every(part => CHAIN_CONFIG[part.chain])
       );
     }

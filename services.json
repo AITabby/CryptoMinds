@@ -11,20 +11,6 @@
     "sales": 145,
     "active": true,
     "avatar": "🔩",
-    "price_usdc": 0.15,
-    "accept_chains": [
-      "bsc",
-      "base",
-      "solana"
-    ],
-    "x402_enabled": true,
-    "prices": {
-      "BNB_BSC": 0.0005,
-      "USDC_BSC": 0.15,
-      "USDC_BASE": 0.15,
-      "USDT_BSC": 0.15,
-      "SOL": 0.001
-    },
     "frameworks": [
       "generic"
     ],
@@ -52,20 +38,6 @@
     "sales": 95,
     "active": true,
     "avatar": "🥚",
-    "price_usdc": 0.09,
-    "accept_chains": [
-      "bsc",
-      "base",
-      "solana"
-    ],
-    "x402_enabled": true,
-    "prices": {
-      "BNB_BSC": 0.0003,
-      "USDC_BSC": 0.09,
-      "USDC_BASE": 0.09,
-      "USDT_BSC": 0.09,
-      "SOL": 0.0006
-    },
     "frameworks": [
       "generic"
     ],
@@ -93,20 +65,6 @@
     "sales": 67,
     "active": true,
     "avatar": "🪺",
-    "price_usdc": 0.24,
-    "accept_chains": [
-      "bsc",
-      "base",
-      "solana"
-    ],
-    "x402_enabled": true,
-    "prices": {
-      "BNB_BSC": 0.0008,
-      "USDC_BSC": 0.24,
-      "USDC_BASE": 0.24,
-      "USDT_BSC": 0.24,
-      "SOL": 0.0016
-    },
     "frameworks": [
       "generic"
     ],
@@ -134,20 +92,6 @@
     "sales": 207,
     "active": true,
     "avatar": "📝",
-    "price_usdc": 0.03,
-    "accept_chains": [
-      "bsc",
-      "base",
-      "solana"
-    ],
-    "x402_enabled": true,
-    "prices": {
-      "BNB_BSC": 0.0001,
-      "USDC_BSC": 0.03,
-      "USDC_BASE": 0.03,
-      "USDT_BSC": 0.03,
-      "SOL": 0.0002
-    },
     "frameworks": [
       "generic"
     ],
@@ -176,20 +120,6 @@
     "sales": 41,
     "active": true,
     "avatar": "🐋",
-    "price_usdc": 0.18,
-    "accept_chains": [
-      "bsc",
-      "base",
-      "solana"
-    ],
-    "x402_enabled": true,
-    "prices": {
-      "BNB_BSC": 0.0006,
-      "USDC_BSC": 0.18,
-      "USDC_BASE": 0.18,
-      "USDT_BSC": 0.18,
-      "SOL": 0.0012
-    },
     "frameworks": [
       "generic"
     ],
@@ -218,20 +148,6 @@
     "sales": 58,
     "active": true,
     "avatar": "📡",
-    "price_usdc": 0.12,
-    "accept_chains": [
-      "bsc",
-      "base",
-      "solana"
-    ],
-    "x402_enabled": true,
-    "prices": {
-      "BNB_BSC": 0.0004,
-      "USDC_BSC": 0.12,
-      "USDC_BASE": 0.12,
-      "USDT_BSC": 0.12,
-      "SOL": 0.0008
-    },
     "frameworks": [
       "generic"
     ],
@@ -260,20 +176,6 @@
     "sales": 36,
     "active": true,
     "avatar": "🛡️",
-    "price_usdc": 0.21,
-    "accept_chains": [
-      "bsc",
-      "base",
-      "solana"
-    ],
-    "x402_enabled": true,
-    "prices": {
-      "BNB_BSC": 0.0007,
-      "USDC_BSC": 0.21,
-      "USDC_BASE": 0.21,
-      "USDT_BSC": 0.21,
-      "SOL": 0.0014
-    },
     "frameworks": [
       "generic"
     ],

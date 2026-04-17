@@ -769,10 +769,9 @@ if __name__ == "__main__":
         
         service_prices = service.get("prices", {})
         if not service_prices:
-            # 兼容旧格式
+            # BNB 统一定价
             service_prices = {
                 "BNB_BSC": service.get("price", 0),
-                "USDC_BSC": service.get("price", 0)
             }
     except Exception as e:
         print(json.dumps({"success": False, "error": f"加载服务失败: {str(e)}"}))
