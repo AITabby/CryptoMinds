@@ -249,6 +249,23 @@
 
       <div id="myRegistrationPanel" style="display:none; margin-bottom:16px;"></div>
 
+      <!-- B端: 收到的订单 + 通知 -->
+      <div id="sellerDashboard" style="display:none; margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h2 style="color:#a78bfa;font-size:18px;">📦 卖家工作台</h2>
+          <div style="display:flex;gap:8px;">
+            <div style="cursor:pointer;padding:6px 12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleSellerOrders()">
+              <span style="font-size:14px;">📋</span>
+              <span style="color:#a78bfa;font-size:12px;font-weight:600;">收到的订单</span>
+            </div>
+            <div style="cursor:pointer;position:relative;padding:6px 12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleSellerNotif()">
+              <span style="font-size:14px;">🔔</span>
+              <span id="sellerUnread" style="color:#a78bfa;font-size:12px;font-weight:600;">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 审核中页面（替代入驻指南） -->
       <div id="pendingReviewPage" style="display:none; background:linear-gradient(135deg,#1e1b4b,#312e81); border:2px solid rgba(139,92,246,0.4); border-radius:20px; padding:48px; text-align:center; margin-bottom:16px;">
         <div style="font-size:64px; margin-bottom:20px;">🎉</div>
@@ -712,8 +729,8 @@
           formArea.style.display = 'none';
           regPanel.style.display = 'block';
           regPanel.innerHTML = mine.map(s => {
-            const statusMap = { pending: '⏳ 审核中', approved: '✅ 已上架', rejected: '❌ 已拒绝' };
-            const statusColor = { pending: '#f59e0b', approved: '#059669', rejected: '#dc2626' };
+            const statusMap = { pending: '⏳ 审核中', approved: '✅ 已上架', rejected: '❌ 已拒绝', deregistered: '🚪 已退出' };
+            const statusColor = { pending: '#f59e0b', approved: '#059669', rejected: '#dc2626', deregistered: '#64748b' };
             return `<div style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:12px;padding:20px;margin-bottom:12px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <div>
@@ -730,9 +747,13 @@
                 <span>📤 ${s.outputFormat}</span>
                 <span>📊 有效率 ${s.effectiveRate}%</span>
               </div>
-              <button onclick="deregisterService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🚪 退出市场</button>
+              ${s.status === 'approved' ? `<button onclick="deregisterService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🚪 退出市场</button>` : ''}
             </div>`;
           }).join('');
+
+          // 加载收到的订单
+          loadSellerOrders();
+          document.getElementById('sellerDashboard').style.display = 'block';
         } else {
           formArea.style.display = 'block';
           regPanel.style.display = 'none';
@@ -2038,6 +2059,153 @@
         loadNotifications();
       } catch(e) {}
     }
+
+    // ===== B端: 卖家工作台 =====
+    let sellerOrdersOpen = false;
+    function toggleSellerOrders() {
+      sellerOrdersOpen = !sellerOrdersOpen;
+      if (!sellerOrdersOpen) {
+        const m = document.getElementById('sellerOrdersModal');
+        if (m) m.remove();
+        return;
+      }
+      const modal = document.createElement('div');
+      modal.id = 'sellerOrdersModal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
+      modal.onclick = (e) => { if (e.target === modal) { sellerOrdersOpen = false; modal.remove(); } };
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:600px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;">📦 收到的订单</div><button onclick="sellerOrdersOpen=false;document.getElementById('sellerOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div><div id="sellerOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      document.body.appendChild(modal);
+      loadSellerOrders();
+    }
+
+    let sellerNotifOpen = false;
+    function toggleSellerNotif() {
+      sellerNotifOpen = !sellerNotifOpen;
+      if (!sellerNotifOpen) {
+        const m = document.getElementById('sellerNotifModal');
+        if (m) m.remove();
+        return;
+      }
+      const modal = document.createElement('div');
+      modal.id = 'sellerNotifModal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
+      modal.onclick = (e) => { if (e.target === modal) { sellerNotifOpen = false; modal.remove(); } };
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;">🔔 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="sellerNotifOpen=false;document.getElementById('sellerNotifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="sellerNotifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      document.body.appendChild(modal);
+      loadSellerNotif();
+    }
+
+    async function loadSellerOrders() {
+      if (!currentAccount) return;
+      try {
+        const res = await fetch(`/api/received-orders?wallet=${currentAccount}`);
+        const data = await res.json();
+        if (!data.ok) return;
+        const list = document.getElementById('sellerOrdersList');
+        if (!list) return;
+        if (data.orders.length === 0) {
+          list.innerHTML = '<div style="color:#475569;text-align:center;padding:20px;">暂无订单</div>';
+          return;
+        }
+        list.innerHTML = data.orders.map(o => {
+          const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+          let statusText = '', statusColor = '';
+          if (o.status === 'pending' || o.status === 'demo-completed') { statusText = '🔄 待交付'; statusColor = '#fbbf24'; }
+          else if (o.status === 'delivered') { statusText = '✅ 已交付'; statusColor = '#34d399'; }
+          else if (o.status === 'completed') { statusText = '✅ 已完成'; statusColor = '#34d399'; }
+          else { statusText = o.status; statusColor = '#94a3b8'; }
+          const needDeliver = (o.status === 'pending' || o.status === 'demo-completed' || o.status === 'confirmed') && !o.result;
+          return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="color:#e2e8f0;font-weight:600;">${o.serviceName || '服务'}</div>
+                <div style="color:#64748b;font-size:11px;margin-top:4px;">买家: ${o.buyerName || o.buyerWallet?.slice(0,10)+'...'} | ${time}</div>
+                <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
+                ${o.input ? `<div style="color:#64748b;font-size:11px;margin-top:2px;">输入: ${typeof o.input === 'string' ? o.input.slice(0,80) : JSON.stringify(o.input).slice(0,80)}</div>` : ''}
+              </div>
+              <div style="text-align:right;">
+                <div style="color:${statusColor};font-size:12px;font-weight:600;">${statusText}</div>
+                ${needDeliver ? `<button onclick="deliverResult('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">提交结果</button>` : ''}
+                ${o.result ? `<button onclick="viewOrderResult('${o.id}')" style="margin-top:6px;background:rgba(139,92,246,0.2);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">查看结果</button>` : ''}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      } catch(e) { console.error('卖家订单加载失败', e); }
+    }
+
+    function deliverResult(orderId) {
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100000;display:flex;justify-content:center;align-items:center;';
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:500px;max-width:90vw;"><div style="color:#a78bfa;font-weight:600;font-size:16px;margin-bottom:16px;">📦 提交服务结果</div><textarea id="deliverOutput" rows="8" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;resize:vertical;" placeholder="输入服务执行结果..."></textarea><div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;"><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:8px;padding:8px 20px;cursor:pointer;">取消</button><button onclick="submitDeliverResult('${orderId}')" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-weight:600;">提交</button></div></div>`;
+      document.body.appendChild(modal);
+    }
+
+    async function submitDeliverResult(orderId) {
+      const output = document.getElementById('deliverOutput')?.value?.trim();
+      if (!output) { showError('请输入结果'); return; }
+      try {
+        const res = await fetch(`/api/orders/${orderId}/result`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ output, sellerWallet: currentAccount })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showNotice('结果已提交！买家将收到通知');
+          document.querySelector('div[style*="z-index:100000"]')?.remove();
+          if (sellerOrdersOpen) { toggleSellerOrders(); toggleSellerOrders(); } // 刷新
+        } else {
+          showError(data.error || '提交失败');
+        }
+      } catch(e) { showError('提交失败'); }
+    }
+
+    async function loadSellerNotif() {
+      if (!currentAccount) return;
+      try {
+        const res = await fetch(`/api/notifications?wallet=${currentAccount}`);
+        const data = await res.json();
+        if (!data.ok) return;
+        // 更新卖家铃铛数字
+        const badge = document.getElementById('sellerUnread');
+        if (badge) badge.textContent = data.unread;
+        const list = document.getElementById('sellerNotifList');
+        if (!list) return;
+        if (data.notifications.length === 0) {
+          list.innerHTML = '<div style="color:#475569;text-align:center;padding:20px;">暂无通知</div>';
+          return;
+        }
+        list.innerHTML = data.notifications.map(n => {
+          const time = new Date(n.createdAt).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+          let icon = '', content = '';
+          if (n.type === 'new_order') {
+            icon = '🛒'; content = `新订单：<strong style="color:#a78bfa">${n.serviceName}</strong> — 买家 ${n.buyerName || n.buyerWallet?.slice(0,8)+'...'}`;
+          } else if (n.type === 'order_confirmed') {
+            icon = '✅'; content = `订单确认：<strong style="color:#34d399">${n.serviceName}</strong>`;
+          } else if (n.type === 'order_result') {
+            icon = '📦'; content = `结果已出：<strong style="color:#34d399">${n.serviceName}</strong>`;
+          }
+          return `<div style="padding:10px 0;border-bottom:1px solid rgba(139,92,246,0.08);${n.read ? 'opacity:0.5' : ''}"><div style="display:flex;align-items:center;gap:8px;"><span>${icon}</span><span>${content}</span><span style="margin-left:auto;font-size:11px;color:#475569;">${time}</span></div></div>`;
+        }).join('');
+      } catch(e) {}
+    }
+
+    // 定期更新卖家铃铛
+    setInterval(async () => {
+      if (!currentAccount) return;
+      try {
+        const res = await fetch(`/api/notifications?wallet=${currentAccount}`);
+        const data = await res.json();
+        if (data.ok) {
+          const badge = document.getElementById('sellerUnread');
+          if (badge) badge.textContent = data.unread;
+          const buyerBadge = document.getElementById('myUnread');
+          if (buyerBadge) buyerBadge.textContent = data.unread;
+        }
+      } catch(e) {}
+    }, 10000);
 
     async function viewOrderResult(orderId) {
       try {

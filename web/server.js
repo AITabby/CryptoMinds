@@ -1944,6 +1944,15 @@ app.get('/api/my-orders', (req, res) => {
   res.json({ ok: true, total: mine.length, orders: mine });
 });
 
+// 卖家查询收到的订单
+app.get('/api/received-orders', (req, res) => {
+  const wallet = (req.query.wallet || '').trim().toLowerCase();
+  if (!wallet) return res.json({ ok: false, error: '缺少 wallet' });
+  const purchases = getPurchases();
+  const mine = purchases.filter(p => p.expertWallet?.toLowerCase() === wallet);
+  res.json({ ok: true, total: mine.length, orders: mine });
+});
+
 app.get('/api/txs', (req, res) => {
   res.json(getTxs());
 });
