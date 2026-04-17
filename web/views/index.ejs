@@ -2732,7 +2732,7 @@
       if (myAgentH2) myAgentH2.textContent = t('myAgent');
 
       const statLabels = document.querySelectorAll('.stat-card .label');
-      const statKeys = ['walletBalance', 'usdcSpent', 'bnbSpent', 'servicesBought'];
+      const statKeys = ['walletBalance', 'bnbSpent', 'servicesBought'];
       statLabels.forEach((label, i) => {
         if (statKeys[i]) label.textContent = t(statKeys[i]);
       });
