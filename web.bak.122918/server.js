@@ -775,7 +775,7 @@ app.post('/api/skills/scan', upload.single('skillFile'), (req, res) => {
 });
 
 app.post('/api/experts/register', async (req, res) => {
-  const { expert, wallet, name, desc, price, deposit, depositTx, inputFormat, outputFormat, latency } = req.body;
+  const { expert, wallet, name, desc, price, deposit, frameworks, depositTx, inputFormat, outputFormat, latency } = req.body;
   const expertName = sanitizeText(expert, 40);
   const skillName = sanitizeText(name, 80);
   const description = sanitizeText(desc, 240);
@@ -783,7 +783,7 @@ app.post('/api/experts/register', async (req, res) => {
   const parsedPrice = parsePositiveNumber(price);
   const parsedDeposit = parseNonNegativeNumber(deposit, 0.001);
   const depositTxHash = typeof depositTx === 'string' ? depositTx.trim() : '';
-  // 不再需要框架筛选（服务契约模式）
+  const fwList = Array.isArray(frameworks) ? frameworks.filter(f => typeof f === 'string' && ['openclaw','langchain','autogpt','hermes','generic'].includes(f.toLowerCase())).map(f => f.toLowerCase()) : ['generic'];
 
   const inputFmt = sanitizeText(inputFormat, 120);
   const outputFmt = sanitizeText(outputFormat, 120);
@@ -839,6 +839,7 @@ app.post('/api/experts/register', async (req, res) => {
     id, expert: expertName, wallet: normalizedWallet, service: 'service', name: skillName,
     desc: description || '', price: parsedPrice, deposit: parsedDeposit,
     inputFormat: inputFmt, outputFormat: outputFmt, latency: latencyEst || '',
+    frameworks: fwList,
     api: { endpoint: '', method: 'POST' },
     depositTx: depositTxHash || null,
     security: { level: 'safe', score: 100, summary: '✅ 服务契约模式' },

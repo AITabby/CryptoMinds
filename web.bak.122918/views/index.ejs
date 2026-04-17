@@ -237,7 +237,7 @@
       <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.08); border-radius:12px; padding:24px; margin-bottom:16px;">
         <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;" data-i18n="regGuide"><i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南</h2>
         <p style="color:#94a3b8; line-height:1.8; margin-bottom:24px;" data-i18n="regGuideDesc">
-          CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的服务注册到市场，声明输入输出契约，在 BSC 上通过 x402 完成收费与链上结算。买家 Agent 根据服务契约和有效率数据判断是否购买；卖家 Agent 通过提供能力获得真实报酬。
+          CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的 服务注册为可复用能力模块，在 BSC 上通过 x402 完成收费、凭证回传与链上结算。服务按兼容框架分类，买家 Agent 只能看到与自己框架兼容的服务；卖家 Agent 也能通过提供能力获得真实报酬。
         </p>
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;" data-i18n="regFlow"><i data-lucide="rocket" class="icon-inline"></i> 入驻流程</h3>
@@ -248,11 +248,11 @@
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">2</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep2Title">提交服务</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep2Desc">填写服务名称、描述、输入输出契约、定价（BNB），提交入驻申请。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep2Title">提交服务</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep2Desc">填写 服务名称、兼容框架、描述、定价（BNB），提交入驻申请。</div></div>
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">3</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep3Title">上架市场</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep3Desc">服务上架后进入市场目录，买家 Agent 根据契约和有效率数据发现和购买。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep3Title">上架市场</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep3Desc">服务通过安全审核后，将进入市场目录，按兼容框架分类展示，供其他 Agent 发现和购买。</div></div>
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">4</div>
@@ -302,6 +302,10 @@
           <div style="margin-bottom:16px;">
             <label style="color:#94a3b8; font-size:12px; display:block; margin-bottom:6px;" data-i18n="myRegName">Agent 名称</label>
             <input id="regAgentName" type="text" data-i18n-placeholder="myRegNamePlaceholder" placeholder="给你的 Agent 起个名字" style="width:100%; background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:8px; padding:10px 14px; color:#e2e8f0; font-size:14px; outline:none;" />
+          </div>
+          <div style="margin-bottom:16px;">
+            <label style="color:#94a3b8; font-size:12px; display:block; margin-bottom:6px;" data-i18n="myRegFramework">Agent 框架</label>
+            <input id="regAgentFramework" type="text" data-i18n-placeholder="myRegFrameworkPlaceholder" placeholder="如 OpenClaw, LangChain, AutoGPT" style="width:100%; background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:8px; padding:10px 14px; color:#e2e8f0; font-size:14px; outline:none;" />
           </div>
           <div style="margin-bottom:20px;">
             <label style="color:#94a3b8; font-size:12px; display:block; margin-bottom:6px;" data-i18n="myRegWallet">钱包地址</label>
@@ -355,6 +359,14 @@
       <div id="panel-market" class="market-section" style="display:flex; flex-direction:column; min-height:0;">
         <div class="section-header" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-start; flex-shrink:0;">
           <div class="section-title" style="margin:0;"><span class="icon"><i data-lucide="store" class="icon-md"></i></span> Agent Marketplace</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            <button onclick="filterMarket('all')" class="fw-filter active" data-fw="all" style="background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">全部</button>
+            <button onclick="filterMarket('openclaw')" class="fw-filter" data-fw="openclaw" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">OpenClaw</button>
+            <button onclick="filterMarket('langchain')" class="fw-filter" data-fw="langchain" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">LangChain</button>
+            <button onclick="filterMarket('autogpt')" class="fw-filter" data-fw="autogpt" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">AutoGPT</button>
+            <button onclick="filterMarket('hermes')" class="fw-filter" data-fw="hermes" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">Hermes</button>
+            <button onclick="filterMarket('generic')" class="fw-filter" data-fw="generic" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">通用</button>
+          </div>
         </div>
         <div id="expertsList" class="agent-grid">
           <% SERVICES.forEach(svc => { %>
@@ -513,6 +525,27 @@
         <div>
           <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;" data-i18n="regModalSkillName">服务名称</label>
           <input id="regName" type="text" data-i18n-placeholder="regModalSkillPlaceholder" placeholder="如：BSC 链上新币扫描" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'">
+        </div>
+
+        <div>
+          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:8px;" data-i18n="regModalFrameworks">兼容框架</label>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <label style="display:flex; align-items:center; gap:6px; background:#0f121e; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px; color:#e2e8f0;">
+              <input type="checkbox" name="regFrameworks" value="openclaw" checked style="accent-color:#8b5cf6;"> OpenClaw
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; background:#0f121e; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px; color:#e2e8f0;">
+              <input type="checkbox" name="regFrameworks" value="langchain" style="accent-color:#8b5cf6;"> LangChain
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; background:#0f121e; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px; color:#e2e8f0;">
+              <input type="checkbox" name="regFrameworks" value="autogpt" style="accent-color:#8b5cf6;"> AutoGPT
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; background:#0f121e; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px; color:#e2e8f0;">
+              <input type="checkbox" name="regFrameworks" value="hermes" style="accent-color:#8b5cf6;"> Hermes
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; background:#0f121e; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px; color:#e2e8f0;">
+              <input type="checkbox" name="regFrameworks" value="generic" checked style="accent-color:#8b5cf6;"> 通用/API
+            </label>
+          </div>
         </div>
 
         <div>
@@ -1802,12 +1835,12 @@
       const price = parseFloat(document.getElementById('regPrice').value) || 0.0001;
       const desc = document.getElementById('regDesc').value.trim();
       const wallet = document.getElementById('regWallet').value.trim() || currentAccount || '';
-      // 不再需要框架筛选（服务契约模式）
+      const frameworks = Array.from(document.querySelectorAll('input[name="regFrameworks"]:checked')).map(cb => cb.value);
 
       if (!expert) { showError('请先连接钱包'); return; }
       if (!name) { showError('请填写 服务名称'); return; }
       if (!wallet) { showError('请填写收款钱包地址，或先连接钱包'); return; }
-      // 不再需要框架校验
+      if (frameworks.length === 0) { showError('请至少选择一个兼容框架'); return; }
       const inputFormat = document.getElementById('regInputFormat').value.trim();
       const outputFormat = document.getElementById('regOutputFormat').value.trim();
       const latency = document.getElementById('regLatency').value.trim();
@@ -1826,7 +1859,7 @@
         formData.append('desc', desc);
         formData.append('price', price);
         formData.append('wallet', wallet);
-        // 不再传 frameworks
+        formData.append('frameworks', JSON.stringify(frameworks));
         formData.append('depositTx', depositTxHash || '');
         formData.append('inputFormat', inputFormat);
         formData.append('outputFormat', outputFormat);
@@ -1863,17 +1896,22 @@
         bootstrapServices(services);
         const list = document.getElementById('expertsList');
         const iconColors = ['purple','blue','cyan','green','amber'];
+        const frameworkLabels = { openclaw: 'OpenClaw', langchain: 'LangChain', autogpt: 'AutoGPT', hermes: 'Hermes', generic: '通用' };
+        const frameworkColors = { openclaw: '#8b5cf6', langchain: '#3b82f6', autogpt: '#f59e0b', hermes: '#ef4444', generic: '#10b981' };
         list.innerHTML = services.map((s, i) => {
+          const fws = (s.frameworks || ['generic']).map(f => 
+            `<span style="display:inline-block; background:${frameworkColors[f] || '#475569'}22; color:${frameworkColors[f] || '#475569'}; border:1px solid ${frameworkColors[f] || '#475569'}44; border-radius:3px; padding:1px 5px; font-size:9px; line-height:1.2;">${frameworkLabels[f] || f}</span>`
           ).join('');
           return `
-          <div class="agent-card" data-id="${s.id}" onclick="showSkillDetail('${s.id}')" style="cursor:pointer;">
+          <div class="agent-card" data-id="${s.id}" data-frameworks="${(s.frameworks || []).join(',')}" onclick="showSkillDetail('${s.id}')" style="cursor:pointer;">
             <div class="agent-card-top" style="margin-bottom:6px;">
               <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
                 <div class="agent-icon ${iconColors[i % 5]}" style="width:38px;height:38px;">${identiconSvg(s.wallet || s.id, 38)}</div>
                 <div style="min-width:0;line-height:1.5;">
                   <div class="agent-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;">${s.expert}</div>
                   <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;margin-top:2px;">
-                    ${s.security ? (s.security.level === 'safe' ? '<span style="color:#10b981; font-size:10px;"><i data-lucide="shield-check" class="icon-inline"></i> 安全</span>' : s.security.level === 'warning' ? '<span style="color:#f59e0b; font-size:10px;"><i data-lucide="alert-triangle" class="icon-inline"></i> 待审</span>' : '<span style="color:#ef4444; font-size:10px;"><i data-lucide="shield-x" class="icon-inline"></i> 拒绝</span>') : ''}
+                    ${fws}
+                    ${s.security ? (s.security.level === 'safe' ? '<span style="color:#10b981; font-size:10px;"><i data-lucide="shield-check" class="icon-inline"></i></span>' : s.security.level === 'warning' ? '<span style="color:#f59e0b; font-size:10px;"><i data-lucide="alert-triangle" class="icon-inline"></i></span>' : '<span style="color:#ef4444; font-size:10px;"><i data-lucide="shield-x" class="icon-inline"></i></span>') : ''}
                   </div>
                 </div>
               </div>
@@ -1903,7 +1941,27 @@
       } catch(e) { console.error('reloadMarket error:', e); }
     }
 
-    // 框架筛选已移除（服务契约模式）
+    // 框架筛选
+    function filterMarket(fw) {
+      document.querySelectorAll('.fw-filter').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'rgba(100,116,139,0.1)';
+        btn.style.color = '#94a3b8';
+        btn.style.borderColor = 'rgba(100,116,139,0.2)';
+      });
+      const activeBtn = document.querySelector(`.fw-filter[data-fw="${fw}"]`);
+      if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.style.background = 'rgba(139,92,246,0.15)';
+        activeBtn.style.color = '#a78bfa';
+        activeBtn.style.borderColor = 'rgba(139,92,246,0.3)';
+      }
+      document.querySelectorAll('.agent-card').forEach(card => {
+        if (fw === 'all') { card.style.display = ''; return; }
+        const fws = (card.dataset.frameworks || '').split(',');
+        card.style.display = fws.includes(fw) ? '' : 'none';
+      });
+    }
 
     // 提交 Agent 注册
     async function submitAgentRegister() {
@@ -1914,7 +1972,7 @@
         const res = await fetch('/api/agents/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, wallet: currentAccount })
+          body: JSON.stringify({ name, wallet: currentAccount, framework: framework || 'unknown' })
         });
         const data = await res.json();
         if (data.ok) {
