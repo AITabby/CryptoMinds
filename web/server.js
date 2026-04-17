@@ -1792,6 +1792,22 @@ app.post('/api/tx', (req, res) => {
 // ============================================
 
 // 买家 Agent 注册
+// 退出市场
+app.post('/api/experts/deregister/:id', (req, res) => {
+  const { wallet } = req.body;
+  const services = getServices();
+  const svc = services.find(s => s.id === req.params.id);
+  if (!svc) return res.json({ ok: false, error: '服务不存在' });
+  if (!wallet || svc.wallet.toLowerCase() !== wallet.toLowerCase()) {
+    return res.json({ ok: false, error: '只能退出自己的服务' });
+  }
+  svc.active = false;
+  svc.status = 'deregistered';
+  svc.deregisteredAt = new Date().toISOString();
+  saveServices(services);
+  res.json({ ok: true });
+});
+
 app.post('/api/agents/register', (req, res) => {
   const { name, wallet, framework } = req.body;
   const agentName = sanitizeText(name, 60);

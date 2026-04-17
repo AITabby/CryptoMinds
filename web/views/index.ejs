@@ -242,7 +242,9 @@
         </div>
       </div>
 
-      <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.08); border-radius:12px; padding:24px; margin-bottom:16px;">
+      <div id="myRegistrationPanel" style="display:none; margin-bottom:16px;"></div>
+
+      <div id="regFormArea">
         <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;" data-i18n="regGuide"><i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南</h2>
         <p style="color:#94a3b8; line-height:1.8; margin-bottom:24px;" data-i18n="regGuideDesc">
           CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的服务注册到市场，声明输入输出契约，在 BSC 上通过 x402 完成收费与链上结算。买家 Agent 根据服务契约和有效率数据判断是否购买；卖家 Agent 通过提供能力获得真实报酬。
@@ -655,6 +657,7 @@
         document.querySelector('.nav span:nth-child(2)').classList.add('active');
         document.getElementById('panel-register').style.display = 'block';
         document.querySelector('.main').style.display = 'none';
+        checkMyRegistration();
       } else if (tab === 'myagent') {
         document.querySelector('.nav span:nth-child(3)').classList.add('active');
         document.getElementById('myAgent').style.display = 'block';
@@ -669,6 +672,66 @@
 
 
     // Generate identicon SVG for wallet address
+    // 检查当前钱包是否已入驻
+    async function checkMyRegistration() {
+      if (!currentAccount) return;
+      try {
+        const res = await fetch('/api/services');
+        const all = await res.json();
+        const mine = all.filter(s => s.wallet && s.wallet.toLowerCase() === currentAccount.toLowerCase());
+        const regPanel = document.getElementById('myRegistrationPanel');
+        const formArea = document.getElementById('regFormArea');
+        if (mine.length > 0) {
+          formArea.style.display = 'none';
+          regPanel.style.display = 'block';
+          regPanel.innerHTML = mine.map(s => {
+            const statusMap = { pending: '⏳ 审核中', approved: '✅ 已上架', rejected: '❌ 已拒绝' };
+            const statusColor = { pending: '#f59e0b', approved: '#059669', rejected: '#dc2626' };
+            return `<div style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:12px;padding:20px;margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <div>
+                  <span style="color:#a78bfa;font-weight:600;font-size:16px;">${s.expert}</span>
+                  <span style="color:#64748b;margin:0 6px;">→</span>
+                  <span style="color:#e2e8f0;font-size:15px;">${s.name}</span>
+                </div>
+                <span style="color:${statusColor[s.status] || '#64748b'};font-size:13px;font-weight:600;">${statusMap[s.status] || s.status}</span>
+              </div>
+              <div style="color:#94a3b8;font-size:13px;margin-bottom:8px;">${s.desc || ''}</div>
+              <div style="display:flex;gap:16px;font-size:12px;color:#64748b;margin-bottom:12px;">
+                <span>💰 ${s.price} BNB</span>
+                <span>📥 ${s.inputFormat}</span>
+                <span>📤 ${s.outputFormat}</span>
+                <span>📊 有效率 ${s.effectiveRate}%</span>
+              </div>
+              <button onclick="deregisterService('${s.id}')" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🚪 退出市场</button>
+            </div>`;
+          }).join('');
+        } else {
+          formArea.style.display = 'block';
+          regPanel.style.display = 'none';
+        }
+      } catch(e) {}
+    }
+
+    async function deregisterService(id) {
+      if (!confirm('确认退出市场？')) return;
+      try {
+        const res = await fetch(`/api/experts/deregister/${id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallet: currentAccount })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showNotice('已退出市场');
+          checkMyRegistration();
+          reloadMarket();
+        } else {
+          showError(data.error || '操作失败');
+        }
+      } catch(e) { showError('操作失败'); }
+    }
+
     function identiconSvg(address, size = 40) {
       try {
         if (typeof Identicon !== 'undefined' && typeof Identicon === 'function') {
