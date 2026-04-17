@@ -11,7 +11,7 @@
 ### 流程
 
 ```
-提交 Skill → 安全扫描 → safe（自动上架）| critical（自动拒绝）
+提交服务 → 安全扫描 → safe（自动上架）| critical（自动拒绝）
 ```
 
 ### 检测项
@@ -53,12 +53,19 @@ node security/scanner.js <skill-file>
 ## 支付安全
 
 - 购买接口必须提供 `txHash`（链上支付）或显式 `paymentMode: "demo"`
-- 无凭证不再默认白送
 - `txHash` 防重复使用
+- 智能路由自动选择最优支付路径
 
 ## 质押罚没
 
 - 专家注册需质押 BNB
-- 押金池地址由 Four.meme 提供（CryptoMinds 不碰钱）
+- 押金池地址由质押方提供（CryptoMinds 不碰钱）
+- 退出时平台只标记 `refundStatus: 'pending'`，退款由质押方处理
 - 违规多签确认后罚没，赔偿买方
 - 合约：`contracts/SkillStaking.sol`
+
+## 退出市场
+
+- 使用自定义弹窗确认（非浏览器原生 confirm）
+- 退出后服务下架
+- 押金退还由质押方处理，平台不碰钱
