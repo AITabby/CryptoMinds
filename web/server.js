@@ -7,12 +7,45 @@ const dns = require('dns').promises;
 const net = require('net');
 const multer = require('multer');
 const { injectCryptoMindsSkill } = require('./inject_skill');
+const webpush = require('web-push');
 
 const upload = multer({ dest: '/tmp/cryptominds-uploads/', limits: { fileSize: 100 * 1024 } }); // 100KB max
 
 const app = express();
 const BSC_RPC = process.env.BSC_RPC || 'https://bsc-dataseed1.binance.org/';
 const w3 = new Web3(BSC_RPC);
+
+// Web Push 配置
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BLzMOK5mKfFnE2xys9GxpEipw6P5hmvb1zOR4Hh5MY-taBxXXt7jIe8jON7-zhphRGrCpFH4_Sjt__8htdgq304';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'N9XArIyKx8ZZkJTS_gACVgibflcQQnyItwA_zxahAfU';
+webpush.setVapidDetails('mailto:cryptominds@four.meme', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+
+// 推送订阅存储
+const PUSH_SUBS_FILE = path.join(__dirname, '..', 'push_subs.json');
+function getPushSubs() {
+  if (!fs.existsSync(PUSH_SUBS_FILE)) return [];
+  try { return JSON.parse(fs.readFileSync(PUSH_SUBS_FILE, 'utf8')); } catch { return []; }
+}
+function savePushSubs(subs) {
+  fs.writeFileSync(PUSH_SUBS_FILE, JSON.stringify(subs, null, 2));
+}
+
+// 发送 Web Push 通知
+async function sendPushNotification(wallet, payload) {
+  const subs = getPushSubs();
+  const mine = subs.filter(s => s.wallet?.toLowerCase() === wallet.toLowerCase());
+  for (const sub of mine) {
+    try {
+      await webpush.sendNotification(sub.subscription, JSON.stringify(payload));
+    } catch (err) {
+      if (err.statusCode === 410) {
+        // 订阅已失效，移除
+        const idx = subs.indexOf(sub);
+        if (idx > -1) { subs.splice(idx, 1); savePushSubs(subs); }
+      }
+    }
+  }
+}
 
 // BNB 价格缓存
 let bnbPriceUsd = 600; // 默认值
@@ -419,6 +452,20 @@ function addNotification(notification) {
   });
   if (notifications.length > 500) notifications.length = 500;
   saveNotifications(notifications);
+
+  // Web Push 推送
+  if (notification.targetWallet) {
+    let icon = '', title = 'CryptoMinds 通知', body = '';
+    if (notification.type === 'new_order') {
+      icon = '🛒'; title = '新订单'; body = `${notification.buyerName || '买家'} 购买了 ${notification.serviceName || '服务'}`;
+    } else if (notification.type === 'order_confirmed') {
+      icon = '✅'; title = '订单确认'; body = `${notification.serviceName || '服务'} 已确认`;
+    } else if (notification.type === 'order_result') {
+      icon = '📦'; title = '结果已出'; body = `${notification.serviceName || '服务'} 结果已交付`;
+    }
+    sendPushNotification(notification.targetWallet, { icon, title, body, notificationId: notifications[0].id }).catch(() => {});
+  }
+
   return notifications[0];
 }
 
@@ -800,6 +847,33 @@ app.get('/api/market', async (req, res) => {
   }).sort((a, b) => (b._sort_score || 0) - (a._sort_score || 0));
   // 返回时去掉内部排序字段
   res.json(sorted.map(({ _sort_score, ...rest }) => rest));
+});
+
+// Web Push 订阅
+app.get('/api/push/vapidPublicKey', (req, res) => {
+  res.json({ ok: true, publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/push/subscribe', (req, res) => {
+  const { wallet, subscription } = req.body;
+  if (!wallet || !subscription) return res.json({ ok: false, error: '缺少 wallet 或 subscription' });
+  const subs = getPushSubs();
+  const normalized = wallet.toLowerCase();
+  // 防重复
+  const exists = subs.find(s => s.wallet?.toLowerCase() === normalized && s.subscription.endpoint === subscription.endpoint);
+  if (!exists) {
+    subs.push({ wallet: normalized, subscription, createdAt: new Date().toISOString() });
+    savePushSubs(subs);
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/push/unsubscribe', (req, res) => {
+  const { wallet, endpoint } = req.body;
+  let subs = getPushSubs();
+  subs = subs.filter(s => !(s.wallet?.toLowerCase() === wallet?.toLowerCase() && s.subscription.endpoint === endpoint));
+  savePushSubs(subs);
+  res.json({ ok: true });
 });
 
 // 通知接口

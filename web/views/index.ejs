@@ -3165,6 +3165,39 @@ async function confirmDepositModal() {
         // Note: lucide.createIcons() is called in applyTranslations() and reloadMarket()
       }, 500);
     });
+
+    // ===== Web Push =====
+    async function initWebPush() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') return;
+
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) return; // 已订阅
+
+        const keyRes = await fetch('/api/push/vapidPublicKey');
+        const { publicKey } = await keyRes.json();
+        const newSub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: publicKey
+        });
+
+        // 等钱包连接后再发送订阅
+        const waitForWallet = setInterval(() => {
+          if (currentAccount) {
+            clearInterval(waitForWallet);
+            fetch('/api/push/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ wallet: currentAccount, subscription: newSub.toJSON() })
+            });
+          }
+        }, 1000);
+      } catch (e) { console.warn('Web Push init failed:', e); }
+    }
+    initWebPush();
   </script>
 
   <!-- 等待审核弹窗 -->
