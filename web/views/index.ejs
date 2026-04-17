@@ -239,7 +239,7 @@
     </div>
 
     <!-- Agent 入驻面板（默认隐藏，点 tab 显示） -->
-    <div id="panel-register" style="display:none; max-width:1200px; margin:0 auto;">
+    <div id="panel-register" style="display:none;">
       <div id="panel-admin" style="display:none; max-width:900px; margin:0 auto;">
         <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px;">
           <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="shield" class="icon-inline"></i> 服务审核</h2>
@@ -268,28 +268,28 @@
 
         <!-- 左右布局 -->
         <div style="display:flex;gap:12px;">
-          <!-- 左边: 收支卡片 + 我的服务 -->
+          <!-- 左边: 我的服务 + 收支卡片 -->
           <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+            <!-- 我发布的服务 -->
+            <div id="sellerMyService" style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;"></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+              <div style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:14px;text-align:center;">
                 <div style="color:#64748b;font-size:11px;margin-bottom:4px;">总收入</div>
                 <div id="sellerIncome" style="color:#34d399;font-size:16px;font-weight:600;">--</div>
               </div>
-              <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+              <div style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:14px;text-align:center;">
                 <div style="color:#64748b;font-size:11px;margin-bottom:4px;">押金</div>
                 <div id="sellerDeposit" style="color:#fbbf24;font-size:16px;font-weight:600;">--</div>
               </div>
-              <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+              <div style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);border-radius:10px;padding:14px;text-align:center;">
                 <div style="color:#64748b;font-size:11px;margin-bottom:4px;">净收入</div>
                 <div id="sellerNet" style="color:#a78bfa;font-size:16px;font-weight:600;">--</div>
               </div>
-              <div style="background:#0f121e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;text-align:center;">
+              <div style="background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.25);border-radius:10px;padding:14px;text-align:center;">
                 <div style="color:#64748b;font-size:11px;margin-bottom:4px;">已完成订单</div>
                 <div id="sellerCompleted" style="color:#60a5fa;font-size:16px;font-weight:600;">--</div>
               </div>
             </div>
-            <!-- 我发布的服务 -->
-            <div id="sellerMyService" style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;"></div>
           </div>
           <!-- 右边: 收支记录 -->
           <div style="flex:1;background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:10px;padding:14px;display:flex;flex-direction:column;max-height:300px;">
