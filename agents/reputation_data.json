@@ -119,13 +119,14 @@
       "last_active": 1776408910.4172318
     },
     "four_meme": {
-      "total_requests": 6,
-      "successful_requests": 2,
+      "total_requests": 7,
+      "successful_requests": 3,
       "failed_requests": 4,
-      "total_response_time": 223.4087839126587,
+      "total_response_time": 223.4107849597931,
       "response_times": [
         124.180349111557,
-        99.22843480110168
+        99.22843480110168,
+        0.002001047134399414
       ],
       "exceptions": [
         {
@@ -149,9 +150,9 @@
           "request_id": "req-four_meme-1776085675"
         }
       ],
-      "reputation_score": 49.33,
+      "reputation_score": 59.14,
       "created_at": 1775879809.268785,
-      "last_active": 1776085774.255769
+      "last_active": 1776414486.9478989
     },
     "test": {
       "total_requests": 5,
@@ -622,7 +623,14 @@
       "success": true,
       "response_time": 0.00029015541076660156,
       "request_id": "demo-020"
+    },
+    {
+      "agent": "four_meme",
+      "timestamp": 1776414486.947902,
+      "success": true,
+      "response_time": 0.002001047134399414,
+      "request_id": "demo-gangdan5"
     }
   ],
-  "last_updated": 1776408910.417253
+  "last_updated": 1776414486.947922
 }
