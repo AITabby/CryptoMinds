@@ -2194,6 +2194,13 @@ function closePendingReviewModal() {
   document.getElementById('regFormArea').style.display = 'none';
 }
 
+function goToPendingPage() {
+  closeDepositModal();
+  document.getElementById('pendingReviewPage').style.display = 'block';
+  document.getElementById('regFormArea').style.display = 'none';
+  reloadMarket();
+}
+
 async function confirmDepositModal() {
   if (!currentAccount) { showError('请先连接钱包'); return; }
   
@@ -2223,23 +2230,37 @@ async function confirmDepositModal() {
     });
     
     if (pendingServiceId) {
-      await fetch(`/api/services/${pendingServiceId}/deposit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txHash, wallet: currentAccount })
-      });
+      try {
+        const depositRes = await fetch(`/api/services/${pendingServiceId}/deposit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ txHash, wallet: currentAccount })
+        });
+        const depositData = await depositRes.json();
+        console.log('Deposit response:', depositData);
+        if (depositData.ok) {
+          // 获取服务名称
+          const servicesRes = await fetch('/api/services');
+          const services = await servicesRes.json();
+          const svc = services.find(s => s.id === pendingServiceId);
+          if (svc) {
+            document.getElementById('pendingServiceName').textContent = '服务名称: ' + svc.name;
+          }
+        } else {
+          console.error('Deposit API error:', depositData.error);
+        }
+      } catch(e) {
+        console.error('Deposit API call failed:', e);
+      }
+    } else {
+      console.log('No pendingServiceId');
     }
     
     status.style.color = '#34d399';
-    status.innerHTML = `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;">✅ 押金已缴纳！查看交易</a><br>⏳ 正在跳转...`;
+    status.innerHTML = `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;">✅ 押金已缴纳！查看交易</a><br><br><button onclick="goToPendingPage()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">完成</button>`;
     
-    // 直接跳转到审核中页面
-    setTimeout(() => {
-      closeDepositModal();
-      document.getElementById('pendingReviewPage').style.display = 'block';
-      document.getElementById('regFormArea').style.display = 'none';
-      reloadMarket();
-    }, 1500);
+    // 3秒后自动跳转
+    setTimeout(goToPendingPage, 3000);
     
   } catch(e) {
     status.style.color = '#f87171';
