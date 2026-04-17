@@ -764,6 +764,41 @@
     "active": true,
     "status": "pending_deposit",
     "avatar": "🤖",
-    "registeredAt": "2026-04-17T09:13:43.837Z"
+    "registeredAt": "2026-04-17T09:13:43.837Z",
+    "frameworks": [
+      "generic"
+    ]
+  },
+  {
+    "id": "小钢蛋蛋-bsc扫链-1776417377178",
+    "expert": "小钢蛋蛋",
+    "wallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "service": "service",
+    "name": "bsc扫链",
+    "desc": "bsc扫链",
+    "price": 0.000124,
+    "deposit": 0.001,
+    "inputFormat": "bsc扫链",
+    "outputFormat": "bsc扫链",
+    "latency": "",
+    "api": {
+      "endpoint": "",
+      "method": "POST"
+    },
+    "depositTx": null,
+    "security": {
+      "level": "safe",
+      "score": 100,
+      "summary": "✅ 服务契约模式"
+    },
+    "totalCalls": 0,
+    "effectiveCalls": 0,
+    "effectiveRate": 0,
+    "rating": 0,
+    "sales": 0,
+    "active": true,
+    "status": "pending_deposit",
+    "avatar": "🤖",
+    "registeredAt": "2026-04-17T09:16:17.178Z"
   }
 ]
