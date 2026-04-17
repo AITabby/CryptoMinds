@@ -787,6 +787,7 @@
           loadSellerStats();
           loadSellerTx();
           document.getElementById('sellerDashboard').style.display = 'block';
+          lucide.createIcons();
         } else {
           formArea.style.display = 'block';
           regPanel.style.display = 'none';
@@ -801,6 +802,7 @@
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
       modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出市场？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:24px;line-height:1.6;">退出后服务将下架，押金退还由质押方处理。<br>可随时重新入驻（需重新质押）。</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('deregisterModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doDeregister('${id}')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
       document.body.appendChild(modal);
+      lucide.createIcons();
     }
 
     async function doDeregister(id) {
@@ -1893,6 +1895,7 @@
       modal.onclick = (e) => { if (e.target === modal) { notifPanelOpen = false; modal.remove(); } };
       modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="notifPanelOpen=false;document.getElementById('notifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="notifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
       document.body.appendChild(modal);
+      lucide.createIcons();
       loadNotifications();
     }
 
@@ -1917,6 +1920,7 @@
         <div id="myOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div>
       </div>`;
       document.body.appendChild(modal);
+      lucide.createIcons();
       loadMyOrders();
     }
 
@@ -1976,6 +1980,7 @@
           <div style="color:#e2e8f0;font-size:13px;white-space:pre-wrap;line-height:1.6;">${typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2)}</div>
         </div>`;
         document.body.appendChild(modal);
+      lucide.createIcons();
       });
     }
 
@@ -2117,6 +2122,7 @@
       modal.onclick = (e) => { if (e.target === modal) { sellerOrdersOpen = false; modal.remove(); } };
       modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:600px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="package" class="icon-inline"></i> 收到的订单</div><button onclick="sellerOrdersOpen=false;document.getElementById('sellerOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div><div id="sellerOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
       document.body.appendChild(modal);
+      lucide.createIcons();
       loadSellerOrders();
     }
 
@@ -2134,6 +2140,7 @@
       modal.onclick = (e) => { if (e.target === modal) { sellerNotifOpen = false; modal.remove(); } };
       modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="sellerNotifOpen=false;document.getElementById('sellerNotifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="sellerNotifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
       document.body.appendChild(modal);
+      lucide.createIcons();
       loadSellerNotif();
     }
 
@@ -2182,6 +2189,7 @@
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
       modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:500px;max-width:90vw;"><div style="color:#a78bfa;font-weight:600;font-size:16px;margin-bottom:16px;"><i data-lucide="package" class="icon-inline"></i> 提交服务结果</div><textarea id="deliverOutput" rows="8" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;resize:vertical;" placeholder="输入服务执行结果..."></textarea><div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;"><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:8px;padding:8px 20px;cursor:pointer;">取消</button><button onclick="submitDeliverResult('${orderId}')" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-weight:600;">提交</button></div></div>`;
       document.body.appendChild(modal);
+      lucide.createIcons();
     }
 
     async function submitDeliverResult(orderId) {
@@ -2414,6 +2422,7 @@
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
       modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:16px;line-height:1.6;">退出后押金将退还，服务将下架。</div><input id="exitExpertName" placeholder="输入专家名确认" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px;color:#e2e8f0;font-size:13px;margin-bottom:20px;outline:none;" /><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('exitExpertModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doExitExpert()" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
       document.body.appendChild(modal);
+      lucide.createIcons();
     }
 
     function doExitExpert() {
