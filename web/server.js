@@ -961,7 +961,7 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
   const latencyEst = sanitizeText(latency, 30);
 
   if (!expertName || !normalizedWallet || !skillName || parsedPrice === null || parsedDeposit === null) {
-    return res.json({ ok: false, error: '缺少必填字段' });
+    return res.json({ ok: false, error: `缺少必填字段: ${[!expertName&&'expert',!normalizedWallet&&'wallet',!skillName&&'name',parsedPrice===null&&'price',parsedDeposit===null&&'deposit'].filter(Boolean).join(',')}` });
   }
   if (!inputFmt || !outputFmt) {
     return res.json({ ok: false, error: '请填写输入/输出格式' });

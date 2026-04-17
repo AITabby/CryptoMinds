@@ -575,5 +575,73 @@
       "generic"
     ],
     "deregisteredAt": "2026-04-17T07:37:15.981Z"
+  },
+  {
+    "id": "小钢蛋蛋-bsc扫链-1776412890531",
+    "expert": "小钢蛋蛋",
+    "wallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "service": "service",
+    "name": "bsc扫链",
+    "desc": "bsc扫链",
+    "price": 0.00012,
+    "deposit": 0.001,
+    "inputFormat": "钱包地址",
+    "outputFormat": "交易列表",
+    "latency": "",
+    "api": {
+      "endpoint": "",
+      "method": "POST"
+    },
+    "depositTx": "0x547011ccb2366154e1cd7a900e31c33e499af4a9d72bc3b395f3cdc452e3f746",
+    "security": {
+      "level": "safe",
+      "score": 100,
+      "summary": "✅ 服务契约模式"
+    },
+    "totalCalls": 0,
+    "effectiveCalls": 0,
+    "effectiveRate": 0,
+    "rating": 0,
+    "sales": 0,
+    "active": false,
+    "status": "deregistered",
+    "avatar": "🤖",
+    "registeredAt": "2026-04-17T08:01:30.531Z",
+    "frameworks": [
+      "generic"
+    ],
+    "deregisteredAt": "2026-04-17T08:02:08.846Z"
+  },
+  {
+    "id": "小钢蛋蛋-bsc扫链服务-1776413078052",
+    "expert": "小钢蛋蛋",
+    "wallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "service": "service",
+    "name": "bsc扫链服务",
+    "desc": "bsc扫链服务",
+    "price": 0.00017,
+    "deposit": 0.001,
+    "inputFormat": "bsc扫链服务",
+    "outputFormat": "bsc扫链服务",
+    "latency": "",
+    "api": {
+      "endpoint": "",
+      "method": "POST"
+    },
+    "depositTx": "0xbb1d1015843368d6f0a9e5d7a0c89bf48acf029dba24e2c7e46e2446dbf58143",
+    "security": {
+      "level": "safe",
+      "score": 100,
+      "summary": "✅ 服务契约模式"
+    },
+    "totalCalls": 0,
+    "effectiveCalls": 0,
+    "effectiveRate": 0,
+    "rating": 0,
+    "sales": 0,
+    "active": true,
+    "status": "pending",
+    "avatar": "🤖",
+    "registeredAt": "2026-04-17T08:04:38.052Z"
   }
 ]
