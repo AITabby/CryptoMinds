@@ -354,11 +354,11 @@
               <div class="addr" id="myAddr">--</div>
             </div>
           </div>
-          <div style="cursor:pointer;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleMyOrders()">
+          <div style="cursor:pointer;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;margin-left:auto;" onclick="toggleMyOrders()">
             <span style="font-size:16px;">📋</span>
             <span style="color:#a78bfa;font-size:13px;font-weight:600;" data-i18n="myOrders">我的订单</span>
           </div>
-          <div style="cursor:pointer;position:relative;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;margin-left:auto;" onclick="toggleNotificationPanel()">
+          <div style="cursor:pointer;position:relative;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleNotificationPanel()">
             <span style="font-size:16px;">🔔</span>
             <span id="myUnread" style="color:#a78bfa;font-size:13px;font-weight:600;">0</span>
             <div id="notifBadge" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;"></div>
@@ -392,14 +392,7 @@
           <div id="notifList" style="color:#94a3b8;font-size:13px;">暂无通知</div>
         </div>
 
-        <!-- 我的订单面板 -->
-        <div id="myOrdersPanel" style="display:none;margin-top:12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:12px;padding:16px;max-height:500px;overflow-y:auto;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <div style="color:#a78bfa;font-weight:600;font-size:14px;">📋 我的订单</div>
-            <button onclick="toggleMyOrders()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">关闭</button>
-          </div>
-          <div id="myOrdersList" style="color:#94a3b8;font-size:13px;">暂无订单</div>
-        </div>
+
         <!-- 我的消费记录 -->
         <div class="txs" style="margin-top:16px;">
           <div class="section-title" style="margin-bottom:0" data-i18n="myTxTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的消费记录</div>
@@ -1839,8 +1832,25 @@
     let myOrdersOpen = false;
     function toggleMyOrders() {
       myOrdersOpen = !myOrdersOpen;
-      document.getElementById('myOrdersPanel').style.display = myOrdersOpen ? 'block' : 'none';
-      if (myOrdersOpen) loadMyOrders();
+      if (!myOrdersOpen) {
+        const m = document.getElementById('myOrdersModal');
+        if (m) m.remove();
+        return;
+      }
+      // 创建弹窗
+      const modal = document.createElement('div');
+      modal.id = 'myOrdersModal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
+      modal.onclick = (e) => { if (e.target === modal) { myOrdersOpen = false; modal.remove(); } };
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div style="color:#a78bfa;font-weight:600;font-size:16px;">📋 我的订单</div>
+          <button onclick="myOrdersOpen=false;document.getElementById('myOrdersModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <div id="myOrdersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div>
+      </div>`;
+      document.body.appendChild(modal);
+      loadMyOrders();
     }
 
     async function loadMyOrders() {
