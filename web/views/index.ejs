@@ -326,10 +326,14 @@
             <div id="notifBadge" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;"></div>
           </div>
         </div>
-        <div class="my-stats" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="my-stats">
           <div class="stat-card">
             <div class="label" data-i18n="walletBalance">钱包余额</div>
             <div class="value" id="myBalance">--</div>
+          </div>
+          <div class="stat-card">
+            <div class="label" data-i18n="usdcSpent">USDC 已花费</div>
+            <div class="value green" id="mySpentUsdc">--</div>
           </div>
           <div class="stat-card">
             <div class="label" data-i18n="bnbSpent">BNB 已花费</div>
@@ -1430,7 +1434,10 @@
             return false;
           });
 
-          document.getElementById('mySpentBnb').textContent = myTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
+          const bnbTxs = myTxs.filter(tx => (tx.currency || 'BNB') === 'BNB');
+          const usdcTxs = myTxs.filter(tx => (tx.currency || 'BNB') === 'USDC');
+          document.getElementById('mySpentBnb').textContent = bnbTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
+          document.getElementById('mySpentUsdc').textContent = usdcTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(2) + ' USDC';
           document.getElementById('myTasks').textContent = myTxs.length;
 
           const tbody = document.getElementById('myTxBody');
@@ -2118,6 +2125,7 @@
           document.getElementById('myAddr').textContent = currentAccount;
           document.getElementById('myBalance').textContent = '0.0000 BNB';
           document.getElementById('mySpentBnb').textContent = '0.0000 BNB';
+          document.getElementById('mySpentUsdc').textContent = '0.00 USDC';
           document.getElementById('myTasks').textContent = '0';
           showTab('myagent');
         } else {
@@ -2198,7 +2206,10 @@
           return false;
         });
 
-        document.getElementById('mySpentBnb').textContent = myTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
+        const bnbTxs2 = myTxs.filter(tx => (tx.currency || 'BNB') === 'BNB');
+        const usdcTxs2 = myTxs.filter(tx => (tx.currency || 'BNB') === 'USDC');
+        document.getElementById('mySpentBnb').textContent = bnbTxs2.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
+        document.getElementById('mySpentUsdc').textContent = usdcTxs2.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(2) + ' USDC';
         document.getElementById('myTasks').textContent = myTxs.length;
 
         const tbody = document.getElementById('myTxBody');
@@ -2732,7 +2743,7 @@
       if (myAgentH2) myAgentH2.textContent = t('myAgent');
 
       const statLabels = document.querySelectorAll('.stat-card .label');
-      const statKeys = ['walletBalance', 'bnbSpent', 'servicesBought'];
+      const statKeys = ['walletBalance', 'usdcSpent', 'bnbSpent', 'servicesBought'];
       statLabels.forEach((label, i) => {
         if (statKeys[i]) label.textContent = t(statKeys[i]);
       });
