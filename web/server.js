@@ -1022,6 +1022,20 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
   const services = getServices();
   const duplicate = services.find(s => s.active && s.expert === expertName && s.name === skillName);
   if (duplicate) {
+    // 允许替换 pending_deposit 状态的服务
+    if (duplicate.status === 'pending_deposit') {
+      // 更新现有服务
+      duplicate.wallet = normalizedWallet;
+      duplicate.desc = description || '';
+      duplicate.price = parsedPrice;
+      duplicate.deposit = parsedDeposit;
+      duplicate.inputFormat = inputFmt;
+      duplicate.outputFormat = outputFmt;
+      duplicate.latency = latencyEst || '';
+      duplicate.registeredAt = new Date().toISOString();
+      saveServices(services);
+      return res.json({ ok: true, service: duplicate, serviceId: duplicate.id });
+    }
     return res.json({ ok: false, error: '该服务已存在，请更换名称' });
   }
 
