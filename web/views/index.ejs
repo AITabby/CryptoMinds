@@ -355,6 +355,12 @@
       <div id="panel-market" class="market-section" style="display:flex; flex-direction:column; min-height:0;">
         <div class="section-header" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-start; flex-shrink:0;">
           <div class="section-title" style="margin:0;"><span class="icon"><i data-lucide="store" class="icon-md"></i></span> Agent Marketplace</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-left:auto;">
+            <input id="marketSearch" type="text" placeholder="搜索服务..." oninput="applyMarketFilter()" style="background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:4px 10px; color:#e2e8f0; font-size:12px; width:140px; outline:none;" />
+            <button onclick="sortMarket('effectiveRate')" class="sort-btn" data-sort="effectiveRate" style="background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">有效率 ↓</button>
+            <button onclick="sortMarket('totalCalls')" class="sort-btn" data-sort="totalCalls" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">调用量 ↓</button>
+            <button onclick="sortMarket('price')" class="sort-btn" data-sort="price" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">价格 ↓</button>
+          </div>
         </div>
         <div id="expertsList" class="agent-grid">
           <% SERVICES.forEach(svc => { %>
@@ -1851,15 +1857,53 @@
       btn.textContent = currentLang === 'zh' ? '<i data-lucide="store" class="icon-inline"></i> 确认入驻' : '<i data-lucide="store" class="icon-inline"></i> Submit';
       btn.disabled = false;
     }
-    async function reloadMarket() {
-      try {
-        const res = await fetch('/api/market');
-        const services = await res.json();
-        bootstrapServices(services);
-        const list = document.getElementById('expertsList');
-        const iconColors = ['purple','blue','cyan','green','amber'];
-        list.innerHTML = services.map((s, i) => {
-          return `
+    let currentSort = 'effectiveRate'; // 默认按有效率
+    let currentSortDir = -1; // -1=desc
+
+    function sortMarket(key) {
+      if (currentSort === key) { currentSortDir *= -1; } // 切换方向
+      else { currentSort = key; currentSortDir = -1; }
+      // 更新按钮样式
+      document.querySelectorAll('.sort-btn').forEach(btn => {
+        if (btn.dataset.sort === key) {
+          btn.style.background = 'rgba(139,92,246,0.15)';
+          btn.style.color = '#a78bfa';
+          btn.style.borderColor = 'rgba(139,92,246,0.3)';
+          btn.textContent = btn.dataset.sort === 'price' ? (currentSortDir === -1 ? '价格 ↓' : '价格 ↑') : btn.dataset.sort === 'totalCalls' ? (currentSortDir === -1 ? '调用量 ↓' : '调用量 ↑') : (currentSortDir === -1 ? '有效率 ↓' : '有效率 ↑');
+        } else {
+          btn.style.background = 'rgba(100,116,139,0.1)';
+          btn.style.color = '#94a3b8';
+          btn.style.borderColor = 'rgba(100,116,139,0.2)';
+          btn.textContent = btn.dataset.sort === 'price' ? '价格' : btn.dataset.sort === 'totalCalls' ? '调用量' : '有效率';
+        }
+      });
+      applyMarketFilter();
+    }
+
+    function applyMarketFilter() {
+      const query = (document.getElementById('marketSearch')?.value || '').toLowerCase().trim();
+      const services = Array.from(marketServices.values());
+      // 搜索过滤
+      let filtered = query ? services.filter(s =>
+        (s.expert || '').toLowerCase().includes(query) ||
+        (s.name || '').toLowerCase().includes(query) ||
+        (s.desc || '').toLowerCase().includes(query) ||
+        (s.inputFormat || '').toLowerCase().includes(query)
+      ) : services;
+      // 排序
+      filtered.sort((a, b) => {
+        let va = a[currentSort] || 0, vb = b[currentSort] || 0;
+        if (currentSort === 'price') { va = Number(va); vb = Number(vb); }
+        return (va - vb) * currentSortDir;
+      });
+      renderMarketCards(filtered);
+    }
+
+    function renderMarketCards(services) {
+      const list = document.getElementById('expertsList');
+      const iconColors = ['purple','blue','cyan','green','amber'];
+      list.innerHTML = services.map((s, i) => {
+        return `
           <div class="agent-card" data-id="${s.id}" onclick="showSkillDetail('${s.id}')" style="cursor:pointer;">
             <div class="agent-card-top" style="margin-bottom:6px;">
               <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
@@ -1883,9 +1927,17 @@
             </div>
           </div>
         `;}).join('');
+        lucide.createIcons();
+    }
+
+    async function reloadMarket() {
+      try {
+        const res = await fetch('/api/market');
+        const services = await res.json();
+        bootstrapServices(services);
+        applyMarketFilter();
         // 更新metrics
         document.getElementById('metricAgents').textContent = services.length;
-        // 同时刷新交易 metrics
         try {
           const txRes = await fetch('/api/transactions');
           const txData = await txRes.json();
@@ -1893,16 +1945,12 @@
             updateMetrics(txData.transactions, services);
           }
         } catch(e) {}
-        lucide.createIcons();
       } catch(e) { console.error('reloadMarket error:', e); }
     }
-
-    // 框架筛选已移除（服务契约模式）
 
     // 提交 Agent 注册
     async function submitAgentRegister() {
       const name = document.getElementById('regAgentName').value.trim();
-      const framework = document.getElementById('regAgentFramework').value.trim();
       if (!name) { showError('请输入 Agent 名称'); return; }
       try {
         const res = await fetch('/api/agents/register', {
