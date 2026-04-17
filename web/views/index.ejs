@@ -312,19 +312,21 @@
       </div>
       <!-- 已注册后显示 -->
       <div id="myAgentContent" style="display:none">
-        <div class="my-agent-header">
-          <div class="icon"><i data-lucide="bot" class="icon-lg"></i></div>
-          <div>
-            <h2 data-i18n="myAgent">我的 Agent</h2>
-            <div class="addr" id="myAddr">--</div>
+        <div class="my-agent-header" style="justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="icon"><i data-lucide="bot" class="icon-lg"></i></div>
+            <div>
+              <h2 data-i18n="myAgent">我的 Agent</h2>
+              <div class="addr" id="myAddr">--</div>
+            </div>
+          </div>
+          <div style="cursor:pointer;position:relative;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleNotificationPanel()">
+            <span style="font-size:16px;">🔔</span>
+            <span id="myUnread" style="color:#a78bfa;font-size:13px;font-weight:600;">0</span>
+            <div id="notifBadge" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;"></div>
           </div>
         </div>
-        <div class="my-stats">
-          <div class="stat-card" style="cursor:pointer;position:relative;" onclick="toggleNotificationPanel()">
-            <div class="label" data-i18n="notifications">通知</div>
-            <div class="value" id="myUnread">🔔 0</div>
-            <div id="notifBadge" style="display:none;position:absolute;top:8px;right:8px;width:10px;height:10px;background:#ef4444;border-radius:50%;"></div>
-          </div>
+        <div class="my-stats" style="grid-template-columns: repeat(3, 1fr);">
           <div class="stat-card">
             <div class="label" data-i18n="walletBalance">钱包余额</div>
             <div class="value" id="myBalance">--</div>
@@ -1428,7 +1430,6 @@
             return false;
           });
 
-          document.getElementById('mySpentUsdc').textContent = '0.0000 USDC';
           document.getElementById('mySpentBnb').textContent = myTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
           document.getElementById('myTasks').textContent = myTxs.length;
 
@@ -2116,7 +2117,6 @@
           document.getElementById('myAgentContent').style.display = 'block';
           document.getElementById('myAddr').textContent = currentAccount;
           document.getElementById('myBalance').textContent = '0.0000 BNB';
-          document.getElementById('mySpentUsdc').textContent = '0.0000 USDC';
           document.getElementById('mySpentBnb').textContent = '0.0000 BNB';
           document.getElementById('myTasks').textContent = '0';
           showTab('myagent');
@@ -2199,7 +2199,6 @@
         });
 
         document.getElementById('mySpentBnb').textContent = myTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
-        document.getElementById('mySpentUsdc').textContent = '0.0000 USDC';
         document.getElementById('myTasks').textContent = myTxs.length;
 
         const tbody = document.getElementById('myTxBody');
