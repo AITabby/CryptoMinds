@@ -785,6 +785,52 @@
       );
     }
 
+    async function executeRealBNBDirectPayment(service, route, wallet) {
+      const chainConfig = CHAIN_CONFIG[route.chain];
+      if (!chainConfig) {
+        throw new Error('当前链暂不支持真实 BNB 支付');
+      }
+      await ensureChain(route.chain);
+      const bnbAmount = route.amount || service.price;
+      const weiValue = '0x' + BigInt(Math.round(bnbAmount * 1e18)).toString(16);
+      renderProgressSteps('等待钱包确认', `请在钱包中确认 ${bnbAmount} BNB 转账给 ${service.expert}`, [
+        { label: `切换到 ${route.chain.toUpperCase()} 链`, state: 'done' },
+        { label: `向 ${service.expert} 发起 BNB 支付`, state: 'active' },
+        { label: '等待链上确认', state: 'pending' },
+        { label: '提交订单', state: 'pending' },
+      ]);
+      const txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: wallet,
+          to: service.wallet,
+          value: weiValue,
+        }]
+      });
+      renderProgressSteps('等待链上确认', '交易已广播，正在等待区块确认...', [
+        { label: `向 ${service.expert} 发起 BNB 支付`, state: 'done' },
+        { label: '等待链上确认', state: 'active' },
+        { label: '提交订单', state: 'pending' },
+      ], `<p style="color:#8b5cf6;">TxHash: ${txHash}</p>`);
+      await waitForTransactionReceipt(txHash);
+      renderProgressSteps('提交订单', '链上确认成功，正在提交订单...', [
+        { label: '等待链上确认', state: 'done' },
+        { label: '提交订单', state: 'active' },
+      ]);
+      const response = await fetch('/api/services/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: service.id,
+          buyerWallet: wallet,
+          paymentMode: 'onchain',
+          txHash: txHash,
+          selectedRoute: { route_type: route.route_type, chain: route.chain, symbol: route.symbol }
+        })
+      });
+      return await response.json();
+    }
+
     async function executeRealSwapPayment(service, route, wallet) {
       const chainConfig = CHAIN_CONFIG[route.chain];
       await ensureChain(route.chain);
@@ -1048,6 +1094,18 @@
         route &&
         route.route_type === 'direct' &&
         route.symbol === 'USDC' &&
+        CHAIN_CONFIG[route.chain]
+      );
+    }
+
+    function isRealBNBDirectRoute(route) {
+      return Boolean(
+        !walletIsDemo &&
+        currentAccount &&
+        window.ethereum &&
+        route &&
+        route.route_type === 'direct' &&
+        (route.symbol === 'BNB' || route.symbol === 'ETH') &&
         CHAIN_CONFIG[route.chain]
       );
     }
@@ -1568,7 +1626,7 @@
                   ${route.route_type === 'split' && route.notes ? `<div style="margin-top:6px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:8px 10px; font-size:12px;">${route.notes}</div>` : `<div style="color:#64748b; margin-top:4px;">${route.notes || ''}</div>`}
 	                  ${route.execution_preview?.steps ? `<div style="margin-top:8px; color:#94a3b8;">${route.execution_preview.steps.map((step, stepIndex) => `<div>${stepIndex + 1}. ${step}</div>`).join('')}</div>` : ''}
                   <div style="color:${isRealX402Route(route) || isRealSwapRoute(route) || isRealSplitRoute(route) ? '#34d399' : '#64748b'}; margin-top:6px; font-size:12px;">
-                    ${isRealX402Route(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实 x402 支付' : isRealSwapRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实 Swap + x402 支付' : isRealSplitRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实 Split 多笔支付' : '<i data-lucide="alert-triangle" class="icon-inline" style="color:#f59e0b"></i> 仅支持 Demo 执行'}
+                    ${isRealX402Route(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实 x402 支付' : isRealSwapRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实 Swap + x402 支付' : isRealSplitRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实 Split 多笔支付' : isRealBNBDirectRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实链上 BNB 支付' : '<i data-lucide="alert-triangle" class="icon-inline" style="color:#f59e0b"></i> 仅支持 Demo 执行'}
                   </div>
                 </div>
                 <div style="margin-top:10px;">
@@ -1620,6 +1678,9 @@
         } else if (isRealX402Route(route)) {
 	          showNotice(`<i data-lucide="loader" class="icon-inline spin"></i> 正在提交真实 x402 支付，请在钱包中确认 ${route.chain.toUpperCase()} USDC 转账...`);
 	          data = await executeRealX402Payment(service, route, wallet);
+	        } else if (isRealBNBDirectRoute(route)) {
+	          showNotice(`<i data-lucide="loader" class="icon-inline spin"></i> 正在提交真实链上支付，请在钱包中确认 ${route.chain.toUpperCase()} ${route.symbol} 转账...`);
+	          data = await executeRealBNBDirectPayment(service, route, wallet);
 	        } else {
 	          renderProgressSteps('执行路径模拟中', `正在按 ${routeLabel} 模拟执行支付编排`, [
 	            ...(route.execution_preview?.steps || ['准备执行路径', '模拟提交支付', '写入订单记录']).map((label, index) => ({
