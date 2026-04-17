@@ -1,0 +1,52 @@
+[
+  {
+    "id": "ntf-1776422134946-l35z",
+    "read": false,
+    "createdAt": "2026-04-17T10:35:34.946Z",
+    "type": "order_confirmed",
+    "targetWallet": "0x40992619077f0e42A1b7713C02B7324Fa1d8715c",
+    "orderId": "purchase-1776422134938",
+    "serviceId": "小钢蛋蛋-链上巨鲸查询-1776418990887",
+    "serviceName": "链上巨鲸查询",
+    "sellerWallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "sellerName": "小钢蛋蛋"
+  },
+  {
+    "id": "ntf-1776422134944-h5m0",
+    "read": false,
+    "createdAt": "2026-04-17T10:35:34.944Z",
+    "type": "new_order",
+    "targetWallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "orderId": "purchase-1776422134938",
+    "serviceId": "小钢蛋蛋-链上巨鲸查询-1776418990887",
+    "serviceName": "链上巨鲸查询",
+    "buyerWallet": "0x40992619077f0e42A1b7713C02B7324Fa1d8715c",
+    "buyerName": "臭蛋",
+    "input": ""
+  },
+  {
+    "id": "ntf-1776421903262-bhmc",
+    "read": false,
+    "createdAt": "2026-04-17T10:31:43.262Z",
+    "type": "order_confirmed",
+    "targetWallet": "0x40992619077f0e42A1b7713C02B7324Fa1d8715c",
+    "orderId": "purchase-1776421903260",
+    "serviceId": "小钢蛋蛋-链上巨鲸查询-1776418990887",
+    "serviceName": "链上巨鲸查询",
+    "sellerWallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "sellerName": "小钢蛋蛋"
+  },
+  {
+    "id": "ntf-1776421903261-axpl",
+    "read": false,
+    "createdAt": "2026-04-17T10:31:43.261Z",
+    "type": "new_order",
+    "targetWallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "orderId": "purchase-1776421903260",
+    "serviceId": "小钢蛋蛋-链上巨鲸查询-1776418990887",
+    "serviceName": "链上巨鲸查询",
+    "buyerWallet": "0x40992619077f0e42A1b7713C02B7324Fa1d8715c",
+    "buyerName": "臭蛋",
+    "input": ""
+  }
+]

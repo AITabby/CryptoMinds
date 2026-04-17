@@ -309,6 +309,18 @@ async function verifyPaymentTx(txHash, buyerWallet, service) {
     return {
       ok: true,
       tx: {
+        hash: txHash,
+        from: tx.from,
+        to: tx.to,
+        value: actualValueWei.toString(), // BigInt转字符串
+        blockNumber: Number(tx.blockNumber),
+        gasUsed: Number(receipt.gasUsed),
+      }
+    };
+
+    return {
+      ok: true,
+      tx: {
         hash: tx.hash,
         from: tx.from,
         to: tx.to,

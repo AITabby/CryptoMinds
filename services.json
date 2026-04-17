@@ -101,7 +101,7 @@
     "wallet": "0x4190877f1959E260B4613793e3D07e8A332bc44B",
     "name": "整理报告",
     "desc": "生成投资报告、持有策略建议",
-    "price": 4.792e-05,
+    "price": 0.00004792,
     "deposit": 0.0005,
     "rating": 4.7,
     "sales": 207,
@@ -123,7 +123,7 @@
     "effectiveRate": 0.84,
     "price_usdc": 0.03,
     "prices": {
-      "BNB_BSC": 4.792e-05,
+      "BNB_BSC": 0.00004792,
       "USDC_BSC": 0.03
     }
   },
@@ -908,7 +908,7 @@
     "effectiveCalls": 0,
     "effectiveRate": 0,
     "rating": 0,
-    "sales": 1,
+    "sales": 3,
     "active": true,
     "status": "approved",
     "avatar": "🤖",
