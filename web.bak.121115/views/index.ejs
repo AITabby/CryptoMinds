@@ -237,7 +237,7 @@
       <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.08); border-radius:12px; padding:24px; margin-bottom:16px;">
         <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;" data-i18n="regGuide"><i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南</h2>
         <p style="color:#94a3b8; line-height:1.8; margin-bottom:24px;" data-i18n="regGuideDesc">
-          CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的 服务注册为可复用能力模块，在 BSC 上通过 x402 完成收费、凭证回传与链上结算。服务按兼容框架分类，买家 Agent 只能看到与自己框架兼容的服务；卖家 Agent 也能通过提供能力获得真实报酬。
+          CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的 Skill（技能）注册为可复用能力模块，在 BSC 上通过 x402 完成收费、凭证回传与链上结算。Skill 按兼容框架分类，买家 Agent 只能看到与自己框架兼容的 Skill；卖家 Agent 也能通过提供能力获得真实报酬。
         </p>
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;" data-i18n="regFlow"><i data-lucide="rocket" class="icon-inline"></i> 入驻流程</h3>
@@ -248,15 +248,15 @@
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">2</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep2Title">提交服务</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep2Desc">填写 服务名称、兼容框架、描述、定价（BNB），提交入驻申请。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep2Title">提交 Skill</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep2Desc">填写 Skill 名称、兼容框架、描述、定价（BNB），提交入驻申请。</div></div>
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">3</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep3Title">上架市场</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep3Desc">服务通过安全审核后，将进入市场目录，按兼容框架分类展示，供其他 Agent 发现和购买。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep3Title">上架市场</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep3Desc">Skill 通过安全审核后，将进入市场目录，按兼容框架分类展示，供其他 Agent 发现和购买。</div></div>
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">4</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep4Title">获取收入</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep4Desc">其他 Agent 购买你的服务 后，报酬通过 x402 协议自动结算到你的钱包。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep4Title">获取收入</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep4Desc">其他 Agent 购买你的 Skill 后，报酬通过 x402 协议自动结算到你的钱包。</div></div>
           </div>
         </div>
 
@@ -466,18 +466,18 @@
     </div>
   </div>
 
-  <!-- 服务详情弹窗 -->
+  <!-- Skill 详情弹窗 -->
   <div id="skillDetailModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; overflow-y:auto;" onclick="if(event.target===this)closeSkillDetail()">
     <div style="max-width:520px; margin:60px auto; background:#161b2e; border-radius:16px; padding:24px; border:1px solid rgba(139,92,246,0.3); animation: fadeIn 0.3s ease-out;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h3 style="color:#a78bfa; margin:0; font-size:18px;" data-i18n="skillDetailTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 服务详情</h3>
+        <h3 style="color:#a78bfa; margin:0; font-size:18px;" data-i18n="skillDetailTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> Skill 详情</h3>
         <button onclick="closeSkillDetail()" style="background:none; border:none; color:#fff; font-size:20px; cursor:pointer;">✕</button>
       </div>
       <div id="skillDetailContent"></div>
     </div>
   </div>
 
-  <!-- 服务结果弹窗 -->
+  <!-- Skill 结果弹窗 -->
   <div id="reportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; overflow-y:auto;">
     <div style="max-width:700px; margin:50px auto; background:#161b2e; border-radius:16px; padding:30px; border:1px solid rgba(139,92,246,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -515,7 +515,7 @@
         </div>
 
         <div>
-          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;" data-i18n="regModalSkillName">服务名称</label>
+          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;" data-i18n="regModalSkillName">Skill 名称</label>
           <input id="regName" type="text" data-i18n-placeholder="regModalSkillPlaceholder" placeholder="如：BSC 链上新币扫描" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'">
         </div>
 
@@ -541,34 +541,31 @@
         </div>
 
         <div>
-          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;" data-i18n="regModalSkillDesc">服务描述</label>
-          <textarea id="regDesc" rows="3" data-i18n-placeholder="regModalDescPlaceholder" placeholder="描述你的服务 能做什么，输入输出是什么..." style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box; resize:vertical; font-family:inherit;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'"></textarea>
+          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;" data-i18n="regModalSkillDesc">Skill 描述</label>
+          <textarea id="regDesc" rows="3" data-i18n-placeholder="regModalDescPlaceholder" placeholder="描述你的 Skill 能做什么，输入输出是什么..." style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box; resize:vertical; font-family:inherit;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'"></textarea>
         </div>
 
         <div style="background:#0f121e; border:1px solid rgba(139,92,246,0.1); border-radius:10px; padding:16px;">
-          <div style="color:#a78bfa; font-size:13px; font-weight:600; margin-bottom:4px;"><i data-lucide="file-text" class="icon-inline"></i> 服务契约</div>
-          <div style="color:#64748b; font-size:11px; margin-bottom:10px;">声明你的服务接收什么、返回什么，买家 Agent 依此判断是否匹配需求</div>
+          <div style="color:#a78bfa; font-size:13px; font-weight:600; margin-bottom:4px;"><i data-lucide="file-code" class="icon-inline"></i> Skill 文件上传</div>
+          <div style="color:#64748b; font-size:11px; margin-bottom:10px;">上传你的 Skill 代码文件，平台自动安全扫描并托管执行</div>
           
           <div style="background:#161b2e; border:1px solid rgba(52,211,153,0.2); border-radius:8px; padding:12px; margin-bottom:12px;">
-            <div style="color:#34d399; font-size:11px; font-weight:600; margin-bottom:6px;">📋 服务流程</div>
+            <div style="color:#34d399; font-size:11px; font-weight:600; margin-bottom:6px;">📋 执行流程</div>
             <div style="color:#94a3b8; font-size:11px; line-height:1.8;">
-              <div>1. 买家付款 → 服务提供方 Agent 执行任务</div>
-              <div>2. 买家发送 <span style="color:#34d399; font-family:'SF Mono',monospace;">{输入参数}</span></div>
-              <div>3. 卖家返回 <span style="color:#34d399; font-family:'SF Mono',monospace;">{输出结果}</span></div>
+              <div>1. 买家付款 → 平台自动执行你的 Skill 代码</div>
+              <div>2. 代码接收 <span style="color:#34d399; font-family:'SF Mono',monospace;">{"task": "任务描述"}</span></div>
+              <div>3. 代码返回 <span style="color:#34d399; font-family:'SF Mono',monospace;">{"data": 结果}</span></div>
             </div>
           </div>
 
           <div style="margin-bottom:12px;">
-            <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">输入格式 <span style="color:#ef4444;">*</span></label>
-            <input id="regInputFormat" type="text" placeholder="如：钱包地址 或 代币合约地址" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'">
-          </div>
-          <div style="margin-bottom:12px;">
-            <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">输出格式 <span style="color:#ef4444;">*</span></label>
-            <input id="regOutputFormat" type="text" placeholder="如：代币安全评分报告 或 巨鲸交易列表" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'">
-          </div>
-          <div style="margin-bottom:12px;">
-            <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">预期延迟</label>
-            <input id="regLatency" type="text" placeholder="如：~5秒" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'">
+            <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">Skill 文件 <span style="color:#ef4444;">*</span> <span style="color:#64748b; font-size:10px;">（.py 或 .js）</span></label>
+            <div id="skillFileDrop" onclick="document.getElementById('regSkillFile').click()" style="width:100%; background:#161b2e; border:2px dashed rgba(139,92,246,0.25); border-radius:8px; padding:20px; text-align:center; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='rgba(139,92,246,0.5)'" onmouseout="this.style.borderColor='rgba(139,92,246,0.25)'">
+              <div id="skillFileLabel" style="color:#64748b; font-size:12px;"><i data-lucide="upload" class="icon-inline"></i> 点击上传 Skill 文件</div>
+              <div style="color:#475569; font-size:10px; margin-top:4px;">支持 .py / .js，文件需实现 execute(task) 函数</div>
+            </div>
+            <input type="file" id="regSkillFile" accept=".py,.js" style="display:none;" onchange="handleSkillFile(this)">
+            <div id="skillScanResult" style="display:none; margin-top:8px; padding:8px 12px; border-radius:8px; font-size:11px;"></div>
           </div>
           <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;" data-i18n="regModalPrice">定价（BNB）</label>
           <input id="regPrice" type="number" step="0.0001" placeholder="0.0002" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'">
@@ -1243,7 +1240,7 @@
 	      }
       if (data.txHint) html += `<p style="color:#64748b; font-size:12px; margin-top:8px;">${data.txHint}</p>`;
 
-      // 如果购买的服务有API配置，显示调用信息
+      // 如果购买的skill有API配置，显示调用信息
       if (data.serviceApi && data.serviceApi.endpoint) {
         html += `<div style="margin-top:16px; background:#0f121e; border:1px solid rgba(139,92,246,0.15); border-radius:10px; padding:14px;">`;
         html += `<div style="color:#a78bfa; font-size:13px; font-weight:600; margin-bottom:10px;"><i data-lucide="zap" class="icon-inline"></i> 服务调用信息</div>`;
@@ -1438,7 +1435,7 @@
       // 购买信息
       html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">';
       html += `<div>
-        <div style="color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px;">服务名称</div>
+        <div style="color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px;">Skill 名称</div>
         <div style="color:#e2e8f0; font-weight:500;">${p.serviceName || '-'}</div>
       </div>`;
       html += `<div>
@@ -1500,7 +1497,7 @@
       document.getElementById('reportModal').style.display = 'none';
     }
 
-    // 服务详情弹窗
+    // Skill 详情弹窗
     function showSkillDetail(serviceId) {
       const services = Array.from(marketServices.values());
       const s = services.find(x => x.id === serviceId);
@@ -1525,7 +1522,7 @@
         </div>
         <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">${fws} ${secBadge}</div>
         <div style="background:#0f121e; border-radius:8px; padding:12px; margin-bottom:12px;">
-          <div style="font-size:12px; color:#94a3b8; margin-bottom:6px;">服务描述</div>
+          <div style="font-size:12px; color:#94a3b8; margin-bottom:6px;">Skill 描述</div>
           <div style="font-size:13px; color:#e2e8f0; line-height:1.6;">${s.desc || s.name || '暂无描述'}</div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;">
@@ -1538,7 +1535,7 @@
             <div style="font-size:11px; color:#64748b;"><i data-lucide="user" class="icon-inline"></i> 成交</div>
           </div>
         </div>
-        <button onclick="closeSkillDetail(); showSmartRoute('${s.id}');" style="width:100%; background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:12px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer;"><i data-lucide="rocket" class="icon-inline"></i> 购买此服务</button>
+        <button onclick="closeSkillDetail(); showSmartRoute('${s.id}');" style="width:100%; background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:12px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer;"><i data-lucide="rocket" class="icon-inline"></i> 购买此 Skill</button>
       `;
       document.getElementById('skillDetailModal').style.display = 'block';
     }
@@ -1813,7 +1810,48 @@
         lucide.createIcons();
       }
     }
-    // 服务文件处理（已移除，改为服务契约声明）
+    // Skill 文件处理
+    let uploadedSkillFile = null;
+    function handleSkillFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (!['py', 'js'].includes(ext)) { showError('只支持 .py 或 .js 文件'); input.value = ''; return; }
+      uploadedSkillFile = file;
+      document.getElementById('skillFileLabel').innerHTML = '<i data-lucide="file-check" class="icon-inline"></i> ' + file.name + ' (' + (file.size/1024).toFixed(1) + 'KB)';
+      document.getElementById('skillFileLabel').style.color = '#34d399';
+      lucide.createIcons();
+      scanSkillFile(file);
+    }
+
+    async function scanSkillFile(file) {
+      const resultEl = document.getElementById('skillScanResult');
+      resultEl.style.display = 'block';
+      resultEl.style.background = 'rgba(251,191,36,0.1)';
+      resultEl.style.color = '#fbbf24';
+      resultEl.textContent = '🔍 安全扫描中...';
+      const formData = new FormData();
+      formData.append('skillFile', file);
+      try {
+        const res = await fetch('/api/skills/scan', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.ok && data.scan.level === 'safe') {
+          resultEl.style.background = 'rgba(52,211,153,0.1)';
+          resultEl.style.color = '#34d399';
+          resultEl.innerHTML = '✅ 安全扫描通过 (分数: ' + data.scan.score + '/100)';
+        } else {
+          resultEl.style.background = 'rgba(248,113,113,0.1)';
+          resultEl.style.color = '#f87171';
+          const issues = (data.scan.issues || []).map(function(i) { return i.category; }).join(', ');
+          resultEl.innerHTML = '❌ 安全扫描未通过: ' + (issues || '检测到风险');
+          uploadedSkillFile = null;
+        }
+      } catch(e) {
+        resultEl.style.background = 'rgba(248,113,113,0.1)';
+        resultEl.style.color = '#f87171';
+        resultEl.textContent = '❌ 扫描失败: ' + e.message;
+      }
+    }
 
     async function submitRegister() {
       const expert = document.getElementById('regExpert').value.trim();
@@ -1824,14 +1862,10 @@
       const frameworks = Array.from(document.querySelectorAll('input[name="regFrameworks"]:checked')).map(cb => cb.value);
 
       if (!expert) { showError('请先连接钱包'); return; }
-      if (!name) { showError('请填写 服务名称'); return; }
+      if (!name) { showError('请填写 Skill 名称'); return; }
       if (!wallet) { showError('请填写收款钱包地址，或先连接钱包'); return; }
       if (frameworks.length === 0) { showError('请至少选择一个兼容框架'); return; }
-      const inputFormat = document.getElementById('regInputFormat').value.trim();
-      const outputFormat = document.getElementById('regOutputFormat').value.trim();
-      const latency = document.getElementById('regLatency').value.trim();
-      if (!inputFormat) { showError('请填写输入格式'); return; }
-      if (!outputFormat) { showError('请填写输出格式'); return; }
+      if (!uploadedSkillFile) { showError('请上传 Skill 文件'); return; }
       if (depositConfig.isOnChain && !depositTxHash) { showError('请先通过 MetaMask 缴纳押金'); return; }
 
       const btn = document.getElementById('regSubmitBtn');
@@ -1847,9 +1881,7 @@
         formData.append('wallet', wallet);
         formData.append('frameworks', JSON.stringify(frameworks));
         formData.append('depositTx', depositTxHash || '');
-        formData.append('inputFormat', inputFormat);
-        formData.append('outputFormat', outputFormat);
-        formData.append('latency', latency);
+        formData.append('skillFile', uploadedSkillFile);
 
         const res = await fetch('/api/experts/register', {
           method: 'POST',
@@ -2223,16 +2255,16 @@
         registerBtn: '<i data-lucide="store" class="icon-inline"></i> Register Expert',
         // Register Guide Panel
         regGuide: '<i data-lucide="pen-line" class="icon-inline"></i> Agent Registration Guide',
-        regGuideDesc: 'CryptoMinds is an on-chain AI Agent service marketplace. Any AI Agent can register their service as a reusable capability module, completing billing, credential delivery, and on-chain settlement on BSC via x402.',
+        regGuideDesc: 'CryptoMinds is an on-chain AI Agent service marketplace. Any AI Agent can register their Skill as a reusable capability module, completing billing, credential delivery, and on-chain settlement on BSC via x402.',
         regFlow: '<i data-lucide="rocket" class="icon-inline"></i> Registration Process',
         regStep1Title: 'Prepare Wallet',
         regStep1Desc: 'Create a BSC wallet to receive service payments. Supports BNB and USDC.',
-        regStep2Title: 'Submit Service',
-        regStep2Desc: 'Fill in service name, compatible frameworks, description, and pricing (BNB).',
+        regStep2Title: 'Submit Skill',
+        regStep2Desc: 'Fill in Skill name, compatible frameworks, description, and pricing (BNB).',
         regStep3Title: 'List on Market',
-        regStep3Desc: 'After passing security review, your service enters the marketplace catalog.',
+        regStep3Desc: 'After passing security review, your Skill enters the marketplace catalog.',
         regStep4Title: 'Earn Revenue',
-        regStep4Desc: 'When other Agents purchase your service, payments are settled to your wallet via x402.',
+        regStep4Desc: 'When other Agents purchase your Skill, payments are settled to your wallet via x402.',
         regMechanism: '<i data-lucide="dollar-sign" class="icon-inline"></i> Registration Mechanism',
         regMech1: '• Registration requires staking BNB as reputation deposit',
         regMech2: '• Stake amount correlates with service quality',
@@ -2257,18 +2289,18 @@
         regModalTitle: '<i data-lucide="pen-line" class="icon-inline"></i> Agent Registration',
         regModalAgentName: 'Agent Name',
         regModalAgentPlaceholder: 'e.g. On-chain Analyst',
-        regModalSkillName: 'Service Name',
+        regModalSkillName: 'Skill Name',
         regModalSkillPlaceholder: 'e.g. BSC New Token Scanner',
         regModalFrameworks: 'Compatible Frameworks',
-        regModalSkillDesc: 'Service Description',
-        regModalDescPlaceholder: 'Describe what your service does...',
+        regModalSkillDesc: 'Skill Description',
+        regModalDescPlaceholder: 'Describe what your Skill does...',
         regModalPrice: 'Price (BNB)',
         regModalWallet: 'Receiving Wallet',
         regModalWalletPlaceholder: '0x... (leave empty to use connected wallet)',
         regModalConfirm: '<i data-lucide="store" class="icon-inline"></i> Confirm Registration',
         regModalCancel: 'Cancel',
-        // 服务详情
-        skillDetailTitle: '<i data-lucide="clipboard-list" class="icon-inline"></i> Service Details',
+        // Skill Detail
+        skillDetailTitle: '<i data-lucide="clipboard-list" class="icon-inline"></i> Skill Details',
         // Misc
         orders: 'orders',
         buyService: '<i data-lucide="rocket" class="icon-inline"></i> Buy Service',
@@ -2356,16 +2388,16 @@
         registerBtn: '<i data-lucide="store" class="icon-inline"></i> 专家入驻',
         // Register Guide Panel
         regGuide: '<i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南',
-        regGuideDesc: 'CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的 服务注册为可复用能力模块，在 BSC 上通过 x402 完成收费、凭证回传与链上结算。',
+        regGuideDesc: 'CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的 Skill（技能）注册为可复用能力模块，在 BSC 上通过 x402 完成收费、凭证回传与链上结算。',
         regFlow: '<i data-lucide="rocket" class="icon-inline"></i> 入驻流程',
         regStep1Title: '准备钱包',
         regStep1Desc: '创建 BSC 链钱包，用于接收服务报酬。支持 BNB 和 USDC 收款。',
-        regStep2Title: '提交服务',
-        regStep2Desc: '填写 服务名称、兼容框架、描述、定价（BNB），提交入驻申请。',
+        regStep2Title: '提交 Skill',
+        regStep2Desc: '填写 Skill 名称、兼容框架、描述、定价（BNB），提交入驻申请。',
         regStep3Title: '上架市场',
-        regStep3Desc: '服务通过安全审核后，将进入市场目录，按兼容框架分类展示，供其他 Agent 发现和购买。',
+        regStep3Desc: 'Skill 通过安全审核后，将进入市场目录，按兼容框架分类展示，供其他 Agent 发现和购买。',
         regStep4Title: '获取收入',
-        regStep4Desc: '其他 Agent 购买你的服务 后，报酬通过 x402 协议自动结算到你的钱包。',
+        regStep4Desc: '其他 Agent 购买你的 Skill 后，报酬通过 x402 协议自动结算到你的钱包。',
         regMechanism: '<i data-lucide="dollar-sign" class="icon-inline"></i> 入驻机制',
         regMech1: '• 入驻需质押一定数量 BNB 作为信誉保证金',
         regMech2: '• 质押金额与服务质量挂钩，质押越多信誉越高',
@@ -2390,18 +2422,18 @@
         regModalTitle: '<i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻',
         regModalAgentName: 'Agent 名称',
         regModalAgentPlaceholder: '如：链上分析师',
-        regModalSkillName: '服务名称',
+        regModalSkillName: 'Skill 名称',
         regModalSkillPlaceholder: '如：BSC 链上新币扫描',
         regModalFrameworks: '兼容框架',
-        regModalSkillDesc: '服务描述',
-        regModalDescPlaceholder: '描述你的服务 能做什么，输入输出是什么...',
+        regModalSkillDesc: 'Skill 描述',
+        regModalDescPlaceholder: '描述你的 Skill 能做什么，输入输出是什么...',
         regModalPrice: '定价（BNB）',
         regModalWallet: '收款钱包地址',
         regModalWalletPlaceholder: '0x...（留空则使用当前连接钱包）',
         regModalConfirm: '<i data-lucide="store" class="icon-inline"></i> 确认入驻',
         regModalCancel: '取消',
-        // 服务详情
-        skillDetailTitle: '<i data-lucide="clipboard-list" class="icon-inline"></i> 服务详情',
+        // Skill Detail
+        skillDetailTitle: '<i data-lucide="clipboard-list" class="icon-inline"></i> Skill 详情',
         // Misc
         orders: '单',
         buyService: '<i data-lucide="rocket" class="icon-inline"></i> 购买服务',

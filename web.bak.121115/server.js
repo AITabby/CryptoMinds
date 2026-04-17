@@ -480,7 +480,7 @@ async function getWalletTokenBalance(walletAddress, tokenAddress) {
   }
 }
 
-// 生成服务执行结果（基于真实链上数据）
+// 生成 Skill 执行结果（基于真实链上数据）
 async function generateReport(serviceType, buyerWallet, targetAddress = null) {
   const ts = new Date().toISOString();
   
@@ -568,7 +568,7 @@ async function generateReport(serviceType, buyerWallet, targetAddress = null) {
       
       return {
         type: 'scanning',
-        title: '服务执行结果 — BSC 最新代币',
+        title: 'Skill 执行结果 — BSC 最新代币',
         timestamp: ts,
         source: '链上实时查询',
         data,
@@ -755,7 +755,7 @@ app.get('/api/config/deposit', (req, res) => {
   });
 });
 
-// 服务文件安全扫描
+// Skill 文件安全扫描
 app.post('/api/skills/scan', upload.single('skillFile'), (req, res) => {
   try {
     if (!req.file) return res.json({ ok: false, error: '未上传文件' });
@@ -774,8 +774,8 @@ app.post('/api/skills/scan', upload.single('skillFile'), (req, res) => {
   }
 });
 
-app.post('/api/experts/register', async (req, res) => {
-  const { expert, wallet, name, desc, price, deposit, frameworks, depositTx, inputFormat, outputFormat, latency } = req.body;
+app.post('/api/experts/register', upload.single('skillFile'), async (req, res) => {
+  const { expert, wallet, name, desc, price, deposit, frameworks, depositTx } = req.body;
   const expertName = sanitizeText(expert, 40);
   const skillName = sanitizeText(name, 80);
   const description = sanitizeText(desc, 240);
@@ -785,20 +785,23 @@ app.post('/api/experts/register', async (req, res) => {
   const depositTxHash = typeof depositTx === 'string' ? depositTx.trim() : '';
   const fwList = Array.isArray(frameworks) ? frameworks.filter(f => typeof f === 'string' && ['openclaw','langchain','autogpt','hermes','generic'].includes(f.toLowerCase())).map(f => f.toLowerCase()) : ['generic'];
 
-  const inputFmt = sanitizeText(inputFormat, 120);
-  const outputFmt = sanitizeText(outputFormat, 120);
-  const latencyEst = sanitizeText(latency, 30);
-
   if (!expertName || !normalizedWallet || !skillName || parsedPrice === null || parsedDeposit === null) {
     return res.json({ ok: false, error: '缺少必填字段' });
-  }
-  if (!inputFmt || !outputFmt) {
-    return res.json({ ok: false, error: '请填写输入/输出格式' });
   }
   if (!isValidAddress(normalizedWallet)) {
     return res.json({ ok: false, error: 'wallet 地址格式无效' });
   }
-  // 服务契约（不再上传文件）
+  // Skill file handling
+  let skillFilePath = null;
+  let skillFileExt = null;
+  if (req.file) {
+    skillFileExt = path.extname(req.file.originalname).toLowerCase();
+    if (!['.py', '.js'].includes(skillFileExt)) {
+      fs.unlinkSync(req.file.path);
+      return res.json({ ok: false, error: '只支持 .py 或 .js 文件' });
+    }
+    skillFilePath = req.file.path;
+  }
   // 验证押金交易（非零地址时需要链上验证）
   if (DEPOSIT_POOL_ADDRESS !== '0x0000000000000000000000000000000000000000') {
     if (!isChainTxHash(depositTxHash)) {
@@ -826,26 +829,46 @@ app.post('/api/experts/register', async (req, res) => {
   const services = getServices();
   const duplicate = services.find(s => s.active && s.expert === expertName && s.name === skillName);
   if (duplicate) {
-    return res.json({ ok: false, error: '该服务已存在，请更换名称' });
+    return res.json({ ok: false, error: '该 Skill 已存在，请更换名称' });
   }
 
-  // 无需安全扫描（不再上传文件，服务契约模式）
-  let securityScan = { level: 'safe', score: 100, issues: [], summary: '✅ 服务契约模式' };
+  // 安全扫描（上传的 Skill 文件）
+  let securityScan = { level: 'safe', score: 100, issues: [], summary: '✅ 未上传文件' };
+  try {
+    const { scan } = require('../security/scanner');
+    if (skillFilePath && fs.existsSync(skillFilePath)) {
+      const skillCode = fs.readFileSync(skillFilePath, 'utf8');
+      securityScan = scan(skillCode);
+    }
+  } catch (e) {
+    console.error('Scanner error:', e.message);
+  }
 
   const id = `${expertName}-${skillName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
-  // 直接上架（契约模式无需安全扫描）
+  // 安全不通过 → 删文件 + 拒绝
+  if (securityScan.level !== 'safe') {
+    if (skillFilePath && fs.existsSync(skillFilePath)) fs.unlinkSync(skillFilePath);
+    return res.json({ ok: false, error: '安全扫描未通过: ' + securityScan.summary });
+  }
+
+  // 保存 skill 文件到 uploaded_skills/{id}/
+  if (skillFilePath && fs.existsSync(skillFilePath)) {
+    const skillDir = path.join(__dirname, '..', 'uploaded_skills', id);
+    if (!fs.existsSync(skillDir)) fs.mkdirSync(skillDir, { recursive: true });
+    const destPath = path.join(skillDir, `skill${skillFileExt}`);
+    fs.renameSync(skillFilePath, destPath);
+    skillFilePath = destPath;
+  }
 
   const newService = {
-    id, expert: expertName, wallet: normalizedWallet, service: 'service', name: skillName,
+    id, expert: expertName, wallet: normalizedWallet, service: 'skill', name: skillName,
     desc: description || '', price: parsedPrice, deposit: parsedDeposit,
-    inputFormat: inputFmt, outputFormat: outputFmt, latency: latencyEst || '',
     frameworks: fwList,
-    api: { endpoint: '', method: 'POST' },
+    api: { endpoint: '', method: 'POST', skillFile: skillFilePath ? true : false, skillExt: skillFileExt },
     depositTx: depositTxHash || null,
-    security: { level: 'safe', score: 100, summary: '✅ 服务契约模式' },
-    totalCalls: 0, effectiveCalls: 0, effectiveRate: 0,
-    rating: 0, sales: 0, active: true,
-    status: 'approved',
+    security: { level: securityScan.level, score: securityScan.score, summary: securityScan.summary },
+    rating: 0, sales: 0, active: securityScan.level === 'safe', // 安全自动上架，不安全自动拒绝
+    status: securityScan.level === 'safe' ? 'approved' : 'rejected', // 自动审核，无需人工
     avatar: '🤖',
     registeredAt: new Date().toISOString()
   };
@@ -886,7 +909,7 @@ app.post('/api/experts/exit', (req, res) => {
   res.json({ ok: true, message: `已退出，退还押金 ${(svc.deposit || 0.001)} BNB`, service: svc });
 });
 
-// 管理员审核服务
+// 管理员审核 Skill
 // 管理员鉴权中间件
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'cryptominds-admin-2026';
 function requireAdmin(req, res, next) {
@@ -917,9 +940,9 @@ app.post('/api/admin/approve/:serviceId', requireAdmin, (req, res) => {
   const { serviceId } = req.params;
   const services = getServices();
   const idx = services.findIndex(s => s.id === serviceId);
-  if (idx === -1) return res.json({ ok: false, error: '服务不存在' });
+  if (idx === -1) return res.json({ ok: false, error: 'Skill 不存在' });
   const svc = services[idx];
-  if (svc.status !== 'pending') return res.json({ ok: false, error: `服务状态为 ${svc.status || 'active'}，无法审核` });
+  if (svc.status !== 'pending') return res.json({ ok: false, error: `Skill 状态为 ${svc.status || 'active'}，无法审核` });
   
   svc.status = 'approved';
   svc.active = true;
@@ -934,9 +957,9 @@ app.post('/api/admin/reject/:serviceId', requireAdmin, (req, res) => {
   const { reason } = req.body;
   const services = getServices();
   const idx = services.findIndex(s => s.id === serviceId);
-  if (idx === -1) return res.json({ ok: false, error: '服务不存在' });
+  if (idx === -1) return res.json({ ok: false, error: 'Skill 不存在' });
   const svc = services[idx];
-  if (svc.status !== 'pending') return res.json({ ok: false, error: `服务状态为 ${svc.status || 'active'}，无法拒绝` });
+  if (svc.status !== 'pending') return res.json({ ok: false, error: `Skill 状态为 ${svc.status || 'active'}，无法拒绝` });
   
   svc.status = 'rejected';
   svc.active = false;
@@ -1055,7 +1078,7 @@ app.post('/api/services/buy', async (req, res) => {
   service.sales += 1;
   saveServices(services);
 
-  // 自动安装服务到买家 Agent（异步，不阻塞）
+  // 自动安装 Skill 到买家 Agent（异步，不阻塞）
   try {
     const { installSkill } = require('../security/install');
     const installResult = installSkill({
@@ -1086,7 +1109,7 @@ app.post('/api/services/buy', async (req, res) => {
 });
 
 // ============================================
-// 服务代理调用（全自动，无需人工介入）
+// Skill 代理调用（全自动，无需人工介入）
 // POST /api/skill/call/:serviceId
 // Body: { buyer: "0x钱包地址", ...请求参数 }
 // ============================================
@@ -1103,7 +1126,7 @@ app.post('/api/skill/call/:serviceId', async (req, res) => {
   const services = getServices();
   const service = services.find(s => s.id === serviceId && s.active);
   if (!service) {
-    return res.json({ ok: false, error: '服务不存在或已下架' });
+    return res.json({ ok: false, error: 'Skill 不存在或已下架' });
   }
 
   // 2. 验证是否已购买
@@ -1114,17 +1137,17 @@ app.post('/api/skill/call/:serviceId', async (req, res) => {
     p.buyerWallet.toLowerCase() === normalizedBuyer
   );
   if (!hasPurchased) {
-    return res.json({ ok: false, error: '未购买此服务，请先通过 /api/pay 购买' });
+    return res.json({ ok: false, error: '未购买此 Skill，请先通过 /api/pay 购买' });
   }
 
-  // 3. 执行服务 — 优先本地文件，其次 endpoint
+  // 3. 执行 Skill — 优先本地文件，其次 endpoint
   const skillId = service.id;
   const skillDir = path.join(__dirname, '..', 'uploaded_skills', skillId);
   const pyFile = path.join(skillDir, 'skill.py');
   const jsFile = path.join(skillDir, 'skill.js');
 
   if (fs.existsSync(pyFile) || fs.existsSync(jsFile)) {
-    // 本地执行上传的服务文件
+    // 本地执行上传的 Skill 文件
     const execFile = require('child_process').execFile;
     const fileToRun = fs.existsSync(pyFile) ? pyFile : jsFile;
     const isPy = fileToRun.endsWith('.py');
@@ -1190,7 +1213,7 @@ app.post('/api/skill/call/:serviceId', async (req, res) => {
       res.json({ ok: false, error: `调用失败: ${error.message}` });
     }
   } else {
-    res.json({ ok: false, error: '该服务没有可用的执行方式' });
+    res.json({ ok: false, error: '该 Skill 没有可用的执行方式' });
   }
 });
 
@@ -1230,7 +1253,7 @@ app.post('/api/pay/x402', async (req, res) => {
       return res.json({ ok: false, error: 'buyerWallet 与已验证付款地址不一致' });
     }
 
-    // 生成服务执行结果
+    // 生成 Skill 执行结果
     const reportType = service.id.includes('scan') ? 'scanning' : 
                        service.id.includes('risk') ? 'risk' : 
                        service.id.includes('report') ? 'report' : 'analysis';
@@ -1726,7 +1749,7 @@ app.post('/api/skills/execute/:id', async (req, res) => {
 
     // 查找 skill
     const service = services.find(s => s.id === id && s.active);
-    if (!service) return res.json({ ok: false, error: '服务不存在或未上架' });
+    if (!service) return res.json({ ok: false, error: 'Skill 不存在或未上架' });
 
     // 检查 skill 文件
     const skillDir = path.join(__dirname, '..', 'uploaded_skills', id);
