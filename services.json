@@ -101,7 +101,7 @@
     "wallet": "0x4190877f1959E260B4613793e3D07e8A332bc44B",
     "name": "整理报告",
     "desc": "生成投资报告、持有策略建议",
-    "price": 0.00004792,
+    "price": 4.792e-05,
     "deposit": 0.0005,
     "rating": 4.7,
     "sales": 207,
@@ -123,7 +123,7 @@
     "effectiveRate": 0.84,
     "price_usdc": 0.03,
     "prices": {
-      "BNB_BSC": 0.00004792,
+      "BNB_BSC": 4.792e-05,
       "USDC_BSC": 0.03
     }
   },
@@ -598,11 +598,11 @@
       "score": 100,
       "summary": "✅ 服务契约模式"
     },
-    "totalCalls": 0,
+    "totalCalls": 1,
     "effectiveCalls": 0,
     "effectiveRate": 0,
     "rating": 0,
-    "sales": 0,
+    "sales": 1,
     "active": false,
     "status": "deregistered",
     "avatar": "🤖",
@@ -761,13 +761,15 @@
     "effectiveRate": 0,
     "rating": 0,
     "sales": 0,
-    "active": true,
-    "status": "pending_deposit",
+    "active": false,
+    "status": "deregistered",
     "avatar": "🤖",
     "registeredAt": "2026-04-17T09:13:43.837Z",
     "frameworks": [
       "generic"
-    ]
+    ],
+    "approvedAt": "2026-04-17T18:00:10.655557",
+    "deregisteredAt": "2026-04-17T10:00:45.498Z"
   },
   {
     "id": "小钢蛋蛋-bsc扫链-1776417377178",
@@ -796,13 +798,15 @@
     "effectiveRate": 0,
     "rating": 0,
     "sales": 0,
-    "active": true,
-    "status": "pending_deposit",
+    "active": false,
+    "status": "deregistered",
     "avatar": "🤖",
     "registeredAt": "2026-04-17T09:16:17.178Z",
     "frameworks": [
       "generic"
-    ]
+    ],
+    "approvedAt": "2026-04-17T18:00:10.655565",
+    "deregisteredAt": "2026-04-17T10:00:47.820Z"
   },
   {
     "id": "小钢蛋蛋-bsc扫链服务-1776418131656",
@@ -831,13 +835,15 @@
     "effectiveRate": 0,
     "rating": 0,
     "sales": 0,
-    "active": true,
-    "status": "pending_deposit",
+    "active": false,
+    "status": "deregistered",
     "avatar": "🤖",
     "registeredAt": "2026-04-17T09:38:48.952Z",
     "frameworks": [
       "generic"
-    ]
+    ],
+    "approvedAt": "2026-04-17T18:00:10.655569",
+    "deregisteredAt": "2026-04-17T10:00:50.411Z"
   },
   {
     "id": "小钢蛋蛋-bsc链上扫链服务-1776418418771",
@@ -861,18 +867,20 @@
       "score": 100,
       "summary": "✅ 服务契约模式"
     },
-    "totalCalls": 0,
+    "totalCalls": 1,
     "effectiveCalls": 0,
     "effectiveRate": 0,
     "rating": 0,
-    "sales": 0,
-    "active": true,
-    "status": "pending_deposit",
+    "sales": 1,
+    "active": false,
+    "status": "deregistered",
     "avatar": "🤖",
     "registeredAt": "2026-04-17T09:33:38.771Z",
     "frameworks": [
       "generic"
-    ]
+    ],
+    "approvedAt": "2026-04-17T18:00:10.655571",
+    "deregisteredAt": "2026-04-17T10:00:53.551Z"
   },
   {
     "id": "小钢蛋蛋-链上巨鲸查询-1776418990887",
@@ -896,18 +904,19 @@
       "score": 100,
       "summary": "✅ 服务契约模式"
     },
-    "totalCalls": 0,
+    "totalCalls": 1,
     "effectiveCalls": 0,
     "effectiveRate": 0,
     "rating": 0,
-    "sales": 0,
+    "sales": 1,
     "active": true,
-    "status": "pending_deposit",
+    "status": "approved",
     "avatar": "🤖",
     "registeredAt": "2026-04-17T09:43:10.887Z",
     "frameworks": [
       "generic"
-    ]
+    ],
+    "approvedAt": "2026-04-17T18:00:10.655573"
   },
   {
     "id": "小钢蛋蛋-交易安全策略-1776419441559",
@@ -931,14 +940,18 @@
       "score": 100,
       "summary": "✅ 服务契约模式"
     },
-    "totalCalls": 0,
+    "totalCalls": 1,
     "effectiveCalls": 0,
     "effectiveRate": 0,
     "rating": 0,
-    "sales": 0,
+    "sales": 1,
     "active": true,
-    "status": "pending_deposit",
+    "status": "approved",
     "avatar": "🤖",
-    "registeredAt": "2026-04-17T09:50:41.559Z"
+    "registeredAt": "2026-04-17T09:50:41.559Z",
+    "approvedAt": "2026-04-17T10:00:00.000Z",
+    "frameworks": [
+      "generic"
+    ]
   }
 ]

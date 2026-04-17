@@ -700,7 +700,7 @@ function addTx(tx) {
   if (txs.some(t => (t.tx && t.tx === tx.tx) || (!t.tx && `${t.from}-${t.to}-${t.amount}-${t.time}` === txKey))) return;
   if (!tx.timestamp) tx.timestamp = new Date().toISOString();
   txs.unshift(tx);
-  if (txs.length > 50) txs.length = 50;
+  // 移除50条限制，保留所有交易记录
   fs.writeFileSync(TX_LOG, JSON.stringify(txs, null, 2));
 }
 
