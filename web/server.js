@@ -130,11 +130,12 @@ async function validateServiceEndpoint(rawEndpoint) {
   return { ok: true, endpoint: url.toString() };
 }
 
-function runPythonJson(scriptPath, args = [], timeoutMs = 10000) {
+function runPythonJson(scriptPath, args = [], timeoutMs = 60000) {
   return new Promise((resolve, reject) => {
-    const proc = execFile(PYTHON_BIN, [scriptPath, ...args], { encoding: 'utf8', maxBuffer: 1024 * 1024, timeout: timeoutMs / 1000 }, (error, stdout, stderr) => {
+    const proc = execFile(PYTHON_BIN, [scriptPath, ...args], { encoding: 'utf8', maxBuffer: 1024 * 1024, timeout: timeoutMs, killSignal: 'SIGTERM' }, (error, stdout, stderr) => {
       if (error) {
-        const detail = stderr?.trim() || stdout?.trim() || error.message;
+        const detail = (stderr?.trim() || '') + (stdout?.trim() ? '\n' + stdout.trim() : '') || error.message + (error.killed ? ' (超时)' : '');
+        console.error('runPythonJson error:', scriptPath, args, error.code, error.killed, detail.substring(0, 200));
         reject(new Error(detail));
         return;
       }
@@ -199,7 +200,7 @@ async function resolveSelectedRoute(serviceId, walletAddress, selectedRoute) {
   if (!service) {
     throw new Error('服务不存在');
   }
-  const result = await runPythonJson(SMART_ROUTER_SCRIPT, ['--wallet', walletAddress, '--service', serviceId]);
+  const result = await runPythonJson(SMART_ROUTER_SCRIPT, ['--wallet', walletAddress, '--service', serviceId], 30000);
   if (!result.success) {
     throw new Error(result.error || '智能路由计算失败');
   }
@@ -1477,7 +1478,7 @@ app.post('/api/smart-route', async (req, res) => {
       return res.json({ ok: false, error: '服务不存在' });
     }
 
-    const result = await runPythonJson(SMART_ROUTER_SCRIPT, ['--wallet', normalizedWalletAddress, '--service', normalizedServiceId]);
+    const result = await runPythonJson(SMART_ROUTER_SCRIPT, ['--wallet', normalizedWalletAddress, '--service', normalizedServiceId], 30000);
 
     if (!result.success) {
       return res.json({ ok: false, error: result.error || '智能路由计算失败' });

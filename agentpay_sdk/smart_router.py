@@ -151,7 +151,7 @@ class SmartRouter:
                             "params": [wallet_address, "latest"],
                             "id": 1
                         }
-                        resp = requests.post(rpc_url, json=payload, timeout=10)
+                        resp = requests.post(rpc_url, json=payload, timeout=5)
                         if resp.status_code == 200:
                             result = resp.json()
                             if "result" in result:
@@ -189,7 +189,7 @@ class SmartRouter:
                                 }, "latest"],
                                 "id": 2
                             }
-                            resp = requests.post(rpc_url, json=payload, timeout=10)
+                            resp = requests.post(rpc_url, json=payload, timeout=5)
                             if resp.status_code == 200:
                                 result = resp.json()
                                 if "result" in result and result["result"] != "0x":
@@ -220,7 +220,7 @@ class SmartRouter:
                             "params": [wallet_address],
                             "id": 1
                         }
-                        resp = requests.post(rpc_url, json=payload, timeout=10)
+                        resp = requests.post(rpc_url, json=payload, timeout=5)
                         if resp.status_code == 200:
                             result = resp.json()
                             if "result" in result and "value" in result["result"]:
@@ -249,7 +249,7 @@ class SmartRouter:
                             "params": [wallet_address, {"mint": usdc_mint}, {"encoding": "jsonParsed"}],
                             "id": 2
                         }
-                        resp = requests.post(rpc_url, json=payload, timeout=10)
+                        resp = requests.post(rpc_url, json=payload, timeout=5)
                         if resp.status_code == 200:
                             result = resp.json()
                             if "result" in result and "value" in result["result"]:
