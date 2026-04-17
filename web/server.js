@@ -1194,6 +1194,34 @@ app.post('/api/skill/call/:serviceId', async (req, res) => {
   }
 });
 
+// 服务有效率反馈（agent 调用后标记有效/无效）
+app.post('/api/services/:id/feedback', (req, res) => {
+  const serviceId = req.params.id;
+  const { effective, buyerWallet } = req.body;
+  if (typeof effective !== 'boolean') {
+    return res.json({ ok: false, error: '缺少 effective 字段（true/false）' });
+  }
+  const services = getServices();
+  const svc = services.find(s => s.id === serviceId);
+  if (!svc) return res.json({ ok: false, error: '服务不存在' });
+
+  svc.totalCalls = (svc.totalCalls || 0) + 1;
+  svc.effectiveCalls = (svc.effectiveCalls || 0) + (effective ? 1 : 0);
+  svc.effectiveRate = svc.totalCalls > 0 ? parseFloat((svc.effectiveCalls / svc.totalCalls).toFixed(4)) : 0;
+  saveServices(services);
+
+  addTx({
+    time: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+    from: (buyerWallet || 'unknown').slice(0, 8) + '...',
+    to: svc.expert,
+    amount: 0,
+    reason: `${effective ? '✅ 有效' : '❌ 无效'}: ${svc.name}`,
+    tx: `fb-${Date.now()}`
+  });
+
+  res.json({ ok: true, totalCalls: svc.totalCalls, effectiveCalls: svc.effectiveCalls, effectiveRate: svc.effectiveRate });
+});
+
 // ============================================
 // x402 支付验证（AgentPay SDK）
 // ============================================
