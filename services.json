@@ -810,11 +810,11 @@
     "wallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
     "service": "service",
     "name": "bsc扫链服务",
-    "desc": "bsc扫链",
-    "price": 0.000111,
+    "desc": "bsc扫链服务",
+    "price": 0.000112,
     "deposit": 0.001,
-    "inputFormat": "bsc扫链",
-    "outputFormat": "bsc扫链",
+    "inputFormat": "bsc扫链服务",
+    "outputFormat": "bsc扫链服务",
     "latency": "",
     "api": {
       "endpoint": "",
@@ -834,7 +834,7 @@
     "active": true,
     "status": "pending_deposit",
     "avatar": "🤖",
-    "registeredAt": "2026-04-17T09:28:51.656Z",
+    "registeredAt": "2026-04-17T09:38:48.952Z",
     "frameworks": [
       "generic"
     ]
@@ -869,6 +869,9 @@
     "active": true,
     "status": "pending_deposit",
     "avatar": "🤖",
-    "registeredAt": "2026-04-17T09:33:38.771Z"
+    "registeredAt": "2026-04-17T09:33:38.771Z",
+    "frameworks": [
+      "generic"
+    ]
   }
 ]

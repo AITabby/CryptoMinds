@@ -2150,6 +2150,15 @@ function closeDepositModal() {
   document.getElementById('depositModal').style.display = 'none';
 }
 
+function openPendingReviewModal() {
+  document.getElementById('pendingReviewModal').style.display = 'flex';
+}
+
+function closePendingReviewModal() {
+  document.getElementById('pendingReviewModal').style.display = 'none';
+  reloadMarket();
+}
+
 async function confirmDepositModal() {
   if (!currentAccount) { showError('请先连接钱包'); return; }
   
@@ -2189,7 +2198,10 @@ async function confirmDepositModal() {
     status.style.color = '#34d399';
     status.innerHTML = `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;">✅ 押金已缴纳！查看交易</a><br>🎉 入驻成功，等待审核`;
     btn.textContent = '完成';
-    btn.onclick = () => { closeDepositModal(); reloadMarket(); showNotice('入驻成功！服务正在审核中'); };
+    btn.onclick = () => { 
+      closeDepositModal(); 
+      openPendingReviewModal(); // 显示等待审核弹窗
+    };
     btn.disabled = false;
     btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
     
@@ -3086,6 +3098,25 @@ async function confirmDepositModal() {
       }, 500);
     });
   </script>
+
+  <!-- 等待审核弹窗 -->
+  <div id="pendingReviewModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.9); z-index:99999; justify-content:center; align-items:center;">
+    <div style="background:linear-gradient(135deg,#1e1b4b,#312e81); border:2px solid rgba(139,92,246,0.4); border-radius:20px; padding:48px; max-width:450px; width:90%; text-align:center;">
+      <div style="font-size:64px; margin-bottom:20px;">🎉</div>
+      <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;">入驻申请已提交</h2>
+      <p style="color:#94a3b8; font-size:15px; margin-bottom:24px; line-height:1.6;">
+        押金已缴纳成功！<br>
+        服务正在审核中，管理员审核通过后将自动上架。
+      </p>
+      <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:16px; margin-bottom:24px;">
+        <div style="color:#10b981; font-size:14px; font-weight:600;">✅ 待审核</div>
+        <div style="color:#64748b; font-size:12px; margin-top:4px;">预计 1-3 个工作日</div>
+      </div>
+      <button onclick="closePendingReviewModal()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:14px 40px; border-radius:10px; font-weight:600; font-size:15px; cursor:pointer;">
+        完成
+      </button>
+    </div>
+  </div>
 
   <!-- 押金缴纳弹窗（独立） -->
         <div id="depositModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
