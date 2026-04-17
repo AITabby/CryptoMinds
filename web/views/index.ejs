@@ -244,6 +244,25 @@
 
       <div id="myRegistrationPanel" style="display:none; margin-bottom:16px;"></div>
 
+      <!-- 审核中页面（替代入驻指南） -->
+      <div id="pendingReviewPage" style="display:none; background:linear-gradient(135deg,#1e1b4b,#312e81); border:2px solid rgba(139,92,246,0.4); border-radius:20px; padding:48px; text-align:center; margin-bottom:16px;">
+        <div style="font-size:64px; margin-bottom:20px;">🎉</div>
+        <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;">入驻申请已提交</h2>
+        <p style="color:#94a3b8; font-size:15px; margin-bottom:24px; line-height:1.6;">
+          押金已缴纳成功！<br>
+          服务正在审核中，管理员审核通过后将自动上架。
+        </p>
+        <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:16px; margin-bottom:24px;">
+          <div id="pendingServiceName" style="color:#e2e8f0; font-size:14px; margin-bottom:8px;">服务名称: --</div>
+          <div style="color:#10b981; font-size:14px; font-weight:600;">✅ 待审核</div>
+          <div style="color:#64748b; font-size:12px; margin-top:4px;">预计 1-3 个工作日</div>
+        </div>
+        <p style="color:#64748b; font-size:13px; margin-top:16px;">
+          审核通过后，您将收到通知，服务将自动上架到市场。<br>
+          如需修改或取消申请，请联系管理员。
+        </p>
+      </div>
+
       <div id="regFormArea" style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px; margin-bottom:16px;">
         <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;" data-i18n="regGuide"><i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南</h2>
         <p style="color:#94a3b8; line-height:1.8; margin-bottom:24px;" data-i18n="regGuideDesc">
@@ -663,6 +682,20 @@
         const mine = all.filter(s => s.wallet && s.wallet.toLowerCase() === currentAccount.toLowerCase());
         const regPanel = document.getElementById('myRegistrationPanel');
         const formArea = document.getElementById('regFormArea');
+        const pendingPage = document.getElementById('pendingReviewPage');
+        
+        // 检查是否有 pending 或 pending_deposit 状态的服务
+        const pendingService = mine.find(s => s.status === 'pending' || s.status === 'pending_deposit');
+        
+        if (pendingService) {
+          // 显示审核中页面
+          formArea.style.display = 'none';
+          regPanel.style.display = 'none';
+          pendingPage.style.display = 'block';
+          document.getElementById('pendingServiceName').textContent = '服务名称: ' + pendingService.name;
+          return;
+        }
+        
         if (mine.length > 0) {
           formArea.style.display = 'none';
           regPanel.style.display = 'block';
@@ -2156,7 +2189,9 @@ function openPendingReviewModal() {
 
 function closePendingReviewModal() {
   document.getElementById('pendingReviewModal').style.display = 'none';
-  reloadMarket();
+  // 显示审核中页面，隐藏入驻指南
+  document.getElementById('pendingReviewPage').style.display = 'block';
+  document.getElementById('regFormArea').style.display = 'none';
 }
 
 async function confirmDepositModal() {

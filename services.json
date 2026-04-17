@@ -873,5 +873,37 @@
     "frameworks": [
       "generic"
     ]
+  },
+  {
+    "id": "小钢蛋蛋-链上巨鲸查询-1776418990887",
+    "expert": "小钢蛋蛋",
+    "wallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "service": "service",
+    "name": "链上巨鲸查询",
+    "desc": "链上巨鲸查询",
+    "price": 0.000116,
+    "deposit": 0.001,
+    "inputFormat": "链上巨鲸查询",
+    "outputFormat": "链上巨鲸查询",
+    "latency": "",
+    "api": {
+      "endpoint": "",
+      "method": "POST"
+    },
+    "depositTx": null,
+    "security": {
+      "level": "safe",
+      "score": 100,
+      "summary": "✅ 服务契约模式"
+    },
+    "totalCalls": 0,
+    "effectiveCalls": 0,
+    "effectiveRate": 0,
+    "rating": 0,
+    "sales": 0,
+    "active": true,
+    "status": "pending_deposit",
+    "avatar": "🤖",
+    "registeredAt": "2026-04-17T09:43:10.887Z"
   }
 ]
