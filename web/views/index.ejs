@@ -2107,132 +2107,128 @@
 
     let pendingServiceId = null; // 待支付押金的服务ID
 
-    async function payDeposit() {
-      if (!currentAccount) { showError('请先连接钱包'); return; }
-      
-      // 先提交表单到后端
-      const btn = document.getElementById('depositBtn');
-      const status = document.getElementById('depositStatus');
-      btn.disabled = true;
-      btn.textContent = '提交申请中...';
-      
-      try {
-        const expert = document.getElementById('regExpert').value.trim();
-        const name = document.getElementById('regName').value.trim();
-        const price = parseFloat(document.getElementById('regPrice').value) || 0.0001;
-        const desc = document.getElementById('regDesc').value.trim();
-        const wallet = document.getElementById('regWallet').value.trim() || currentAccount;
-        const inputFormat = document.getElementById('regInputFormat').value.trim();
-        const outputFormat = document.getElementById('regOutputFormat').value.trim();
-        const latency = document.getElementById('regLatency').value.trim();
-        
-        const formData = new FormData();
-        formData.append('expert', expert);
-        formData.append('name', name);
-        formData.append('desc', desc);
-        formData.append('price', String(price));
-        formData.append('wallet', wallet);
-        formData.append('deposit', '0.001');
-        formData.append('depositTx', ''); // 先不传押金交易
-        formData.append('inputFormat', inputFormat);
-        formData.append('outputFormat', outputFormat);
-        formData.append('latency', latency);
-        formData.append('status', 'pending_deposit'); // 标记为待支付押金
-        
-        console.log('Form data:', { expert, name, price: String(price), wallet, inputFormat, outputFormat });
-        
-        const res = await fetch('/api/experts/register', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        
-        if (!data.ok) {
-          showError(data.error || '提交失败');
-          btn.disabled = false;
-          btn.textContent = '提交入驻申请';
-          return;
-        }
-        
-        pendingServiceId = data.serviceId;
-        status.style.display = 'block';
-        status.style.color = '#34d399';
-        status.innerHTML = '✅ 申请已提交！请缴纳押金完成入驻';
-        
-        // 弹出押金缴纳
-        btn.textContent = '缴纳押金 (0.001 BNB)';
-        btn.onclick = confirmDeposit;
-        btn.disabled = false;
-        
-      } catch(e) {
-        showError('提交失败: ' + e.message);
-        btn.disabled = false;
-        btn.textContent = '提交入驻申请';
-      }
+    // 新的押金弹窗逻辑
+async function payDeposit() {
+  if (!currentAccount) { showError('请先连接钱包'); return; }
+  
+  const btn = document.getElementById('depositBtn');
+  btn.disabled = true;
+  btn.textContent = '提交申请中...';
+  
+  try {
+    const expert = document.getElementById('regExpert').value.trim();
+    const name = document.getElementById('regName').value.trim();
+    const price = parseFloat(document.getElementById('regPrice').value) || 0.0001;
+    const desc = document.getElementById('regDesc').value.trim();
+    const wallet = document.getElementById('regWallet').value.trim() || currentAccount;
+    const inputFormat = document.getElementById('regInputFormat').value.trim();
+    const outputFormat = document.getElementById('regOutputFormat').value.trim();
+    const latency = document.getElementById('regLatency').value.trim();
+    
+    const formData = new FormData();
+    formData.append('expert', expert);
+    formData.append('name', name);
+    formData.append('desc', desc);
+    formData.append('price', String(price));
+    formData.append('wallet', wallet);
+    formData.append('deposit', '0.001');
+    formData.append('depositTx', '');
+    formData.append('inputFormat', inputFormat);
+    formData.append('outputFormat', outputFormat);
+    formData.append('latency', latency);
+    formData.append('status', 'pending_deposit');
+    
+    const res = await fetch('/api/experts/register', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    
+    if (!data.ok) {
+      showError(data.error || '提交失败');
+      btn.disabled = false;
+      btn.textContent = '提交入驻申请';
+      return;
     }
+    
+    pendingServiceId = data.serviceId;
+    
+    // 关闭入驻表单，打开押金弹窗
+    closeRegisterModal();
+    openDepositModal();
+    
+  } catch(e) {
+    showError('提交失败: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '提交入驻申请';
+  }
+}
 
-    async function confirmDeposit() {
-      if (!currentAccount) { showError('请先连接钱包'); return; }
-      if (!depositConfig.isOnChain) { showError('押金池地址未配置'); return; }
-      
-      // 切换到 BSC
-      try {
-        await ensureChain('bsc');
-      } catch(e) {
-        showError('切换到 BSC 链失败');
-        return;
-      }
+function openDepositModal() {
+  document.getElementById('depositModal').style.display = 'flex';
+  document.getElementById('depositPoolAddrModal').textContent = depositConfig.depositPoolAddress || '--';
+  lucide.createIcons();
+}
 
+function closeDepositModal() {
+  document.getElementById('depositModal').style.display = 'none';
+}
 
-      const btn = document.getElementById('depositBtn');
-      const status = document.getElementById('depositStatus');
-      btn.disabled = true;
-      btn.textContent = '等待 MetaMask 确认...';
-      status.style.display = 'block';
-      status.style.color = '#fbbf24';
-      status.textContent = '请在 MetaMask 中确认交易...';
-
-      try {
-        const depositWei = '0x' + (0.001 * 1e18).toString(16);
-        const txHash = await window.ethereum.request({
-          method: 'eth_sendTransaction',
-          params: [{
-            from: currentAccount,
-            to: depositConfig.depositPoolAddress,
-            value: depositWei,
-          }]
-        });
-
-        depositTxHash = txHash;
-        status.style.color = '#34d399';
-        status.innerHTML = `✅ 押金已发送！<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;">查看交易</a>`;
-        btn.textContent = '✅ 入驻成功，等待审核';
-        btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
-        btn.disabled = true;
-        
-        // 通知后端押金已缴纳
-        if (pendingServiceId) {
-          try {
-            await fetch(`/api/services/${pendingServiceId}/deposit`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ txHash, wallet: currentAccount })
-            });
-          } catch(e) {}
-        }
-        
-        // 更新状态
-        status.innerHTML += '<br>🎉 入驻申请已提交，等待管理员审核';
-        showNotice('入驻成功！服务正在审核中，通过后将自动上架');
-        reloadMarket();
-      } catch(e) {
-        status.style.color = '#f87171';
-        status.textContent = '❌ ' + (e.message || '交易被取消');
-        btn.disabled = false;
-        btn.innerHTML = '<i data-lucide="wallet" class="icon-inline"></i> 重试缴纳押金';
-        lucide.createIcons();
-      }
+async function confirmDepositModal() {
+  if (!currentAccount) { showError('请先连接钱包'); return; }
+  
+  try {
+    await ensureChain('bsc');
+  } catch(e) {
+    showError('切换到 BSC 链失败');
+    return;
+  }
+  
+  const btn = document.getElementById('depositBtnModal');
+  const status = document.getElementById('depositStatusModal');
+  btn.disabled = true;
+  btn.textContent = '等待 MetaMask 确认...';
+  status.style.color = '#fbbf24';
+  status.textContent = '请在 MetaMask 中确认交易...';
+  
+  try {
+    const depositWei = '0x' + (0.001 * 1e18).toString(16);
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: currentAccount,
+        to: depositConfig.depositPoolAddress,
+        value: depositWei,
+      }]
+    });
+    
+    if (pendingServiceId) {
+      await fetch(`/api/services/${pendingServiceId}/deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txHash, wallet: currentAccount })
+      });
     }
+    
+    status.style.color = '#34d399';
+    status.innerHTML = `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;">✅ 押金已缴纳！查看交易</a><br>🎉 入驻成功，等待审核`;
+    btn.textContent = '完成';
+    btn.onclick = () => { closeDepositModal(); reloadMarket(); showNotice('入驻成功！服务正在审核中'); };
+    btn.disabled = false;
+    btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+    
+  } catch(e) {
+    status.style.color = '#f87171';
+    status.textContent = '❌ ' + (e.message || '交易被取消');
+    btn.disabled = false;
+    btn.textContent = '缴纳押金';
+    btn.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+  }
+}
+
+
+
+
     // 服务文件处理（已移除，改为服务契约声明）
 
     async function submitRegister() {
