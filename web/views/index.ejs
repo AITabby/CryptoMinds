@@ -384,13 +384,7 @@
         </div>
 
         <!-- 通知面板 -->
-        <div id="notifPanel" style="display:none;margin-top:12px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:12px;padding:16px;max-height:400px;overflow-y:auto;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <div style="color:#a78bfa;font-weight:600;font-size:14px;">📋 通知中心</div>
-            <button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button>
-          </div>
-          <div id="notifList" style="color:#94a3b8;font-size:13px;">暂无通知</div>
-        </div>
+
 
 
         <!-- 我的消费记录 -->
@@ -1825,8 +1819,18 @@
 
     function toggleNotificationPanel() {
       notifPanelOpen = !notifPanelOpen;
-      document.getElementById('notifPanel').style.display = notifPanelOpen ? 'block' : 'none';
-      if (notifPanelOpen) loadNotifications();
+      if (!notifPanelOpen) {
+        const m = document.getElementById('notifModal');
+        if (m) m.remove();
+        return;
+      }
+      const modal = document.createElement('div');
+      modal.id = 'notifModal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
+      modal.onclick = (e) => { if (e.target === modal) { notifPanelOpen = false; modal.remove(); } };
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;">🔔 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="notifPanelOpen=false;document.getElementById('notifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="notifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      document.body.appendChild(modal);
+      loadNotifications();
     }
 
     let myOrdersOpen = false;
