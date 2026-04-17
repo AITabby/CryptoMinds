@@ -939,6 +939,15 @@ app.get('/api/services', async (req, res) => {
   res.json(withUsd);
 });
 
+// 获取用户自己的服务（包括 pending 状态）
+app.get('/api/my-services/:wallet', (req, res) => {
+  const wallet = req.params.wallet.toLowerCase();
+  const services = getServices().filter(s => 
+    s.wallet && s.wallet.toLowerCase() === wallet && s.active
+  );
+  res.json(services);
+});
+
 // 专家入驻
 app.get('/api/config/deposit', (req, res) => {
   res.json({

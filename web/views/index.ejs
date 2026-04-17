@@ -677,9 +677,9 @@
     async function checkMyRegistration() {
       if (!currentAccount) return;
       try {
-        const res = await fetch('/api/services');
-        const all = await res.json();
-        const mine = all.filter(s => s.wallet && s.wallet.toLowerCase() === currentAccount.toLowerCase());
+        // 使用新的 API 获取用户自己的服务
+        const res = await fetch(`/api/my-services/${currentAccount}`);
+        const mine = await res.json();
         const regPanel = document.getElementById('myRegistrationPanel');
         const formArea = document.getElementById('regFormArea');
         const pendingPage = document.getElementById('pendingReviewPage');
