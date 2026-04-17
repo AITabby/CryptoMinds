@@ -2149,6 +2149,7 @@
         formData.append('price', price);
         formData.append('wallet', wallet);
         // 不再传 frameworks
+        formData.append('deposit', '0.001');
         formData.append('depositTx', depositTxHash || '');
         formData.append('inputFormat', inputFormat);
         formData.append('outputFormat', outputFormat);
