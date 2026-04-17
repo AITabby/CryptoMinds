@@ -684,19 +684,26 @@
         const formArea = document.getElementById('regFormArea');
         const pendingPage = document.getElementById('pendingReviewPage');
         
-        // 检查是否有 pending 或 pending_deposit 状态的服务
-        const pendingService = mine.find(s => s.status === 'pending' || s.status === 'pending_deposit');
+        // 重置所有面板
+        formArea.style.display = 'none';
+        regPanel.style.display = 'none';
+        pendingPage.style.display = 'none';
         
-        if (pendingService) {
-          // 显示审核中页面
-          formArea.style.display = 'none';
-          regPanel.style.display = 'none';
+        // 检查是否有 pending 或 pending_deposit 状态的服务
+        const pendingServices = mine.filter(s => s.status === 'pending' || s.status === 'pending_deposit');
+        
+        if (pendingServices.length > 0) {
+          // 显示审核中页面（显示最新的一条）
+          const latest = pendingServices[pendingServices.length - 1];
           pendingPage.style.display = 'block';
-          document.getElementById('pendingServiceName').textContent = '服务名称: ' + pendingService.name;
+          document.getElementById('pendingServiceName').textContent = '服务名称: ' + latest.name;
           return;
         }
         
-        if (mine.length > 0) {
+        // 检查是否有已上架的服务
+        const approvedServices = mine.filter(s => s.status === 'approved');
+        
+        if (approvedServices.length > 0) {
           formArea.style.display = 'none';
           regPanel.style.display = 'block';
           regPanel.innerHTML = mine.map(s => {
