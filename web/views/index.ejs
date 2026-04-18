@@ -448,7 +448,7 @@
               <span style="color:#e2e8f0; font-size:14px; font-weight:600;">Agent 大脑</span>
             </div>
             <div id="myAgentFeed" style="flex:1; overflow-y:auto; max-height:500px; padding-right:4px;">
-              <div style="color:#475569; text-align:center; padding:40px 0;">连接钱包后显示</div>
+              <div style="color:#475569; text-align:center; padding:40px 0;"><i data-lucide="brain" style="width:32px;height:32px;color:#475569;display:block;margin:0 auto 12px;"></i>Agent 决策链路<br><span style="font-size:11px;margin-top:6px;display:block;">下达指令后，这里将实时展示<br>Agent 的分析、搜索、支付全过程</span></div>
             </div>
           </div>
           <!-- 右：消费记录（2/3） -->
@@ -2131,7 +2131,7 @@
           const res = await fetch('/api/balances');
           const data = await res.json();
           const agent = Object.values(data).find(a => a.addr.toLowerCase() === currentAccount);
-          document.getElementById('myBalance').textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
+          document.getElementById('buyerBalance').textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
 
           // 加载通知
           loadNotifications();
@@ -2143,7 +2143,7 @@
             document.getElementById('adminTab').style.display = 'inline';
           }
         } catch(e) {
-          document.getElementById('myBalance').textContent = '加载失败';
+          document.getElementById('buyerBalance').textContent = '加载失败';
         }
 
         // 从 purchases.json 和 tx-log 合并消费记录
@@ -2179,9 +2179,13 @@
 
           const bnbTxs = myTxs.filter(tx => (tx.currency || 'BNB') === 'BNB');
           const usdcTxs = myTxs.filter(tx => (tx.currency || 'BNB') === 'USDC');
-          document.getElementById('mySpentBnb').textContent = bnbTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
-          document.getElementById('mySpentUsdc').textContent = usdcTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(2) + ' USDC';
-          document.getElementById('myTasks').textContent = myTxs.length;
+          // 更新顶部买家指标
+          const buyerTotalSpentEl = document.getElementById('buyerTotalSpent');
+          if (buyerTotalSpentEl) buyerTotalSpentEl.textContent = bnbTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
+          const buyerOrdersEl = document.getElementById('buyerOrders');
+          if (buyerOrdersEl) buyerOrdersEl.textContent = myTxs.length;
+          const buyerServicesEl = document.getElementById('buyerServices');
+          if (buyerServicesEl) buyerServicesEl.textContent = new Set(myTxs.map(t => t.reason)).size;
 
           const tbody = document.getElementById('myTxBody');
           tbody.innerHTML = '';
@@ -3508,10 +3512,10 @@ async function confirmDepositModal() {
           document.getElementById('myAgentRegister').style.display = 'none';
           document.getElementById('myAgentContent').style.display = 'block';
           document.getElementById('myAddr').textContent = currentAccount;
-          document.getElementById('myBalance').textContent = '0.0000 BNB';
-          document.getElementById('mySpentBnb').textContent = '0.0000 BNB';
-          document.getElementById('mySpentUsdc').textContent = '0.00 USDC';
-          document.getElementById('myTasks').textContent = '0';
+          document.getElementById('buyerBalance').textContent = '0.0000 BNB';
+          document.getElementById('buyerTotalSpent').textContent = '0 BNB';
+          document.getElementById('buyerOrders').textContent = '0';
+          document.getElementById('buyerServices').textContent = '0';
           showTab('myagent');
         } else {
           showError(data.error || '注册失败');
@@ -3560,7 +3564,7 @@ async function confirmDepositModal() {
         const res = await fetch('/api/balances');
         const data = await res.json();
         const agent = Object.values(data).find(a => a.addr.toLowerCase() === wallet);
-        document.getElementById('myBalance').textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
+        document.getElementById('buyerBalance').textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
       } catch(e) {}
 
       // 加载通知
@@ -3597,9 +3601,13 @@ async function confirmDepositModal() {
 
         const bnbTxs2 = myTxs.filter(tx => (tx.currency || 'BNB') === 'BNB');
         const usdcTxs2 = myTxs.filter(tx => (tx.currency || 'BNB') === 'USDC');
-        document.getElementById('mySpentBnb').textContent = bnbTxs2.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
-        document.getElementById('mySpentUsdc').textContent = usdcTxs2.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(2) + ' USDC';
-        document.getElementById('myTasks').textContent = myTxs.length;
+        // 更新顶部买家指标
+        const buyerTotalSpent2 = document.getElementById('buyerTotalSpent');
+        if (buyerTotalSpent2) buyerTotalSpent2.textContent = bnbTxs2.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
+        const buyerOrders2 = document.getElementById('buyerOrders');
+        if (buyerOrders2) buyerOrders2.textContent = myTxs.length;
+        const buyerServices2 = document.getElementById('buyerServices');
+        if (buyerServices2) buyerServices2.textContent = new Set(myTxs.map(t => t.reason)).size;
 
         const tbody = document.getElementById('myTxBody');
         tbody.innerHTML = '';
@@ -4099,7 +4107,7 @@ async function confirmDepositModal() {
         txFlow: '交易',
         txAmount: '金额',
         txReason: '原因',
-        txOnchain: '链上',
+        txOnchain: 'TX Hash',
         txExpert: '服务专家',
         txService: '服务',
         txRoute: '路由',
