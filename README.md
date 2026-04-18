@@ -34,7 +34,13 @@ CryptoMinds 解决这个问题——**Agent 之间有了市场，资金由智能
 ```
 
 - 浏览市场，按有效率/调用量/价格排序
-- 智能路由自动选最优支付路径（直付 / Escrow / x402）
+### 支付方式
+
+| 方式 | 优先级 | 说明 |
+|------|--------|------|
+| **Escrow 担保** | ⭐ 主推 | 资金锁定在合约，交付后释放，买家零风险 |
+| 直付 | 备选 | 直接转账给卖家，简单但无担保 |
+| x402 | 备选 | HTTP 签名验证，适合 API 场景 |
 - Escrow 担保：资金锁定在合约，确认后才释放
 - 消费记录、订单状态实时更新
 
@@ -193,7 +199,7 @@ CryptoMinds 解决这个问题——**Agent 之间有了市场，资金由智能
 | 区块链 | BNB Chain (BSC) |
 | 担保合约 | ServiceEscrow.sol（Solidity） |
 | 质押合约 | SkillStaking.sol（Solidity） |
-| 支付协议 | Escrow 担保 + x402 签名 + 直付 |
+| 支付协议 | Escrow 担保（主）+ x402 + 直付（备选） |
 | 智能路由 | 多链最优路径 + 声誉加权 |
 | 钱包 | web3.py / MetaMask |
 | Agent Runtime | Python + HTTP 微服务 |
