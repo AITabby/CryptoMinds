@@ -67,7 +67,7 @@ async function fetchBnbPrice() {
 const PORT = 3456;
 const DEMO_WALLET = '0xd2f899ce74320aef9d8f2359183232a554f4c0e1';
 // 押金池地址（获奖后替换为Four.meme地址或合约地址）
-const DEPOSIT_POOL_ADDRESS = process.env.DEPOSIT_POOL_ADDRESS || '0xd2f899CE74320AEf9d8f2359183232a554f4C0E1';
+const DEPOSIT_POOL_ADDRESS = process.env.DEPOSIT_POOL_ADDRESS || '0x287A44aAADDB78CA67EffCD94E83046353723862';
 const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
 const SDK_DIR = path.join(__dirname, '..', 'agentpay_sdk');
 const X402_VERIFY_SCRIPT = path.join(SDK_DIR, 'x402_verify.py');
