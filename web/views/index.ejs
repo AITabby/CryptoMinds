@@ -433,24 +433,6 @@
             <div id="notifBadge" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;"></div>
           </div>
         </div>
-        <div class="my-stats">
-          <div class="stat-card">
-            <div class="label" data-i18n="walletBalance">钱包余额</div>
-            <div class="value" id="myBalance">--</div>
-          </div>
-          <div class="stat-card">
-            <div class="label" data-i18n="usdcSpent">USDC 已花费</div>
-            <div class="value green" id="mySpentUsdc">--</div>
-          </div>
-          <div class="stat-card">
-            <div class="label" data-i18n="bnbSpent">BNB 已花费</div>
-            <div class="value" id="mySpentBnb">--</div>
-          </div>
-          <div class="stat-card">
-            <div class="label" data-i18n="servicesBought">购买服务</div>
-            <div class="value" id="myTasks">--</div>
-          </div>
-        </div>
 
         <!-- 通知面板 -->
 
@@ -808,8 +790,44 @@
           const svcSet = new Set(orders.map(o => o.serviceId));
           const svcEl = document.getElementById('buyerServices');
           if (svcEl) svcEl.textContent = svcSet.size;
+
+          // 刷新消费记录表
+          renderBuyerTxTable(orders);
         }
       } catch(e) {}
+    }
+
+    // 渲染买家消费记录表
+    function renderBuyerTxTable(orders) {
+      const tbody = document.getElementById('myTxBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      const noTx = document.getElementById('noMyTxs');
+      if (orders.length === 0) {
+        if (noTx) noTx.style.display = 'block';
+        return;
+      }
+      if (noTx) noTx.style.display = 'none';
+      orders.forEach((o, idx) => {
+        const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai', hour12:false});
+        const route = o.selectedRoute ? `${o.selectedRoute.route_type}/${o.selectedRoute.chain}/${o.selectedRoute.symbol}` : 'BNB/BSC/BNB';
+        const receipt = o.escrowAddress ? 'Escrow🔒' : (o.payment?.verified ? '链上✅' : '待确认');
+        const txHash = o.txHash || '';
+        const shortHash = txHash.length > 10 ? txHash.slice(0,8) + '...' : txHash || '--';
+        const txLink = txHash ? `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;text-decoration:none;">${shortHash}</a>` : '--';
+        const receiptId = o.id || '';
+        window['_myBuyerOrders'] = window['_myBuyerOrders'] || {};
+        window['_myBuyerOrders'][idx] = { id: receiptId, serviceName: o.serviceName, expert: o.expert, price: o.price, priceCurrency: 'BNB', time: o.time, buyerWallet: currentAccount, expertWallet: o.expertWallet, txHash, escrowOrderId: o.escrowOrderId, escrowAddress: o.escrowAddress };
+        tbody.innerHTML += `<tr>
+          <td class="time">${time}</td>
+          <td class="flow">${o.expert || '--'}</td>
+          <td class="amount">${o.price || 0} BNB</td>
+          <td class="reason">${route}</td>
+          <td><a href="javascript:void(0)" onclick="showReceipt(window._myBuyerOrders[${idx}])" style="color:#a78bfa;cursor:pointer;" title="查看凭证"><i data-lucide="receipt-text" class="icon-inline"></i></a></td>
+          <td>${txLink}</td>
+        </tr>`;
+      });
+      lucide.createIcons();
     }
 
 
@@ -3599,7 +3617,7 @@ async function confirmDepositModal() {
             <td class="time">${tx.time || '--'}</td>
             <td class="flow">${tx.to || '--'}</td>
             <td class="amount">${tx.amount || 0} BNB</td>
-            <td class="reason">${tx.route_type || '--'}</td>
+            <td class="reason">${tx.route_type ? tx.route_type + '/' + (tx.chain||'BSC') + '/' + (tx.symbol||'BNB') : 'BNB/BSC/BNB'}</td>
             <td><a href="javascript:void(0)" onclick="showReceipt(window._myTxs2[${idx}])" style="color:#a78bfa;cursor:pointer;" title="查看凭证"><i data-lucide="receipt-text" class="icon-inline"></i></a></td>
             <td>${chainLink}</td>
           </tr>`;
