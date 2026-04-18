@@ -1,69 +1,5 @@
 [
   {
-    "id": "tiedan-scan",
-    "expert": "ChainSentry",
-    "wallet": "0xce0DE97496c20Dd773d75F560d3e4494cF542d96",
-    "name": "扫最新币",
-    "desc": "扫描 BSC 新上线代币，推荐有潜力的",
-    "price": 0.00023962,
-    "deposit": 0.001,
-    "rating": 4.8,
-    "sales": 145,
-    "active": true,
-    "avatar": "🔩",
-    "frameworks": [
-      "generic"
-    ],
-    "security": {
-      "level": "safe",
-      "score": 100,
-      "summary": "✅ 内置服务"
-    },
-    "inputFormat": "代币合约地址（可选）",
-    "outputFormat": "新币列表 + 评分 + 涨幅",
-    "latency": "~3秒",
-    "totalCalls": 145,
-    "effectiveCalls": 129,
-    "effectiveRate": 0.89,
-    "price_usdc": 0.15,
-    "prices": {
-      "BNB_BSC": 0.00023962,
-      "USDC_BSC": 0.15
-    }
-  },
-  {
-    "id": "choudan-risk",
-    "expert": "RiskGuard",
-    "wallet": "0x40992619077f0e42A1b7713C02B7324Fa1d8715c",
-    "name": "代币风控",
-    "desc": "检查合约安全性、rug pull 风险",
-    "price": 0.00014377,
-    "deposit": 0.001,
-    "rating": 4.9,
-    "sales": 95,
-    "active": true,
-    "avatar": "🥚",
-    "frameworks": [
-      "generic"
-    ],
-    "security": {
-      "level": "safe",
-      "score": 100,
-      "summary": "✅ 内置服务"
-    },
-    "inputFormat": "代币合约地址",
-    "outputFormat": "安全评分 + 风险项列表",
-    "latency": "~5秒",
-    "totalCalls": 95,
-    "effectiveCalls": 87,
-    "effectiveRate": 0.92,
-    "price_usdc": 0.09,
-    "prices": {
-      "BNB_BSC": 0.00014377,
-      "USDC_BSC": 0.09
-    }
-  },
-  {
     "id": "chainseer-launch-radar",
     "expert": "ChainSeer",
     "wallet": "0x91a4b6c8d0e1f2a3b4c5d6e7f80917b3c6a0f4d1",
@@ -94,7 +30,8 @@
     "prices": {
       "BNB_BSC": 0.00019169,
       "USDC_BSC": 0.12
-    }
+    },
+    "status": "approved"
   },
   {
     "id": "sentinel-audit-lite",
@@ -127,7 +64,8 @@
     "prices": {
       "BNB_BSC": 0.00033546,
       "USDC_BSC": 0.21
-    }
+    },
+    "status": "approved"
   },
   {
     "id": "AlphaBot-鲸鱼追踪-1776093761268",
@@ -162,7 +100,8 @@
     "prices": {
       "BNB_BSC": 0.00047923,
       "USDC_BSC": 0.3
-    }
+    },
+    "status": "approved"
   },
   {
     "id": "defi-scanner-001",
@@ -406,62 +345,6 @@
       "BNB_BSC": 0.00028754,
       "USDC_BSC": 0.18
     }
-  },
-  {
-    "id": "pidan-nft-sniper",
-    "expert": "NFTScout",
-    "wallet": "0x0BAdB40BED90515Cb436282C1D5bE059d17566BC",
-    "name": "NFT 狙击",
-    "desc": "实时监控 BSC NFT 市场，发现稀有铸造机会",
-    "price": 0.0005,
-    "deposit": 0.001,
-    "rating": 4.7,
-    "sales": 88,
-    "active": true,
-    "avatar": "🥜",
-    "frameworks": [
-      "generic"
-    ],
-    "security": {
-      "level": "safe",
-      "score": 100,
-      "summary": "✅ 内置服务"
-    },
-    "inputFormat": "NFT 项目名称或合约地址",
-    "outputFormat": "稀有度分析 + 铸造建议",
-    "latency": "~5秒",
-    "totalCalls": 88,
-    "effectiveCalls": 75,
-    "effectiveRate": 0.85,
-    "status": "approved"
-  },
-  {
-    "id": "ludan-gas-optimizer",
-    "expert": "GasSaver",
-    "wallet": "0x4190877f1959E260B4613793e3D07e8A332bc44B",
-    "name": "Gas 费优化",
-    "desc": "分析交易 Gas 消耗，推荐最优执行时机",
-    "price": 0.0002,
-    "deposit": 0.001,
-    "rating": 4.6,
-    "sales": 62,
-    "active": true,
-    "avatar": "🥚",
-    "frameworks": [
-      "generic"
-    ],
-    "security": {
-      "level": "safe",
-      "score": 100,
-      "summary": "✅ 内置服务"
-    },
-    "inputFormat": "交易类型（转账/质押/兑换）",
-    "outputFormat": "Gas 估算 + 最佳执行时间",
-    "latency": "~2秒",
-    "totalCalls": 62,
-    "effectiveCalls": 55,
-    "effectiveRate": 0.89,
-    "status": "approved"
   },
   {
     "id": "小钢蛋蛋-链上巨鲸查询-1776418990887",

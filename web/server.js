@@ -328,8 +328,9 @@ async function verifyPaymentTx(txHash, buyerWallet, service) {
     const expectedFrom = buyerWallet.toLowerCase();
     const expectedValueWei = BigInt(w3.utils.toWei(String(service.price), 'ether'));
     const actualValueWei = BigInt(tx.value.toString());
+    const isEscrowPayment = actualTo === ESCROW_CONFIG.address.toLowerCase();
 
-    if (actualTo !== expectedTo) {
+    if (actualTo !== expectedTo && !isEscrowPayment) {
       return { ok: false, error: '收款地址不匹配服务提供者' };
     }
     if (actualFrom !== expectedFrom) {
