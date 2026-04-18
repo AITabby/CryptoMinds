@@ -1316,30 +1316,57 @@
       await ensureChain(route.chain);
       const bnbAmount = route.amount || service.price;
       const weiValue = '0x' + BigInt(Math.round(bnbAmount * 1e18)).toString(16);
-      renderProgressSteps('等待钱包确认', `请在钱包中确认 ${bnbAmount} BNB 转账给 ${service.expert}`, [
+
+      // ===== Escrow 担保支付 =====
+      renderProgressSteps('Escrow 担保支付', `资金将锁定在担保合约中，确认收货后释放给 ${service.expert}`, [
         { label: `切换到 ${route.chain.toUpperCase()} 链`, state: 'done' },
-        { label: `向 ${service.expert} 发起 BNB 支付`, state: 'active' },
+        { label: `向担保合约存入 ${bnbAmount} BNB`, state: 'active' },
         { label: '等待链上确认', state: 'pending' },
         { label: '提交订单', state: 'pending' },
       ]);
+
+      // 获取合约配置
+      const escrowRes = await fetch('/api/escrow/config');
+      const escrowCfg = await escrowRes.json();
+      const ESCROW_ADDR = escrowCfg.address;
+
+      // createOrder(address seller, string serviceId, uint256 timeoutSeconds) payable returns (bytes32)
+      // selector: 0x + keccak256('createOrder(address,string,uint256)') 前4字节
+      const createOrderSelector = '0x84d3afe6'; // createOrder(address,string,uint256)
+      const sellerParam = service.wallet.toLowerCase().replace('0x', '').padStart(64, '0');
+      const timeoutParam = BigInt(86400).toString(16).padStart(64, '0');
+      // dynamic string encoding: offset + length + data + padding
+      const serviceIdHex = service.id;
+      const svcBytes = new TextEncoder().encode(serviceIdHex);
+      const svcHex = Array.from(svcBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      const svcPadded = svcHex.padEnd(Math.ceil(svcHex.length / 64) * 64, '0');
+      const svcLen = svcBytes.length.toString(16).padStart(64, '0');
+      const svcOffset = (192).toString(16).padStart(64, '0'); // 3 * 64 = 192
+      const data = createOrderSelector + sellerParam + svcOffset + timeoutParam + svcLen + svcPadded;
+
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
         params: [{
           from: wallet,
-          to: service.wallet,
+          to: ESCROW_ADDR,
           value: weiValue,
+          data: data,
         }]
       });
-      renderProgressSteps('等待链上确认', '交易已广播，正在等待区块确认...', [
-        { label: `向 ${service.expert} 发起 BNB 支付`, state: 'done' },
+
+      renderProgressSteps('等待链上确认', '担保交易已广播，正在等待区块确认...', [
+        { label: `向担保合约存入 ${bnbAmount} BNB`, state: 'done' },
         { label: '等待链上确认', state: 'active' },
         { label: '提交订单', state: 'pending' },
-      ], `<p style="color:#8b5cf6;">TxHash: ${txHash}</p>`);
+      ], `<p style="color:#8b5cf6;">TxHash: ${txHash}</p><p style="color:#34d399; font-size:11px;">🔒 资金已锁定在担保合约 ${ESCROW_ADDR.slice(0,10)}...</p>`);
+
       await waitForTransactionReceipt(txHash);
+
       renderProgressSteps('提交订单', '链上确认成功，正在提交订单...', [
         { label: '等待链上确认', state: 'done' },
         { label: '提交订单', state: 'active' },
       ]);
+
       const response = await fetch('/api/services/buy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1348,6 +1375,7 @@
           buyerWallet: wallet,
           paymentMode: 'onchain',
           txHash: txHash,
+          escrowOrderId: '',  // orderId 需要从链上事件解析，后端可补查
           selectedRoute: { route_type: route.route_type, chain: route.chain, symbol: route.symbol }
         })
       });
@@ -3270,13 +3298,15 @@ async function confirmDepositModal() {
         section.style.display = 'block';
         count.textContent = data.count;
         list.innerHTML = data.purchases.map(p => {
+          const escrowBadge = p.escrowAddress ? '<span style="background:rgba(52,211,153,0.15); color:#34d399; padding:1px 6px; border-radius:4px; font-size:10px; margin-left:4px;">🔒 担保</span>' : '';
+          const escrowLink = p.escrowOrderId ? `<a href="https://bscscan.com/tx/${p.txHash}" target="_blank" style="color:#8b5cf6; font-size:10px;">链上查看</a>` : '';
           return `<div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(251,191,36,0.1);">
             <div style="flex:1; min-width:0;">
-              <div style="color:#e2e8f0; font-size:12px; font-weight:600;">${p.buyerName || p.buyerWallet.slice(0,10)+'...'} → ${p.expert}</div>
-              <div style="color:#94a3b8; font-size:11px;">${p.serviceName} · ${p.price} BNB</div>
+              <div style="color:#e2e8f0; font-size:12px; font-weight:600;">${p.buyerName || p.buyerWallet.slice(0,10)+'...'} → ${p.expert}${escrowBadge}</div>
+              <div style="color:#94a3b8; font-size:11px;">${p.serviceName} · ${p.price} BNB ${escrowLink}</div>
             </div>
-            <button onclick="confirmPurchase('${p.id}')" style="background:rgba(52,211,153,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.3); border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer;">确认</button>
-            <button onclick="rejectPurchase('${p.id}')" style="background:rgba(248,113,113,0.2); color:#f87171; border:1px solid rgba(248,113,113,0.3); border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer;">拒绝</button>
+            <button onclick="confirmPurchase('${p.id}')" style="background:rgba(52,211,153,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.3); border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer;">确认收货</button>
+            <button onclick="disputePurchase('${p.id}')" style="background:rgba(251,191,36,0.2); color:#fbbf24; border:1px solid rgba(251,191,36,0.3); border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer;">争议</button>
           </div>`;
         }).join('');
         lucide.createIcons();
@@ -3299,6 +3329,43 @@ async function confirmDepositModal() {
         if (data.ok) { showNotice('<i data-lucide="x-circle" class="icon-inline"></i> 购买已拒绝'); loadPendingPurchases(); }
         else { showError(data.error); }
       } catch(e) { showError('拒绝失败: ' + e.message); }
+    }
+
+    // Escrow 争议：买家在链上提交争议
+    async function disputePurchase(purchaseId) {
+      try {
+        // 先获取购买记录
+        const purchases = getPurchases();
+        const purchase = purchases.find(p => p.id === purchaseId);
+        if (!purchase) { showError('订单不存在'); return; }
+
+        if (purchase.escrowAddress && purchase.escrowOrderId && window.ethereum) {
+          // 链上争议
+          const reason = prompt('请输入争议原因：');
+          if (!reason) return;
+
+          const escrowRes = await fetch('/api/escrow/config');
+          const escrowCfg = await escrowRes.json();
+
+          // dispute(bytes32 orderId)
+          const disputeSelector = '0xadd98c70'; // dispute(bytes32)
+          const orderIdParam = purchase.escrowOrderId.replace('0x','').padStart(64,'0');
+          const data = disputeSelector + orderIdParam;
+
+          const wallet = getActiveWallet();
+          const txHash = await window.ethereum.request({
+            method: 'eth_sendTransaction',
+            params: [{ from: wallet, to: escrowCfg.address, data: data }]
+          });
+          showNotice(`<i data-lucide="alert-triangle" class="icon-inline"></i> 争议已提交，TxHash: ${txHash}`);
+        } else {
+          // 非链上订单，走后端拒绝
+          const res = await fetch('/api/purchases/reject/' + purchaseId, { method: 'POST' });
+          const data = await res.json();
+          if (data.ok) { showNotice('<i data-lucide="alert-triangle" class="icon-inline"></i> 争议已提交'); loadPendingPurchases(); }
+          else { showError(data.error); }
+        }
+      } catch(e) { showError('争议失败: ' + e.message); }
     }
 
     // 初始加载

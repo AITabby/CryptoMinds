@@ -750,6 +750,37 @@ app.use(express.static(path.join(__dirname, 'public')));
 // TX 记录
 const TX_LOG = path.join(__dirname, '..', 'tx-log.json');
 const AGENT_EVENTS_FILE = path.join(__dirname, '..', 'agent_events.json');
+
+// Escrow 合约配置
+const ESCROW_CONFIG = {
+  address: '0x1A81a18dFC26676AC30f95f4659Fe4c0b4355EC3',
+  chainId: 56,
+  defaultTimeout: 86400,  // 24h
+};
+const ESCROW_ABI = [
+  {"inputs":[{"internalType":"uint256","name":"_defaultTimeout","type":"uint256"}],"stateMutability":"nonpayable","type":"constructor"},
+  {"inputs":[{"internalType":"address","name":"seller","type":"address"},{"internalType":"string","name":"serviceId","type":"string"},{"internalType":"uint256","name":"timeoutSeconds","type":"uint256"}],"name":"createOrder","outputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"stateMutability":"payable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"},{"internalType":"string","name":"result","type":"string"}],"name":"deliver","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"confirm","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"dispute","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"claimTimeout","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"},{"internalType":"string","name":"reason","type":"string"}],"name":"arbitrateRefund","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"arbitrateRelease","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"getOrder","outputs":[{"internalType":"address","name":"buyer"},{"internalType":"address","name":"seller"},{"internalType":"string","name":"serviceId"},{"internalType":"uint256","name":"amount"},{"internalType":"uint256","name":"createdAt"},{"internalType":"uint256","name":"deliveredAt"},{"internalType":"uint256","name":"timeoutAt"},{"internalType":"enum ServiceEscrow.OrderStatus","name":"status"},{"internalType":"string","name":"deliverResult"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"getOrderCount","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":""}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"defaultTimeout","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalEscrowed","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalReleased","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalRefunded","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalDisputed","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"indexed":true,"name":"buyer","type":"address"},{"indexed":true,"name":"seller","type":"address"},{"name":"serviceId","type":"string"},{"name":"amount","type":"uint256"}],"name":"OrderCreated","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"name":"deliverResult","type":"string"}],"name":"OrderDelivered","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"name":"amount","type":"uint256"}],"name":"OrderConfirmed","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"name":"amount","type":"uint256"}],"name":"OrderExpired","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"name":"amount","type":"uint256"},{"name":"reason","type":"string"}],"name":"OrderRefunded","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"indexed":true,"name":"buyer","type":"address"}],"name":"OrderDisputed","type":"event"}
+];
 function getTxs() {
   try { return JSON.parse(fs.readFileSync(TX_LOG, 'utf8')); } catch(e) { return []; }
 }
@@ -1397,7 +1428,7 @@ app.get('/api/experts', (req, res) => {
 
 // 购买服务
 app.post('/api/services/buy', async (req, res) => {
-  const { serviceId, buyerWallet, buyerName, txHash, selectedRoute, paymentMode } = req.body;
+  const { serviceId, buyerWallet, buyerName, txHash, selectedRoute, paymentMode, escrowOrderId } = req.body;
   const normalizedServiceId = sanitizeText(serviceId, 120);
   const normalizedBuyerWallet = typeof buyerWallet === 'string' ? buyerWallet.trim() : '';
   const normalizedPaymentMode = typeof paymentMode === 'string' ? paymentMode.trim().toLowerCase() : '';
@@ -1484,6 +1515,8 @@ app.post('/api/services/buy', async (req, res) => {
     selectedRoute: route,
     report,
     txHash: txHash || '',
+    escrowOrderId: escrowOrderId || '',
+    escrowAddress: escrowOrderId ? ESCROW_CONFIG.address : '',
     time: new Date().toISOString(),
     autoConfirm
   };
@@ -2030,6 +2063,72 @@ app.get('/api/live-stream', (req, res) => {
   res.write(`data: ${JSON.stringify({ _type: 'connected' })}\n\n`);
   sseClients.add(res);
   req.on('close', () => { sseClients.delete(res); });
+});
+
+// ===== Escrow 合约接口 =====
+// 获取合约配置（前端需要）
+app.get('/api/escrow/config', (req, res) => {
+  res.json({
+    address: ESCROW_CONFIG.address,
+    chainId: ESCROW_CONFIG.chainId,
+    defaultTimeout: ESCROW_CONFIG.defaultTimeout,
+    abi: ESCROW_ABI,
+  });
+});
+
+// 验证链上 Escrow 订单
+app.get('/api/escrow/order/:orderId', async (req, res) => {
+  try {
+    const { Web3 } = await import('web3');
+    const w3 = new Web3('https://bsc-dataseed1.binance.org');
+    const contract = new w3.eth.Contract(ESCROW_ABI, ESCROW_CONFIG.address);
+    const order = await contract.methods.getOrder(req.params.orderId).call();
+    const statusNames = ['None','Pending','Delivering','Delivered','Confirmed','Disputed','Refunded','Expired'];
+    res.json({
+      ok: true,
+      order: {
+        buyer: order[0],
+        seller: order[1],
+        serviceId: order[2],
+        amount: order[3],
+        amountBNB: w3.utils.fromWei(order[3], 'ether'),
+        createdAt: Number(order[4]),
+        deliveredAt: Number(order[5]),
+        timeoutAt: Number(order[6]),
+        status: statusNames[Number(order[7])] || 'Unknown',
+        deliverResult: order[8],
+      }
+    });
+  } catch(e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// Escrow 统计
+app.get('/api/escrow/stats', async (req, res) => {
+  try {
+    const { Web3 } = await import('web3');
+    const w3 = new Web3('https://bsc-dataseed1.binance.org');
+    const fullAbi = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'build', 'contracts_ServiceEscrow_sol_ServiceEscrow.abi'), 'utf8'));
+    const contract = new w3.eth.Contract(fullAbi, ESCROW_CONFIG.address);
+    const [totalEscrowed, totalReleased, totalRefunded, totalDisputed, orderCount] = await Promise.all([
+      contract.methods.totalEscrowed().call(),
+      contract.methods.totalReleased().call(),
+      contract.methods.totalRefunded().call(),
+      contract.methods.totalDisputed().call(),
+      contract.methods.getOrderCount().call(),
+    ]);
+    res.json({
+      ok: true,
+      totalEscrowed: w3.utils.fromWei(totalEscrowed, 'ether'),
+      totalReleased: w3.utils.fromWei(totalReleased, 'ether'),
+      totalRefunded: w3.utils.fromWei(totalRefunded, 'ether'),
+      totalDisputed: Number(totalDisputed),
+      orderCount: Number(orderCount),
+    });
+  } catch(e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 // 接收新交易（仅允许内部 Agent 调用）
