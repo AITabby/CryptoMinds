@@ -923,13 +923,7 @@ app.post('/api/push/subscribe', (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/push/unsubscribe', (req, res) => {
-  const { wallet, endpoint } = req.body;
-  let subs = getPushSubs();
-  subs = subs.filter(s => !(s.wallet?.toLowerCase() === wallet?.toLowerCase() && s.subscription.endpoint === endpoint));
-  savePushSubs(subs);
-  res.json({ ok: true });
-});
+// push/unsubscribe 已移除（未使用）
 
 // 通知接口
 app.get('/api/notifications', (req, res) => {
@@ -1336,21 +1330,7 @@ app.post('/api/experts/exit', (req, res) => {
 });
 
 // 质押方退款回调（Four.meme 或合约调用）
-app.post('/api/refund/callback', (req, res) => {
-  const { serviceId, txHash } = req.body;
-  if (!serviceId) return res.json({ ok: false, error: '缺少 serviceId' });
-  const services = getServices();
-  const svc = services.find(s => s.id === serviceId);
-  if (!svc) return res.json({ ok: false, error: '服务不存在' });
-  if (svc.refundStatus !== 'pending') return res.json({ ok: false, error: '该服务不在待退款状态' });
-
-  svc.refundStatus = 'refunded';
-  svc.refundedAt = new Date().toISOString();
-  svc.refundTx = txHash || '';
-  saveServices(services);
-
-  res.json({ ok: true, message: '退款确认成功' });
-});
+// refund/callback 已移除（未使用）
 
 // 管理员审核服务
 // 管理员鉴权中间件
@@ -1363,14 +1343,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// 审核日志（公开只读）
-app.get('/api/admin/audit-log', (req, res) => {
-  const services = getServices();
-  const approved = services.filter(s => s.status === 'approved' || (s.active && !s.status));
-  const rejected = services.filter(s => s.status === 'rejected');
-  const pending = services.filter(s => s.status === 'pending');
-  res.json({ ok: true, approved, rejected, pending });
-});
+// admin/audit-log 已移除（未使用）
 
 // 管理员操作接口（需鉴权）
 app.get('/api/admin/pending', requireAdmin, (req, res) => {
@@ -2048,15 +2021,7 @@ app.get('/api/txs', (req, res) => {
 });
 
 // Agent 思考事件 API
-app.get('/api/agent-events', (req, res) => {
-  res.json(getAgentEvents());
-});
-app.post('/api/agent-events', (req, res) => {
-  const event = req.body;
-  if (!event || !event.agent) return res.status(400).json({ error: 'missing agent field' });
-  addAgentEvent(event);
-  res.json({ ok: true, id: event.id });
-});
+// agent-events GET/POST 已移除（未使用，live-feed 内部直接调用）
 
 // 合并 feed：交易 + 事件，统一时间线
 app.get('/api/live-feed', (req, res) => {
@@ -2258,41 +2223,7 @@ app.get('/api/agents/:wallet/skills', (req, res) => {
 });
 
 // 获取购买技能（公开）
-const BUY_SERVICE_SKILL = {
-  name: 'buy-service',
-  version: '1.0',
-  description: '从 CryptoMinds 市场购买专家服务，获取链上情报',
-  marketApi: 'http://localhost:3456',
-  steps: [
-    { action: 'discover', method: 'GET', path: '/api/market', desc: '查看可用服务列表' },
-    { action: 'purchase', method: 'POST', path: '/api/services/buy', desc: '购买服务并获取 Skill 执行结果', body: { serviceId: '服务ID', buyerWallet: '你的钱包地址', buyerName: '你的名字' } },
-    { action: 'read-report', desc: '解析返回的 report 字段，包含专家提供的数据和建议' }
-  ],
-  reportTypes: {
-    scanning: 'Skill 执行结果 — 推荐代币 + 价格 + 风险',
-    risk: '风控分析 — 合约检查 + 安全结论',
-    report: '持有建议 — 持仓分析 + 买卖建议',
-    analysis: '深度分析 — 综合数据'
-  },
-  quickStart: 'GET /api/market 查看服务 → POST /api/services/buy 购买 → 拿到 report 决策'
-};
-
-function getBuyServiceSkill() {
-  return BUY_SERVICE_SKILL;
-}
-
-// 获取购买技能（公开接口）
-app.get('/api/skill/buy-service', (req, res) => {
-  res.json(BUY_SERVICE_SKILL);
-});
-
-// 指定 Agent 获取技能
-app.get('/api/agents/:id/skill', (req, res) => {
-  const agents = getAgents();
-  const agent = agents.find(a => a.id === req.params.id);
-  if (!agent) return res.json({ ok: false, error: 'Agent 不存在' });
-  res.json({ ok: true, agent: agent.name, skill: BUY_SERVICE_SKILL });
-});
+// BUY_SERVICE_SKILL + agents/:id/skill 已移除（未使用）
 
 // 链上交易同步：扫描最近区块，发现所有 Agent 间 BNB 转账
 app.get('/api/sync-chain', async (req, res) => {
@@ -2375,135 +2306,9 @@ app.get('/api/sync-chain', async (req, res) => {
 });
 
 // 验证单笔链上交易并写入记录
-app.get('/api/verify-tx/:txHash', async (req, res) => {
-  try {
-    const txHash = req.params.txHash;
-    if (!txHash || !txHash.startsWith('0x')) return res.json({ ok: false, error: '无效交易哈希' });
-    
-    // 检查是否已记录
-    const txs = getTxs();
-    if (txs.find(t => t.tx && t.tx.toLowerCase() === txHash.toLowerCase())) {
-      return res.json({ ok: true, existed: true });
-    }
-    
-    // 从链上查交易
-    const tx = await w3.eth.getTransaction(txHash);
-    if (!tx) return res.json({ ok: false, error: '链上未找到交易' });
-    
-    const receipt = await w3.eth.getTransactionReceipt(txHash);
-    if (!receipt || receipt.status !== 1n) return res.json({ ok: false, error: '交易未确认或失败' });
-    
-    // 检查是否是 Agent 间转账
-    const fromLower = tx.from.toLowerCase();
-    const toLower = tx.to ? tx.to.toLowerCase() : '';
-    const agentAddrs = Object.values(AGENTS).map(a => a.addr.toLowerCase());
-    const registered = getAgents();
-    const registeredAddrs = registered.map(a => (a.wallet || '').toLowerCase()).filter(Boolean);
-    const allAgentAddrs = new Set([...agentAddrs, ...registeredAddrs]);
-    
-    if (!allAgentAddrs.has(fromLower) && !allAgentAddrs.has(toLower)) {
-      return res.json({ ok: false, error: '非 Agent 间交易' });
-    }
-    
-    // 名字映射
-    const nameMap = {};
-    for (const [k, v] of Object.entries(AGENTS)) nameMap[v.addr.toLowerCase()] = v.name;
-    for (const a of registered) { if (a.wallet) nameMap[a.wallet.toLowerCase()] = a.name; }
-    
-    const amount = Number(w3.utils.fromWei(tx.value, 'ether'));
-    if (amount <= 0) return res.json({ ok: false, error: '零金额交易' });
-    
-    // 根据收款方匹配服务
-    const services = getServices().filter(s => s.active);
-    const matchedService = services.find(s => 
-      s.wallet && s.wallet.toLowerCase() === toLower && 
-      Math.abs(Number(s.price) - amount) < 0.00001
-    ) || services.find(s => s.wallet && s.wallet.toLowerCase() === toLower);
-    const reason = matchedService ? matchedService.name : '链上支付';
-    
-    // 获取区块时间
-    const block = await w3.eth.getBlock(tx.blockNumber);
-    const blockTime = new Date(Number(block.timestamp) * 1000);
-    
-    addTx({
-      time: blockTime.toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
-      from: nameMap[fromLower] || tx.from.slice(0, 8),
-      fromWallet: fromLower,
-      to: nameMap[toLower] || (matchedService ? matchedService.expert : '') || (tx.to || '').slice(0, 8),
-      amount,
-      reason,
-      tx: txHash,
-      receipt: txHash,
-      route_type: 'direct/bsc/BNB',
-      verified: '✅ 已验证',
-      timestamp: blockTime.toISOString(),
-    });
-    
-    res.json({ ok: true, synced: 1 });
-  } catch(e) {
-    res.json({ ok: false, error: e.message });
-  }
-});
+// verify-tx 已移除（未使用，sync-chain 已覆盖链上同步功能）
 
-// Skill 执行接口 — 买家购买后调用
-app.post('/api/skills/execute/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { task, token_address } = req.body || {};
-    if (!task) return res.json({ ok: false, error: '缺少 task 参数' });
-
-    // 查找 skill
-    const service = services.find(s => s.id === id && s.active);
-    if (!service) return res.json({ ok: false, error: '服务不存在或未上架' });
-
-    // 检查 skill 文件
-    const skillDir = path.join(__dirname, '..', 'uploaded_skills', id);
-    const pyFile = path.join(skillDir, 'skill.py');
-    const jsFile = path.join(skillDir, 'skill.js');
-
-    if (fs.existsSync(pyFile)) {
-      // Python 执行
-      const { execFile } = require('child_process');
-      const args = ['-c', `
-import json, sys
-sys.path.insert(0, '${skillDir}')
-from skill import execute
-result = execute(${JSON.stringify(task)})
-print(json.dumps({"data": result}))
-`];
-      execFile('python3', args, { timeout: 15000, cwd: skillDir }, (err, stdout, stderr) => {
-        if (err) return res.json({ ok: false, error: '执行失败: ' + err.message });
-        try {
-          const out = JSON.parse(stdout.trim().split('\n').pop());
-          res.json({ ok: true, data: out.data });
-        } catch(e) {
-          res.json({ ok: true, data: stdout.trim() });
-        }
-      });
-    } else if (fs.existsSync(jsFile)) {
-      // JS 执行
-      const { execFile } = require('child_process');
-      const args = ['-e', `
-const skill = require('${jsFile}');
-const result = skill.execute(${JSON.stringify(task)});
-Promise.resolve(result).then(r => { console.log(JSON.stringify({data: r})); process.exit(0); }).catch(e => { console.error(JSON.stringify({error: e.message})); process.exit(1); });
-`];
-      execFile('node', args, { timeout: 15000 }, (err, stdout, stderr) => {
-        if (err) return res.json({ ok: false, error: '执行失败: ' + err.message });
-        try {
-          const out = JSON.parse(stdout.trim().split('\n').pop());
-          res.json({ ok: true, data: out.data });
-        } catch(e) {
-          res.json({ ok: true, data: stdout.trim() });
-        }
-      });
-    } else {
-      res.json({ ok: false, error: 'Skill 文件不存在' });
-    }
-  } catch(e) {
-    res.json({ ok: false, error: e.message });
-  }
-});
+// skills/execute 已移除（未使用，通过 skill/call 调用）
 
 app.listen(PORT, () => {
   console.log(`CryptoMinds Marketplace running on http://localhost:${PORT}`);

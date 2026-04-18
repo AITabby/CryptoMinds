@@ -1302,16 +1302,6 @@
       } catch(e) {}
     }
 
-    function deregisterService(id) {
-      const modal = document.createElement('div');
-      modal.id = 'deregisterModal';
-      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
-      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出市场？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:24px;line-height:1.6;">退出后服务将下架，押金退还由质押方处理。<br>可随时重新入驻（需重新质押）。</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('deregisterModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doDeregister('${id}')" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
-      document.body.appendChild(modal);
-      lucide.createIcons();
-    }
-
     async function doDeregister(id) {
       document.getElementById('deregisterModal')?.remove();
       try {
@@ -1389,31 +1379,6 @@
 
     function getActiveWallet() {
       return walletIsDemo || !currentAccount ? DEMO_WALLET : currentAccount;
-    }
-
-    function formatSpendTotals(purchases) {
-      return purchases.reduce((totals, purchase) => {
-        const amount = Number(purchase.price) || 0;
-        const currency = (purchase.priceCurrency || 'BNB').toUpperCase();
-        if (currency === 'USDC') totals.usdc += amount;
-        else if (currency === 'BNB') totals.bnb += amount;
-        return totals;
-      }, { usdc: 0, bnb: 0 });
-    }
-
-    function getRouteLabel(purchase) {
-      const route = purchase.selectedRoute || purchase.payment?.route;
-      if (!route) return '默认';
-      return `${route.route_type || 'direct'}/${route.chain || purchase.payment?.chain || '-'}/${route.symbol || '-'}`;
-    }
-
-    function getVerificationLabel(purchase) {
-      if (purchase.payment?.verified) {
-        return purchase.payment?.mode === 'x402'
-          ? `x402 · ${purchase.payment?.chain || '-'}`
-          : `${purchase.payment?.mode || 'onchain'} · ${currentLang === 'zh' ? '已验证' : 'Verified'}`;
-      }
-      return purchase.payment?.mode === 'demo' ? (currentLang === 'zh' ? 'Demo 订单' : 'Demo Order') : (currentLang === 'zh' ? '待确认' : 'Pending');
     }
 
     function sortObjectKeys(value) {
@@ -3251,9 +3216,7 @@ function closeDepositModal() {
   document.getElementById('depositModal').style.display = 'none';
 }
 
-function openPendingReviewModal() {
-  document.getElementById('pendingReviewModal').style.display = 'flex';
-}
+// openPendingReviewModal 已移除（未使用）
 
 function closePendingReviewModal() {
   document.getElementById('pendingReviewModal').style.display = 'none';
@@ -3344,67 +3307,7 @@ async function confirmDepositModal() {
 
     // 服务文件处理（已移除，改为服务契约声明）
 
-    async function submitRegister() {
-      const expert = document.getElementById('regExpert').value.trim();
-      const name = document.getElementById('regName').value.trim();
-      const price = parseFloat(document.getElementById('regPrice').value) || 0.0001;
-      const desc = document.getElementById('regDesc').value.trim();
-      const wallet = document.getElementById('regWallet').value.trim() || currentAccount || '';
-      // 不再需要框架筛选（服务契约模式）
-
-      if (!expert) { showError('请先连接钱包'); return; }
-      if (!name) { showError('请填写 服务名称'); return; }
-      if (!wallet) { showError('请填写收款钱包地址，或先连接钱包'); return; }
-      // 不再需要框架校验
-      const inputFormat = document.getElementById('regInputFormat').value.trim();
-      const outputFormat = document.getElementById('regOutputFormat').value.trim();
-      const latency = document.getElementById('regLatency').value.trim();
-      if (!inputFormat) { showError('请填写输入格式'); return; }
-      if (!outputFormat) { showError('请填写输出格式'); return; }
-      if (depositConfig.isOnChain && !depositTxHash) { showError('请先通过 MetaMask 缴纳押金'); return; }
-
-      const btn = document.getElementById('regSubmitBtn');
-      btn.textContent = currentLang === 'zh' ? '提交中...' : 'Submitting...';
-      btn.disabled = true;
-
-      try {
-        const formData = new FormData();
-        formData.append('expert', expert);
-        formData.append('name', name);
-        formData.append('desc', desc);
-        formData.append('price', price);
-        formData.append('wallet', wallet);
-        // 不再传 frameworks
-        formData.append('deposit', '0.001');
-        formData.append('depositTx', depositTxHash || '');
-        formData.append('inputFormat', inputFormat);
-        formData.append('outputFormat', outputFormat);
-        formData.append('latency', latency);
-
-        const res = await fetch('/api/experts/register', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        if (data.ok) {
-          closeRegisterModal();
-          showNotice('<i data-lucide="clock" class="icon-inline"></i> 入驻成功！服务正在审核中，通过后将自动上架');
-          reloadMarket();
-          uploadedSkillFile = null;
-          document.getElementById('regExpert').value = '';
-          document.getElementById('regName').value = '';
-          document.getElementById('regPrice').value = '';
-          document.getElementById('regDesc').value = '';
-          document.getElementById('regWallet').value = '';
-        } else {
-          showError('入驻失败：' + (data.error || '未知错误'));
-        }
-      } catch(e) {
-        showError('网络请求失败：' + e.message);
-      }
-      btn.textContent = currentLang === 'zh' ? '<i data-lucide="store" class="icon-inline"></i> 确认入驻' : '<i data-lucide="store" class="icon-inline"></i> Submit';
-      btn.disabled = false;
-    }
+    // submitRegister 已移除（未使用，入驻流程由 payDeposit 处理）
     let currentSort = 'effectiveRate'; // 默认按有效率
     let currentSortDir = -1; // -1=desc
 
@@ -3688,14 +3591,7 @@ async function confirmDepositModal() {
       } catch(e) { showError('确认失败: ' + e.message); }
     }
 
-    async function rejectPurchase(purchaseId) {
-      try {
-        const res = await fetch('/api/purchases/reject/' + purchaseId, { method: 'POST' });
-        const data = await res.json();
-        if (data.ok) { showNotice('<i data-lucide="x-circle" class="icon-inline"></i> 购买已拒绝'); loadPendingPurchases(); }
-        else { showError(data.error); }
-      } catch(e) { showError('拒绝失败: ' + e.message); }
-    }
+    // rejectPurchase 已移除（未使用）
 
     // Escrow 争议：买家在链上提交争议
     async function disputePurchase(purchaseId) {
@@ -4166,12 +4062,7 @@ async function confirmDepositModal() {
       applyTranslations();
       updateLangToggle();
     }
-    function setLang(lang) {
-      currentLang = lang;
-      localStorage.setItem('cryptominds_lang', currentLang);
-      applyTranslations();
-      updateLangToggle();
-    }
+    // setLang 已移除（未使用，用 toggleLang 切换）
 
     function applyTranslations() {
       // Update all elements with data-i18n attribute
