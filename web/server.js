@@ -215,8 +215,8 @@ function buildExecutionPreview(route, service) {
   const stepsByType = {
     direct: [
       `检查 ${route.chain.toUpperCase()} 链上 ${route.symbol} 余额`,
-      `向服务提供者地址发起 ${priceLabel} 直付`,
-      '提交 x402 支付头并验证链上交易',
+      route.symbol === 'BNB' ? `通过 Escrow 担保合约锁定 ${priceLabel}，确认收货后放款` : `向服务提供者地址发起 ${priceLabel} 支付`,
+      '提交链上交易并验证',
     ],
     swap: [
       `检查 ${route.chain.toUpperCase()} 链上可兑换余额`,

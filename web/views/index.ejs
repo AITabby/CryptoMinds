@@ -2168,7 +2168,7 @@
         if (data.ok && data.routes && data.routes.length > 0) {
           const recommended = data.recommended || data.routes[0];
           let html = `<p style="color:#a78bfa; margin-bottom:10px;">找到 ${data.routes.length} 条支付路径：</p>`;
-          html += `<p style="color:#64748b; margin-bottom:15px; font-size:12px;">当前执行为可验证的路由演示闭环：会校验你选择的推荐路径，并将该路径写入订单记录。未附链上交易哈希时，仍会标记为 Demo 支付。</p>`;
+          html += `<p style="color:#64748b; margin-bottom:15px; font-size:12px;">选择支付路径完成购买。BNB 支付走 Escrow 担保合约，资金确认收货后释放；代币支付为直付模式。</p>`;
           data.routes.forEach((route, i) => {
             const isRecommended =
               recommended &&
@@ -2189,7 +2189,7 @@
                   ${route.route_type === 'split' && route.notes ? `<div style="margin-top:6px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:8px 10px; font-size:12px;">${route.notes}</div>` : `<div style="color:#64748b; margin-top:4px;">${route.notes || ''}</div>`}
 	                  ${route.execution_preview?.steps ? `<div style="margin-top:8px; color:#94a3b8;">${route.execution_preview.steps.map((step, stepIndex) => `<div>${stepIndex + 1}. ${step}</div>`).join('')}</div>` : ''}
                   <div style="color:${isRealX402Route(route) || isRealSwapRoute(route) || isRealSplitRoute(route) ? '#34d399' : '#64748b'}; margin-top:6px; font-size:12px;">
-                    ${isRealX402Route(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实 x402 支付' : isRealSwapRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实 Swap + x402 支付' : isRealSplitRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实 Split 多笔支付' : isRealBNBDirectRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持真实链上 BNB 支付' : '<i data-lucide="alert-triangle" class="icon-inline" style="color:#f59e0b"></i> 仅支持 Demo 执行'}
+                    ${isRealX402Route(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持 x402 协议支付' : isRealSwapRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持 Swap + x402 支付' : isRealSplitRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支持 Split 多笔支付' : isRealBNBDirectRoute(route) ? '<i data-lucide="shield" class="icon-inline" style="color:#10b981"></i> 🔒 Escrow 担保支付，确认收货后放款' : '<i data-lucide="alert-triangle" class="icon-inline" style="color:#f59e0b"></i> 模拟执行'}
                   </div>
                 </div>
                 <div style="margin-top:10px;">
@@ -2716,10 +2716,10 @@
 	            amount: `${data.purchase.price} ${data.purchase.priceCurrency || 'BNB'}`,
 	            route: routeLabel,
 	            chain: data.purchase.payment?.chain,
-	            paymentMode: data.purchase.payment?.mode === 'demo' ? 'Demo 路由执行' : data.purchase.payment?.mode,
-	            paymentStatus: data.purchase.payment?.verified ? '已验证链上支付' : '未附链上交易哈希，按 Demo 订单处理',
+	            paymentMode: data.purchase.payment?.mode === 'demo' ? '模拟执行' : (data.purchase.escrowAddress ? 'Escrow 担保支付' : data.purchase.payment?.mode),
+	            paymentStatus: data.purchase.payment?.verified ? '已验证链上支付' : (data.purchase.escrowAddress ? '资金已锁定在担保合约' : '链上支付待确认'),
 	            txHash: data.purchase.txHash || data.purchase.payment?.txHash || '',
-            txHint: data.purchase.payment?.verified ? '' : '本次没有附上链上 txHash，因此不会伪装成真实支付。'
+            txHint: data.purchase.escrowAddress ? '🔒 BNB 已锁定在 Escrow 合约，确认收货后释放给卖家' : (data.purchase.payment?.verified ? '' : '交易已提交，等待链上确认')
           });
 	          if (document.getElementById('myAgent').style.display === 'block') {
 	            autoLoadWalletData();
