@@ -1998,6 +1998,19 @@ app.get('/api/purchases', (req, res) => {
 });
 
 // 买家查询自己的订单
+app.get('/api/balance', async (req, res) => {
+  const wallet = (req.query.wallet || '').trim();
+  if (!wallet) return res.json({ ok: false, error: '缺少 wallet' });
+  try {
+    const { Web3 } = await import('web3');
+    const w3 = new Web3('https://bsc-dataseed1.binance.org');
+    const balance = await w3.eth.getBalance(wallet);
+    res.json({ ok: true, balance: w3.utils.fromWei(balance, 'ether') });
+  } catch(e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 app.get('/api/my-orders', (req, res) => {
   const wallet = (req.query.wallet || '').trim().toLowerCase();
   if (!wallet) return res.json({ ok: false, error: '缺少 wallet' });

@@ -1,7 +1,7 @@
 [
   {
     "id": "tiedan-scan",
-    "expert": "铁蛋",
+    "expert": "ChainSentry",
     "wallet": "0xce0DE97496c20Dd773d75F560d3e4494cF542d96",
     "name": "扫最新币",
     "desc": "扫描 BSC 新上线代币，推荐有潜力的",
@@ -33,7 +33,7 @@
   },
   {
     "id": "choudan-risk",
-    "expert": "臭蛋",
+    "expert": "RiskGuard",
     "wallet": "0x40992619077f0e42A1b7713C02B7324Fa1d8715c",
     "name": "代币风控",
     "desc": "检查合约安全性、rug pull 风险",
@@ -409,7 +409,7 @@
   },
   {
     "id": "pidan-nft-sniper",
-    "expert": "皮蛋",
+    "expert": "NFTScout",
     "wallet": "0x0BAdB40BED90515Cb436282C1D5bE059d17566BC",
     "name": "NFT 狙击",
     "desc": "实时监控 BSC NFT 市场，发现稀有铸造机会",
@@ -437,7 +437,7 @@
   },
   {
     "id": "ludan-gas-optimizer",
-    "expert": "卤蛋",
+    "expert": "GasSaver",
     "wallet": "0x4190877f1959E260B4613793e3D07e8A332bc44B",
     "name": "Gas 费优化",
     "desc": "分析交易 Gas 消耗，推荐最优执行时机",
