@@ -1,0 +1,83 @@
+[
+  {
+    "type": "think",
+    "agent": "钢蛋",
+    "message": "SSE 实时测试成功",
+    "timestamp": "2026-04-18T02:28:15.455Z",
+    "id": "evt-1776479295455-7e63"
+  },
+  {
+    "type": "think",
+    "agent": "钢蛋",
+    "message": "SSE 实时推送测试",
+    "timestamp": "2026-04-18T02:22:05.382Z",
+    "id": "evt-1776478925382-apjk"
+  },
+  {
+    "type": "result",
+    "agent": "臭蛋",
+    "message": "CAKE 风控完成: 评分 72/100 (中风险)",
+    "timestamp": "2026-04-18T02:11:44.340Z",
+    "id": "evt-1776478304340-tqhl"
+  },
+  {
+    "type": "execute",
+    "agent": "臭蛋",
+    "message": "分析合约 0x0E09...E82 — 5 项链上安全检查",
+    "timestamp": "2026-04-18T02:11:44.326Z",
+    "id": "evt-1776478304326-9nxy"
+  },
+  {
+    "type": "pay",
+    "agent": "钢蛋",
+    "message": "→ 臭蛋 0.000112 BNB: 购买风控服务",
+    "to": "臭蛋",
+    "amount": 0.000112,
+    "timestamp": "2026-04-18T02:11:44.316Z",
+    "id": "evt-1776478304316-unid"
+  },
+  {
+    "type": "think",
+    "agent": "钢蛋",
+    "message": "发现了代币，需要验证安全性",
+    "timestamp": "2026-04-18T02:11:44.304Z",
+    "id": "evt-1776478304304-ewgn"
+  },
+  {
+    "type": "result",
+    "agent": "铁蛋",
+    "message": "扫描完成，发现 5 个代币，🔥 PEPE — 24h涨幅 +45%, 流动性 $120,000",
+    "timestamp": "2026-04-18T02:11:44.287Z",
+    "id": "evt-1776478304287-9unx"
+  },
+  {
+    "type": "execute",
+    "agent": "铁蛋",
+    "message": "正在查询 PancakeSwap + DEXScreener 链上数据...",
+    "timestamp": "2026-04-18T02:11:44.273Z",
+    "id": "evt-1776478304273-pfki"
+  },
+  {
+    "type": "pay",
+    "agent": "钢蛋",
+    "message": "→ 铁蛋 0.000124 BNB: 购买扫链服务",
+    "to": "铁蛋",
+    "amount": 0.000124,
+    "timestamp": "2026-04-18T02:11:44.263Z",
+    "id": "evt-1776478304263-ifgs"
+  },
+  {
+    "type": "think",
+    "agent": "钢蛋",
+    "message": "扫链 Skill 便宜评分高，先买它发现代币",
+    "timestamp": "2026-04-18T02:11:44.252Z",
+    "id": "evt-1776478304252-fd9k"
+  },
+  {
+    "type": "think",
+    "agent": "钢蛋",
+    "message": "用户想找 meme 币，先搜市场有什么工具",
+    "timestamp": "2026-04-18T02:10:21.982Z",
+    "id": "evt-1776478221982-2f4c"
+  }
+]

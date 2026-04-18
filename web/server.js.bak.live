@@ -762,11 +762,9 @@ function addTx(tx) {
   txs.unshift(tx);
   // 移除50条限制，保留所有交易记录
   fs.writeFileSync(TX_LOG, JSON.stringify(txs, null, 2));
-  broadcastSSE({ ...tx, _type: 'tx' });
 }
 
 // Agent 思考事件
-const sseClients = new Set();
 function getAgentEvents() {
   try { return JSON.parse(fs.readFileSync(AGENT_EVENTS_FILE, 'utf8')); } catch(e) { return []; }
 }
@@ -775,15 +773,9 @@ function addAgentEvent(event) {
   if (!event.timestamp) event.timestamp = new Date().toISOString();
   if (!event.id) event.id = 'evt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
   events.unshift(event);
+  // 保留最近 200 条
   if (events.length > 200) events.length = 200;
   fs.writeFileSync(AGENT_EVENTS_FILE, JSON.stringify(events, null, 2));
-  broadcastSSE({ ...event, _type: 'event' });
-}
-function broadcastSSE(data) {
-  const msg = `data: ${JSON.stringify(data)}\n\n`;
-  for (const res of sseClients) {
-    try { res.write(msg); } catch(e) { sseClients.delete(res); }
-  }
 }
 
 let balanceCache = { data: {}, fetchedAt: 0 };
@@ -2017,19 +2009,6 @@ app.get('/api/live-feed', (req, res) => {
   const events = getAgentEvents().map(e => ({ ...e, _type: 'event' }));
   const combined = [...txs, ...events].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
   res.json(combined);
-});
-
-// SSE 实时流
-app.get('/api/live-stream', (req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no',
-  });
-  res.write(`data: ${JSON.stringify({ _type: 'connected' })}\n\n`);
-  sseClients.add(res);
-  req.on('close', () => { sseClients.delete(res); });
 });
 
 // 接收新交易（仅允许内部 Agent 调用）

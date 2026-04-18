@@ -225,7 +225,7 @@
         <div class="brand-name">CryptoMinds</div>
       </div>
       <div class="nav">
-        <span class="active" onclick="showTab('live')" data-i18n="tabLive"><i data-lucide="radio" class="icon-inline"></i> 经济脉搏</span>
+        <span class="active" onclick="showTab('live')" data-i18n="tabLive"><i data-lucide="radio" class="icon-inline"></i> Live</span>
         <span onclick="showTab('market')" data-i18n="tabMarket"><i data-lucide="store" class="icon-inline"></i> 服务市场</span>
         <span onclick="showTab('register')" data-i18n="tabRegister"><i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻</span>
         <span onclick="showTab('myagent')" data-i18n="tabMyAgent"><i data-lucide="bot" class="icon-inline"></i> 我的 Agent</span>
@@ -271,10 +271,9 @@
       <!-- 顶部状态栏 -->
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="live-pulse" id="livePulse"></div>
+          <div class="live-pulse"></div>
           <span style="color:#e2e8f0; font-size:15px; font-weight:600;" data-i18n="liveTitle">Agent 实时动态</span>
           <span id="liveAgentCount" style="color:#64748b; font-size:12px;">--</span>
-          <span id="liveConnStatus" style="font-size:10px; color:#34d399;">● 实时</span>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
           <span id="liveLastUpdate" style="color:#475569; font-size:11px;"></span>
@@ -919,12 +918,11 @@
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const txs = items.filter(i => i._type === 'tx');
         const todayTxs = txs.filter(t => new Date(t.timestamp) >= today);
-        const NON_AGENTS = ['押金池', '未知服务', 'test', 'undefined', 'null'];
         const uniqueAgents = new Set();
         items.forEach(t => {
-          [t.from, t.to, t.agent].forEach(name => {
-            if (name && !NON_AGENTS.includes(name)) uniqueAgents.add(name);
-          });
+          if (t.from) uniqueAgents.add(t.from);
+          if (t.to) uniqueAgents.add(t.to);
+          if (t.agent) uniqueAgents.add(t.agent);
         });
         const verifiedCount = txs.filter(t => t.tx && !t.tx.startsWith('purchase-') && t.verified !== '🧪 模拟').length;
         const todayVolume = todayTxs.reduce((s, t) => s + (t.amount || 0), 0);
@@ -965,70 +963,14 @@
       }
     }
 
-    let liveEventSource = null;
-
-    function startLiveStream() {
-      if (liveEventSource) liveEventSource.close();
-      const statusEl = document.getElementById('liveConnStatus');
-      const pulseEl = document.getElementById('livePulse');
-      if (statusEl) { statusEl.textContent = '● 连接中...'; statusEl.style.color = '#fbbf24'; }
-
-      liveEventSource = new EventSource('/api/live-stream');
-
-      liveEventSource.onmessage = function(e) {
-        try {
-          const item = JSON.parse(e.data);
-          if (item._type === 'connected') {
-            if (statusEl) { statusEl.textContent = '● 实时'; statusEl.style.color = '#34d399'; }
-            if (pulseEl) pulseEl.style.background = '#34d399';
-            return;
-          }
-          prependLiveEvent(item);
-        } catch(err) {}
-      };
-
-      liveEventSource.onerror = function() {
-        if (statusEl) { statusEl.textContent = '○ 重连中...'; statusEl.style.color = '#f87171'; }
-        if (pulseEl) pulseEl.style.background = '#f87171';
-        liveEventSource.close();
-        setTimeout(startLiveStream, 3000);
-      };
-    }
-
-    function prependLiveEvent(item) {
-      const feed = document.getElementById('liveFeed');
-      if (!feed) return;
-
-      const html = renderEventItem(item);
-      const wrapper = document.createElement('div');
-      wrapper.innerHTML = html;
-      const el = wrapper.firstElementChild;
-      if (!el) return;
-
-      // Highlight animation
-      el.style.transition = 'background 0.5s ease';
-      el.style.background = 'rgba(139,92,246,0.12)';
-      setTimeout(() => { el.style.background = ''; }, 1500);
-
-      // Check if user is near bottom before inserting
-      const nearBottom = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 100;
-
-      // Remove "no data" placeholder if present
-      const placeholder = feed.querySelector('[style*="text-align:center"]');
-      if (placeholder && placeholder.textContent.includes('暂无')) placeholder.remove();
-
-      feed.insertBefore(el, feed.firstChild);
-
-      // Auto-scroll if was near bottom
-      if (nearBottom) {
-        feed.scrollTop = 0; // scroll to top since new items are prepended
-      }
-
-      // Update timestamp
-      const now = new Date();
-      document.getElementById('liveLastUpdate').textContent = '更新于 ' + now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-      lucide.createIcons();
+    let liveRefreshTimer = null;
+    function startLiveRefresh() {
+      if (liveRefreshTimer) clearInterval(liveRefreshTimer);
+      liveRefreshTimer = setInterval(() => {
+        if (document.getElementById('panel-live').style.display !== 'none') {
+          loadLiveFeed();
+        }
+      }, 15000);
     }
 
 
@@ -3094,9 +3036,8 @@ async function confirmDepositModal() {
         const services = await res.json();
         bootstrapServices(services);
         applyMarketFilter();
-        // 更新metrics — 用 unique experts 而非 services.length
-        const uniqueExperts = [...new Set(services.map(s => s.expert).filter(Boolean))];
-        document.getElementById('metricAgents').textContent = uniqueExperts.length;
+        // 更新metrics
+        document.getElementById('metricAgents').textContent = services.length;
         try {
           const txRes = await fetch('/api/transactions');
           const txData = await txRes.json();
@@ -3311,8 +3252,8 @@ async function confirmDepositModal() {
       const now = Date.now();
       const h24 = 24 * 60 * 60 * 1000;
 
-      // --- Agent 总数 (去重) ---
-      const totalAgents = [...new Set((services || []).map(s => s.expert).filter(Boolean))].length;
+      // --- Agent 总数 ---
+      const totalAgents = (services || []).length;
       document.getElementById('metricAgents').textContent = totalAgents;
       const todayNew = (services || []).filter(s => {
         if (!s.registeredAt) return false;
@@ -3445,7 +3386,6 @@ async function confirmDepositModal() {
         bnbSpent: 'BNB Spent',
         servicesBought: 'Services Bought',
         // Tabs
-        tabLive: '<i data-lucide="radio" class="icon-inline"></i> Economic Pulse',
         tabMarket: '<i data-lucide="store" class="icon-inline"></i> Service Market',
         tabRegister: '<i data-lucide="pen-line" class="icon-inline"></i> Agent Register',
         tabMyAgent: '<i data-lucide="bot" class="icon-inline"></i> My Agent',
@@ -3598,7 +3538,6 @@ async function confirmDepositModal() {
         bnbSpent: 'BNB 已花费',
         servicesBought: '购买服务',
         // Tabs
-        tabLive: '<i data-lucide="radio" class="icon-inline"></i> 经济脉搏',
         tabMarket: '<i data-lucide="store" class="icon-inline"></i> 服务市场',
         tabRegister: '<i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻',
         tabMyAgent: '<i data-lucide="bot" class="icon-inline"></i> 我的 Agent',
@@ -3763,10 +3702,10 @@ async function confirmDepositModal() {
 
       // Update nav links (use innerHTML to preserve Lucide icons)
       const navLinks = document.querySelectorAll('.nav span');
-      if (navLinks[0]) navLinks[0].innerHTML = t('tabLive');
-      if (navLinks[1]) navLinks[1].innerHTML = t('tabMarket');
-      if (navLinks[2]) navLinks[2].innerHTML = t('tabRegister');
-      if (navLinks[3]) navLinks[3].innerHTML = t('tabMyAgent');
+      if (navLinks[0]) navLinks[0].innerHTML = t('tabMarket');
+      if (navLinks[1]) navLinks[1].innerHTML = t('tabRegister');
+      if (navLinks[2]) navLinks[2].innerHTML = t('tabMyAgent');
+      if (navLinks[3]) navLinks[3].innerHTML = t('tabAdmin');
 
       // Update metrics labels
       const metricLabels = document.querySelectorAll('.metric-card .label');
@@ -3874,7 +3813,7 @@ async function confirmDepositModal() {
       });
       // Default: show Live tab
       showTab('live');
-      startLiveStream();
+      startLiveRefresh();
       lucide.createIcons();
     });
 

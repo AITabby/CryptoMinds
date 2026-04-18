@@ -14,6 +14,13 @@ sys.path.insert(0, DIR)
 
 def run(task_description=None, token_address=None):
     """执行风控分析"""
+    try:
+        from agent_events import think as _think, execute as _exec, result as _result
+    except ImportError:
+        _think = _exec = _result = lambda *a, **kw: None
+
+    _think("臭蛋", f"收到风控任务: {task_description or '分析代币安全性'}")
+    
     from web3 import Web3
     from web3.middleware import ExtraDataToPOAMiddleware
 
@@ -22,6 +29,7 @@ def run(task_description=None, token_address=None):
     w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 
     target = token_address or "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82"
+    _exec("臭蛋", f"分析合约 {target[:10]}... — 5 项链上安全检查")
 
     FULL_ABI = json.loads(
         '[{"inputs":[],"name":"name","outputs":[{"type":"string"}],"stateMutability":"view","type":"function"},'
@@ -142,6 +150,8 @@ def run(task_description=None, token_address=None):
         conclusion = f"{symbol} 风险较高：多项指标异常，不建议大额参与。"
     else:
         conclusion = f"⚠️ {symbol} 高度危险：疑似蜜罐或 Rug 项目，强烈建议远离！"
+
+    _result("臭蛋", f"{symbol} 风控完成: 评分 {score}/100 ({'低' if score >= 75 else '中' if score >= 50 else '高' if score >= 30 else '极高'}风险)")
 
     return {
         "risk": {

@@ -9,6 +9,13 @@ import time
 
 def run(task_description=None, token_address=None):
     """执行报告整理"""
+    try:
+        from agent_events import think as _think, execute as _exec, result as _result
+    except ImportError:
+        _think = _exec = _result = lambda *a, **kw: None
+
+    _think("卤蛋", "收到报告任务，汇总各专家结果")
+    
     scan_data = None
     risk_data = None
 
@@ -64,5 +71,7 @@ def run(task_description=None, token_address=None):
             report["verdict"] = "❌ 暂不推荐：热点不足且风控风险较高"
     else:
         report["verdict"] = "📋 各专家报告已收录，请综合参考后决策"
+
+    _result("卤蛋", f"报告生成完毕: {report.get('verdict', '')[:40]}")
 
     return {"report": report}
