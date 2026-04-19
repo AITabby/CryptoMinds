@@ -246,22 +246,22 @@
       <div class="metric-card">
         <div class="label"><i data-lucide="bot" class="icon-inline"></i> Agent 总数</div>
         <div class="value" id="metricAgents" style="color:#f1f5f9;">0</div>
-        <div class="trend" id="trendAgents" style="color:#64748b;">加载中...</div>
+        <div class="trend" id="trendAgents" style="color:#64748b;">&nbsp;</div>
       </div>
       <div class="metric-card">
         <div class="label"><i data-lucide="trending-up" class="icon-inline"></i> 近24h 交易额</div>
         <div class="value" id="metricVolume" style="color:#f1f5f9;">0 BNB</div>
-        <div class="trend" id="trendVolume" style="color:#64748b;">加载中...</div>
+        <div class="trend" id="trendVolume" style="color:#64748b;">&nbsp;</div>
       </div>
       <div class="metric-card">
         <div class="label"><i data-lucide="zap" class="icon-inline"></i> 近24h 交易</div>
         <div class="value" id="metricTxs" style="color:#f1f5f9;">0 笔</div>
-        <div class="trend" id="trendTxs" style="color:#64748b;">加载中...</div>
+        <div class="trend" id="trendTxs" style="color:#64748b;">&nbsp;</div>
       </div>
       <div class="metric-card">
         <div class="label"><i data-lucide="database" class="icon-inline"></i> 总交易额</div>
         <div class="value" id="metricTotalVolume" style="color:#f1f5f9;">0 BNB</div>
-        <div class="trend" id="trendTotalVolume" style="color:#64748b;">加载中...</div>
+        <div class="trend" id="trendTotalVolume" style="color:#64748b;">&nbsp;</div>
       </div>
     </div>
 
@@ -765,7 +765,6 @@
 
     // 加载卖家工作台全部数据
     async function loadSellerData() {
-      console.log('loadSellerData called, currentAccount:', currentAccount);
       await checkMyRegistration();
       loadSellerService();
       loadSellerOrders();
@@ -1255,7 +1254,6 @@
     // 检查当前钱包是否已入驻
     async function checkMyRegistration() {
       const wallet = currentAccount || getActiveWallet();
-      console.log('checkMyRegistration wallet:', wallet, 'currentAccount:', currentAccount);
       if (!wallet) {
         // 没有钱包，显示入驻指南
         document.getElementById('regFormArea').style.display = 'block';
@@ -1287,7 +1285,6 @@
         
         // 检查是否有已上架的服务
         const approvedServices = mine.filter(s => s.status === 'approved');
-        console.log('checkMyRegistration mine:', mine.length, 'pending:', pendingServices.length, 'approved:', approvedServices.length);
         
         if (approvedServices.length > 0) {
           formArea.style.display = 'none';
@@ -3664,19 +3661,22 @@ async function confirmDepositModal() {
 
       // --- Agent 总数 (去重) ---
       const totalAgents = [...new Set((services || []).map(s => s.expert).filter(Boolean))].length;
-      document.getElementById('metricAgents').textContent = totalAgents;
+      const metricAgentsEl = document.getElementById('metricAgents');
+      if (metricAgentsEl) metricAgentsEl.textContent = totalAgents;
       const todayNew = (services || []).filter(s => {
         if (!s.registeredAt) return false;
         return (now - new Date(s.registeredAt).getTime()) < h24;
       }).length;
       const trendEl = document.getElementById('trendAgents');
-      if (todayNew > 0) {
-        trendEl.innerHTML = `<i data-lucide="trending-up" class="icon-inline"></i> 今日 +${todayNew}`;
-        trendEl.className = 'trend up';
-      } else {
-        trendEl.textContent = '稳定运行中';
-        trendEl.className = 'trend';
-        trendEl.style.color = '#64748b';
+      if (trendEl) {
+        if (todayNew > 0) {
+          trendEl.innerHTML = `<i data-lucide="trending-up" class="icon-inline"></i> 今日 +${todayNew}`;
+          trendEl.className = 'trend up';
+        } else {
+          trendEl.textContent = '稳定运行中';
+          trendEl.className = 'trend';
+          trendEl.style.color = '#64748b';
+        }
       }
 
       // --- 从真实购买订单计算 ---
@@ -3696,7 +3696,7 @@ async function confirmDepositModal() {
 
         // 24h 交易额
         const vol24h = recent24h.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
-        document.getElementById('metricVolume').textContent = vol24h > 0 ? vol24h.toFixed(4) + ' BNB' : '0 BNB';
+        const _mv = document.getElementById('metricVolume'); if (_mv) _mv.textContent = vol24h > 0 ? vol24h.toFixed(4) + ' BNB' : '0 BNB';
 
         // 涨幅：24h vs 前24h
         const volPrev24h = prev24h.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
@@ -3707,20 +3707,22 @@ async function confirmDepositModal() {
         } else {
           pctVol = vol24h > 0 ? null : '0'; // null 表示新币式 N/A
         }
-        if (pctVol !== null) {
-          const numPct = parseFloat(pctVol);
-          const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
-          const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
-          const sign = numPct > 0 ? '+' : '';
-          trendVol.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctVol}%`;
-          trendVol.className = `trend ${cls}`;
-        } else {
-          trendVol.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
-          trendVol.className = 'trend up';
+        if (trendVol) {
+          if (pctVol !== null) {
+            const numPct = parseFloat(pctVol);
+            const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
+            const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
+            const sign = numPct > 0 ? '+' : '';
+            trendVol.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctVol}%`;
+            trendVol.className = `trend ${cls}`;
+          } else {
+            trendVol.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
+            trendVol.className = 'trend up';
+          }
         }
 
         // 24h 交易笔数
-        document.getElementById('metricTxs').textContent = recent24h.length > 0 ? recent24h.length + ' 笔' : '0 笔';
+        const _mt = document.getElementById('metricTxs'); if (_mt) _mt.textContent = recent24h.length > 0 ? recent24h.length + ' 笔' : '0 笔';
         const trendTxs = document.getElementById('trendTxs');
         let pctTxs;
         if (prev24h.length > 0) {
@@ -3728,25 +3730,29 @@ async function confirmDepositModal() {
         } else {
           pctTxs = recent24h.length > 0 ? null : '0';
         }
-        if (pctTxs !== null) {
-          const numPct = parseFloat(pctTxs);
-          const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
-          const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
-          const sign = numPct > 0 ? '+' : '';
-          trendTxs.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctTxs}%`;
-          trendTxs.className = `trend ${cls}`;
-        } else {
-          trendTxs.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
-          trendTxs.className = 'trend up';
+        if (trendTxs) {
+          if (pctTxs !== null) {
+            const numPct = parseFloat(pctTxs);
+            const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
+            const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
+            const sign = numPct > 0 ? '+' : '';
+            trendTxs.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctTxs}%`;
+            trendTxs.className = `trend ${cls}`;
+          } else {
+            trendTxs.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
+            trendTxs.className = 'trend up';
+          }
         }
 
         // 总交易额 + 总笔数
         const totalVol = allOrders.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
-        document.getElementById('metricTotalVolume').textContent = totalVol.toFixed(4) + ' BNB';
+        const _mtv = document.getElementById('metricTotalVolume'); if (_mtv) _mtv.textContent = totalVol.toFixed(4) + ' BNB';
         const trendTotal = document.getElementById('trendTotalVolume');
-        trendTotal.textContent = allOrders.length + ' 笔';
-        trendTotal.className = 'trend';
-        trendTotal.style.color = '#64748b';
+        if (trendTotal) {
+          trendTotal.textContent = allOrders.length + ' 笔';
+          trendTotal.className = 'trend';
+          trendTotal.style.color = '#64748b';
+        }
 
         lucide.createIcons();
         initMetricsBackup(); // 备份已填充数据的指标卡片
@@ -4241,8 +4247,14 @@ async function confirmDepositModal() {
     window.addEventListener('DOMContentLoaded', () => {
       initMetricsBackup();
       initLang();
-      reloadMarket();
+      // 立即加载所有数据（不等待），切tab时直接用缓存
       updateMetrics(<%- JSON.stringify(TRANSACTIONS) %>, <%- JSON.stringify(SERVICES) %>);
+      reloadMarket();
+      // 预加载所有tab数据
+      loadSellerData();
+      loadLiveFeed();
+      loadBuyerStats();
+      loadTxsFeed();
       // 先渲染页面，再后台重连钱包
       restoreTab();
       lucide.createIcons();
