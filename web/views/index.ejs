@@ -2657,9 +2657,10 @@
     }
 
     async function loadSellerOrders() {
-      if (!currentAccount) return;
+      const wallet = currentAccount || getActiveWallet();
+      if (!wallet) return;
       try {
-        const res = await fetch(`/api/received-orders?wallet=${currentAccount}`);
+        const res = await fetch(`/api/received-orders?wallet=${wallet}`);
         const data = await res.json();
         if (!data.ok) return;
         const list = document.getElementById('sellerOrdersList');
@@ -2770,9 +2771,10 @@
     }, 10000);
 
     async function loadSellerStats() {
-      if (!currentAccount) return;
+      const wallet = currentAccount || getActiveWallet();
+      if (!wallet) return;
       try {
-        const res = await fetch(`/api/seller-stats?wallet=${currentAccount}`);
+        const res = await fetch(`/api/seller-stats?wallet=${wallet}`);
         const data = await res.json();
         if (!data.ok) return;
         // 总收入 / 总订单
@@ -2843,9 +2845,10 @@
     }
 
     async function loadSellerTx() {
-      if (!currentAccount) return;
+      const wallet = currentAccount || getActiveWallet();
+      if (!wallet) return;
       try {
-        const res = await fetch(`/api/received-orders?wallet=${currentAccount}`);
+        const res = await fetch(`/api/received-orders?wallet=${wallet}`);
         const data = await res.json();
         if (!data.ok) return;
 
@@ -2920,9 +2923,10 @@
 
     // 加载我的服务详情
     async function loadSellerService() {
-      if (!currentAccount) return;
+      const wallet = currentAccount || getActiveWallet();
+      if (!wallet) return;
       try {
-        const res = await fetch(`/api/my-services/${currentAccount}`);
+        const res = await fetch(`/api/my-services/${wallet}`);
         const data = await res.json();
         const el = document.getElementById('sellerServiceContent');
         if (!el) return;
