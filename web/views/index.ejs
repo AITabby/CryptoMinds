@@ -765,6 +765,7 @@
 
     // 加载卖家工作台全部数据
     async function loadSellerData() {
+      console.log('loadSellerData called, currentAccount:', currentAccount);
       await checkMyRegistration();
       loadSellerService();
       loadSellerOrders();
@@ -1254,6 +1255,7 @@
     // 检查当前钱包是否已入驻
     async function checkMyRegistration() {
       const wallet = currentAccount || getActiveWallet();
+      console.log('checkMyRegistration wallet:', wallet, 'currentAccount:', currentAccount);
       if (!wallet) {
         // 没有钱包，显示入驻指南
         document.getElementById('regFormArea').style.display = 'block';
@@ -1261,7 +1263,7 @@
       }
       try {
         // 使用新的 API 获取用户自己的服务
-        const res = await fetch(`/api/my-services/${currentAccount}`);
+        const res = await fetch(`/api/my-services/${wallet}`);
         const mine = await res.json();
         const regPanel = document.getElementById('myRegistrationPanel');
         const formArea = document.getElementById('regFormArea');
@@ -1285,6 +1287,7 @@
         
         // 检查是否有已上架的服务
         const approvedServices = mine.filter(s => s.status === 'approved');
+        console.log('checkMyRegistration mine:', mine.length, 'pending:', pendingServices.length, 'approved:', approvedServices.length);
         
         if (approvedServices.length > 0) {
           formArea.style.display = 'none';
@@ -2509,10 +2512,11 @@
         const data = await res.json();
         if (!data.ok) return;
 
-        document.getElementById('myUnread').textContent = data.unread;
-        document.getElementById('notifBadge').style.display = data.unread > 0 ? 'block' : 'none';
+        const unreadEl = document.getElementById('myUnread'); if (unreadEl) unreadEl.textContent = data.unread;
+        const badgeEl = document.getElementById('notifBadge'); if (badgeEl) badgeEl.style.display = data.unread > 0 ? 'block' : 'none';
 
         const list = document.getElementById('notifList');
+        if (!list) return;
         if (data.notifications.length === 0) {
           list.innerHTML = '<div style="color:#475569;text-align:center;padding:20px;">暂无通知</div>';
           return;
@@ -2928,15 +2932,15 @@
     async function loadSellerService() {
       if (!currentAccount) return;
       try {
-        const res = await fetch(`/api/my-service?wallet=${currentAccount}`);
+        const res = await fetch(`/api/my-services/${currentAccount}`);
         const data = await res.json();
         const el = document.getElementById('sellerServiceContent');
         if (!el) return;
-        if (!data.ok || !data.service) {
+        if (!Array.isArray(data) || data.length === 0) {
           el.innerHTML = '<div style="color:#475569;">暂无服务</div>';
           return;
         }
-        const s = data.service;
+        const s = data[0];
         el.innerHTML = `
           <div style="color:#e2e8f0;font-weight:600;font-size:15px;margin-bottom:8px;">${s.name || '--'}</div>
           <div style="color:#64748b;font-size:12px;margin-bottom:8px;line-height:1.6;">${s.description || '--'}</div>
@@ -3405,7 +3409,8 @@ async function confirmDepositModal() {
         applyMarketFilter();
         // 更新metrics — 用 unique experts 而非 services.length
         const uniqueExperts = [...new Set(services.map(s => s.expert).filter(Boolean))];
-        document.getElementById('metricAgents').textContent = uniqueExperts.length;
+        const metricAgentsEl = document.getElementById('metricAgents');
+        if (metricAgentsEl) metricAgentsEl.textContent = uniqueExperts.length;
         try {
           const txRes = await fetch('/api/transactions');
           const txData = await txRes.json();
