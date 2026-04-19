@@ -388,8 +388,13 @@
 
     <!-- 我的 Agent 面板（默认隐藏，点 tab 显示） -->
     <div class="my-agent" id="myAgent" style="display:none">
+      <!-- 加载中提示 -->
+      <div id="myAgentLoading" style="text-align:center; padding:60px 20px;">
+        <div style="margin-bottom:16px;"><i data-lucide="loader" style="width:48px;height:48px;color:#a78bfa;animation:spin 1s linear infinite;"></i></div>
+        <p style="color:#64748b; font-size:14px;">加载中...</p>
+      </div>
       <!-- 未连接钱包提示 -->
-      <div id="myAgentPrompt" style="text-align:center; padding:60px 20px;">
+      <div id="myAgentPrompt" style="display:none; text-align:center; padding:60px 20px;">
         <div style="margin-bottom:16px;"><i data-lucide="bot" style="width:48px;height:48px;color:#a78bfa;"></i></div>
         <h2 style="color:#a78bfa; margin-bottom:8px;" data-i18n="myAgentTitle">我的 Agent</h2>
         <p style="color:#64748b; font-size:14px;" data-i18n="myAgentDesc2">请先连接钱包</p>
@@ -2080,6 +2085,7 @@
         document.getElementById('connectBtn').classList.add('connected');
 
         // 切换到我的 Agent 面板
+        document.getElementById('myAgentLoading').style.display = 'none';
         document.getElementById('myAgentPrompt').style.display = 'none';
         
         // 检查是否已注册
@@ -3451,7 +3457,8 @@ async function confirmDepositModal() {
       lucide.createIcons();
       document.getElementById('connectBtn').classList.add('connected');
 
-      // 隐藏"请连接钱包"提示
+      // 隐藏加载中/请连接钱包提示
+      document.getElementById('myAgentLoading').style.display = 'none';
       document.getElementById('myAgentPrompt').style.display = 'none';
 
       // 检查是否已注册
@@ -4179,16 +4186,33 @@ async function confirmDepositModal() {
     }
 
     async function autoReconnectWallet() {
-      if (!window.ethereum) return;
+      if (!window.ethereum) {
+        // 没有钱包，隐藏加载中，显示连接提示
+        const loading = document.getElementById('myAgentLoading');
+        if (loading) loading.style.display = 'none';
+        const prompt = document.getElementById('myAgentPrompt');
+        if (prompt) prompt.style.display = 'block';
+        return;
+      }
       try {
         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         if (accounts && accounts.length > 0) {
           currentAccount = accounts[0].toLowerCase();
           walletIsDemo = false;
           await autoLoadWalletData();
+        } else {
+          // 有钱包但没连接，隐藏加载中
+          const loading = document.getElementById('myAgentLoading');
+          if (loading) loading.style.display = 'none';
+          const prompt = document.getElementById('myAgentPrompt');
+          if (prompt) prompt.style.display = 'block';
         }
       } catch (e) {
         console.warn('autoReconnectWallet failed:', e);
+        const loading = document.getElementById('myAgentLoading');
+        if (loading) loading.style.display = 'none';
+        const prompt = document.getElementById('myAgentPrompt');
+        if (prompt) prompt.style.display = 'block';
       }
     }
 
@@ -4204,19 +4228,20 @@ async function confirmDepositModal() {
       });
     };
 
-    window.addEventListener('DOMContentLoaded', async () => {
+    window.addEventListener('DOMContentLoaded', () => {
       initMetricsBackup();
       initLang();
       reloadMarket();
       updateMetrics(<%- JSON.stringify(TRANSACTIONS) %>, <%- JSON.stringify(SERVICES) %>);
-      await autoReconnectWallet();
+      // 先渲染页面，再后台重连钱包
+      restoreTab();
+      lucide.createIcons();
       // Render identicons
       document.querySelectorAll('[data-identicon]').forEach(el => {
         el.innerHTML = identiconSvg(el.dataset.identicon, parseInt(el.style.width) || 30);
       });
-      // 恢复上次tab，否则默认市场
-      restoreTab();
-      lucide.createIcons();
+      // 后台重连钱包，完成后自动更新 myAgent 状态
+      autoReconnectWallet();
     });
 
     // ===== Web Push =====
