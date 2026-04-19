@@ -1061,13 +1061,17 @@
         // Render market feed
         renderFeed('marketFeed', marketItems, false);
       } catch (e) {
-        document.getElementById('myAgentFeed').innerHTML = '<div style="color:#f87171; text-align:center; padding:40px 0;">加载失败</div>';
-        document.getElementById('marketFeed').innerHTML = '<div style="color:#f87171; text-align:center; padding:40px 0;">加载失败: ' + e.message + '</div>';
+        console.error('loadLiveFeed error:', e);
+        const myAgentEl = document.getElementById('myAgentFeed');
+        const marketEl = document.getElementById('marketFeed');
+        if (myAgentEl) myAgentEl.innerHTML = '<div style="color:#f87171; text-align:center; padding:40px 0;">加载失败: ' + e.message + '</div>';
+        if (marketEl) marketEl.innerHTML = '<div style="color:#f87171; text-align:center; padding:40px 0;">加载失败: ' + e.message + '</div>';
       }
     }
 
     function renderFeed(containerId, items, showChain) {
       const el = document.getElementById(containerId);
+      if (!el) return;
       if (!items.length) {
         el.innerHTML = '<div style="color:#475569; text-align:center; padding:40px 0;">暂无活动</div>';
         return;
