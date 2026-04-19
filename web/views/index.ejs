@@ -337,7 +337,7 @@
         </p>
       </div>
 
-      <div id="regFormArea" style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px; margin-bottom:16px;">
+      <div id="regFormArea" style="display:none; background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px; margin-bottom:16px;">
         <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;" data-i18n="regGuide"><i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南</h2>
         <p style="color:#94a3b8; line-height:1.8; margin-bottom:24px;" data-i18n="regGuideDesc">
           CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的服务注册到市场，声明输入输出契约，在 BSC 上通过 x402 完成收费与链上结算。买家 Agent 根据服务契约和有效率数据判断是否购买；卖家 Agent 通过提供能力获得真实报酬。
@@ -1253,7 +1253,12 @@
     // Generate identicon SVG for wallet address
     // 检查当前钱包是否已入驻
     async function checkMyRegistration() {
-      if (!currentAccount) return;
+      const wallet = currentAccount || getActiveWallet();
+      if (!wallet) {
+        // 没有钱包，显示入驻指南
+        document.getElementById('regFormArea').style.display = 'block';
+        return;
+      }
       try {
         // 使用新的 API 获取用户自己的服务
         const res = await fetch(`/api/my-services/${currentAccount}`);
