@@ -821,12 +821,16 @@ function broadcastSSE(data) {
 let balanceCache = { data: {}, fetchedAt: 0 };
 
 async function fetchBalancesLive() {
-  const result = {};
-  for (const [key, agent] of Object.entries(AGENTS)) {
-    const bal = await w3.eth.getBalance(agent.addr);
-    result[key] = w3.utils.fromWei(bal.toString(), 'ether');
-  }
-  return result;
+  const entries = Object.entries(AGENTS);
+  const results = await Promise.all(entries.map(async ([key, agent]) => {
+    try {
+      const bal = await w3.eth.getBalance(agent.addr);
+      return [key, w3.utils.fromWei(bal.toString(), 'ether')];
+    } catch(e) {
+      return [key, '0'];
+    }
+  }));
+  return Object.fromEntries(results);
 }
 
 async function getBalancesCached(forceRefresh = false) {
@@ -867,7 +871,9 @@ app.get('/', async (req, res) => {
 });
 
 app.get('/api/balances', async (req, res) => {
-  const balances = await getBalancesCached(true);
+  const balances = await getBalancesCached(false);
+  // 后台异步刷新
+  getBalancesCached(true);
   const result = {};
   for (const [key, agent] of Object.entries(AGENTS)) {
     result[key] = {
@@ -885,7 +891,9 @@ app.get('/api/transactions', (req, res) => {
 
 app.get('/api/market', async (req, res) => {
   const services = getServices().filter(s => s.active && s.status === 'approved');
-  const bnbPrice = await fetchBnbPrice();
+  // BNB 价格用缓存，不阻塞响应
+  const bnbPrice = bnbPriceUsd || 600;
+  fetchBnbPrice(); // 后台刷新
   // 按有效率+调用量排序
   const sorted = services.map(s => {
     // 兼容旧数据：sales 映射到 totalCalls
