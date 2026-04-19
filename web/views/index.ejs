@@ -4185,7 +4185,7 @@ async function confirmDepositModal() {
         if (accounts && accounts.length > 0) {
           currentAccount = accounts[0].toLowerCase();
           walletIsDemo = false;
-          autoLoadWalletData();
+          await autoLoadWalletData();
         }
       } catch (e) {
         console.warn('autoReconnectWallet failed:', e);
@@ -4209,7 +4209,7 @@ async function confirmDepositModal() {
       initLang();
       reloadMarket();
       updateMetrics(<%- JSON.stringify(TRANSACTIONS) %>, <%- JSON.stringify(SERVICES) %>);
-      autoReconnectWallet();
+      await autoReconnectWallet();
       // Render identicons
       document.querySelectorAll('[data-identicon]').forEach(el => {
         el.innerHTML = identiconSvg(el.dataset.identicon, parseInt(el.style.width) || 30);
