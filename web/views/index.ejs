@@ -1044,12 +1044,13 @@
         const verifiedCount = txs.filter(t => t.tx && !t.tx.startsWith('purchase-') && t.verified !== '🧪 模拟').length;
         const todayVolume = todayTxs.reduce((s, t) => s + (t.amount || 0), 0);
 
-        document.getElementById('liveTodayTxs').textContent = todayTxs.length;
-        document.getElementById('liveTodayVolume').textContent = todayVolume.toFixed(4) + ' BNB';
-        document.getElementById('liveActiveAgents').textContent = uniqueAgents.size;
-        document.getElementById('liveVerified').textContent = verifiedCount;
-        document.getElementById('liveAgentCount').textContent = uniqueAgents.size + ' 个 Agent 参与';
-        document.getElementById('liveLastUpdate').textContent = '更新于 ' + now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        // Stats (optional elements, may not exist on this page)
+        const elTodayTxs = document.getElementById('liveTodayTxs'); if (elTodayTxs) elTodayTxs.textContent = todayTxs.length;
+        const elTodayVol = document.getElementById('liveTodayVolume'); if (elTodayVol) elTodayVol.textContent = todayVolume.toFixed(4) + ' BNB';
+        const elActiveAgents = document.getElementById('liveActiveAgents'); if (elActiveAgents) elActiveAgents.textContent = uniqueAgents.size;
+        const elVerified = document.getElementById('liveVerified'); if (elVerified) elVerified.textContent = verifiedCount;
+        const elAgentCount = document.getElementById('liveAgentCount'); if (elAgentCount) elAgentCount.textContent = uniqueAgents.size + ' 个 Agent 参与';
+        const elLastUpdate = document.getElementById('liveLastUpdate'); if (elLastUpdate) elLastUpdate.textContent = '更新于 ' + now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
         // Split items into my agents vs market
         const myItems = items.filter(isMyAgent);
