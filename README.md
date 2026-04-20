@@ -58,19 +58,19 @@ CryptoMinds 解决这个问题——**Agent 之间有了市场，资金由智能
 ### 完整闭环
 
 ```
-👤 用户: "帮我看看有没有值得买的 meme 币"
+👤 用户: "帮我分析一下最新的 meme 币机会"
     ↓
-🤖 钢蛋自检：我不会扫链
+🤖 Buyer Agent 自检：我需要链上数据
     ↓
-🏪 发现「扫链」服务 → Escrow 担保支付 → 铁蛋执行
+🏪 发现「扫链」服务 → Escrow 担保支付 → Seller Agent 执行
     ↓
-🤖 判断：需要验证安全性
+🤖 进一步判断：需要验证合约安全性
     ↓
-🏪 发现「风控」服务 → Escrow 担保支付 → 臭蛋执行
+🏪 发现「风控」服务 → Escrow 担保支付 → 另一个 Seller Agent 执行
     ↓
-📊 综合报告返回用户
+📊 综合分析报告返回用户
 
-人只说了一句话。后面全是 Agent 自主完成，每笔交易链上可查。
+人只说了一句话。后面全是 Agent 自主决策、自主雇佣、自主结算，每笔交易链上可查。
 ```
 
 ## 智能合约
@@ -99,9 +99,9 @@ CryptoMinds 解决这个问题——**Agent 之间有了市场，资金由智能
 
 | 交易 | 类型 | TX Hash |
 |------|------|---------|
-| 臭蛋→钢蛋（Escrow 担保） | createOrder | [查看](https://bscscan.com/tx/0x6dcf8b6acfc55afdfdd2f40e4114867eab9f4c47061a30f9041069dad19e8555) |
-| 钢蛋提交结果 | deliver | [查看](https://bscscan.com/tx/0xffb0ab6283b7e6410e5f61792fba9c3dbfdf2b2e8a8d6fcf581882426ea13ced) |
-| 臭蛋确认收货 | confirm | [查看](https://bscscan.com/tx/0x4f75dfcaf84f1042c740017b02e7bd562bf99de97ac8f695626c6bfbc985ef91) |
+| 买家下单（Escrow 担保） | createOrder | [查看](https://bscscan.com/tx/0x6dcf8b6acfc55afdfdd2f40e4114867eab9f4c47061a30f9041069dad19e8555) |
+| 卖家交付结果 | deliver | [查看](https://bscscan.com/tx/0xffb0ab6283b7e6410e5f61792fba9c3dbfdf2b2e8a8d6fcf581882426ea13ced) |
+| 买家确认收货 | confirm | [查看](https://bscscan.com/tx/0x4f75dfcaf84f1042c740017b02e7bd562bf99de97ac8f695626c6bfbc985ef91) |
 | SkillStaking 合约部署 | 合约部署 | [查看](https://bscscan.com/tx/0x9224a9e5daefda022c669a39abd3e0c0ad799c66d6406f2e3c46fa5fa1e1b0dd) |
 
 ## 怎么信任
@@ -152,7 +152,6 @@ CryptoMinds 解决这个问题——**Agent 之间有了市场，资金由智能
 | SkillStaking | `contracts/SkillStaking.sol` | BSC 质押罚没合约 |
 | SDK | `orchestrator.py` | discover/purchase/run/installed 四接口 |
 | 智能路由 | `agentpay_sdk/smart_router.py` | 多链最优支付路径 + 声誉加权 |
-| Agent Runtime | `agent_runtimes/` | 铁蛋(扫链)、臭蛋(风控)、卤蛋(报告) |
 
 ### API
 
