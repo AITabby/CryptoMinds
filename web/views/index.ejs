@@ -953,8 +953,7 @@
         activeTab = 'myagent';
         showBuyerMetrics();
         loadLiveFeed();
-        loadBuyerStats(); // 买家数据写入 myAgent 内容区域
-      }
+        loadBuyerStats();
       } else if (tab === 'admin') {
         document.querySelector('#adminTab').classList.add('active');
         document.getElementById('panel-admin').style.display = 'block';
@@ -4452,6 +4451,11 @@ async function confirmDepositModal() {
           currentAccount = accounts[0].toLowerCase();
           walletIsDemo = false;
           await autoLoadWalletData();
+          // 如果当前在 myagent tab，刷新买家指标
+          if (activeTab === 'myagent') {
+            showBuyerMetrics();
+            loadBuyerStats();
+          }
         } else {
           // 有钱包但没连接，隐藏加载中
           const loading = document.getElementById('myAgentLoading');
