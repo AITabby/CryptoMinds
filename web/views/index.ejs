@@ -790,6 +790,7 @@
         // 余额
         const balRes = await fetch(`/api/balance?wallet=${currentAccount}`);
         const balData = await balRes.json();
+        if (activeTab !== 'myagent') return; // tab 已切走，不写
         const balEl = document.getElementById('buyerBalance');
         if (balEl && balData.ok) balEl.textContent = parseFloat(balData.balance).toFixed(4) + ' BNB';
 
@@ -848,6 +849,8 @@
 
 
 
+    let activeTab = 'market'; // 追踪当前 tab，防止异步回调改错指标
+
     function showTab(tab) {
       document.querySelectorAll('.nav span').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('[id^="panel-"]').forEach(p => { p.style.display = 'none'; });
@@ -862,6 +865,7 @@
         document.getElementById('panel-market').style.display = 'flex';
         document.getElementById('txPanel').style.display = 'flex';
         if (metricsDiv) metricsDiv.style.display = 'grid';
+        activeTab = 'market';
         showMarketMetrics();
         loadTxsFeed();
         startTxsStream();
@@ -870,6 +874,7 @@
         document.getElementById('panel-register').style.display = 'block';
         document.querySelector('.main').style.display = 'none';
         if (metricsDiv) metricsDiv.style.display = 'grid';
+        activeTab = 'register';
         showSellerMetrics();
         loadSellerData();
       } else if (tab === 'myagent') {
@@ -877,6 +882,7 @@
         document.getElementById('myAgent').style.display = 'block';
         document.querySelector('.main').style.display = 'none';
         if (metricsDiv) metricsDiv.style.display = 'grid';
+        activeTab = 'myagent';
         showBuyerMetrics();
         loadLiveFeed();
         loadBuyerStats();
@@ -2123,7 +2129,10 @@
           const res = await fetch('/api/balances');
           const data = await res.json();
           const agent = Object.values(data).find(a => a.addr.toLowerCase() === currentAccount);
-          document.getElementById('buyerBalance').textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
+          if (activeTab === 'myagent') {
+            const balEl2 = document.getElementById('buyerBalance');
+            if (balEl2) balEl2.textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
+          }
 
           // 加载通知
           loadNotifications();
@@ -2135,7 +2144,7 @@
             document.getElementById('adminTab').style.display = 'inline';
           }
         } catch(e) {
-          document.getElementById('buyerBalance').textContent = '加载失败';
+          if (activeTab === 'myagent') document.getElementById('buyerBalance').textContent = '加载失败';
         }
 
         // 从 purchases.json 和 tx-log 合并消费记录
@@ -2795,6 +2804,7 @@
         const res = await fetch(`/api/seller-stats?wallet=${wallet}`);
         const data = await res.json();
         if (!data.ok) return;
+        if (activeTab !== 'register') return; // tab 已切走，不写
         // 总收入 / 总订单
         const totalIncomeEl = document.getElementById('sellerTotalIncome');
         const totalOrdersEl = document.getElementById('sellerTotalOrders');
@@ -3448,10 +3458,10 @@ async function confirmDepositModal() {
           document.getElementById('myAgentRegister').style.display = 'none';
           document.getElementById('myAgentContent').style.display = 'block';
           document.getElementById('myAddr').textContent = currentAccount;
-          document.getElementById('buyerBalance').textContent = '0.0000 BNB';
-          document.getElementById('buyerTotalSpent').textContent = '0 BNB';
-          document.getElementById('buyerOrders').textContent = '0';
-          document.getElementById('buyerServices').textContent = '0';
+          if (document.getElementById('buyerBalance')) document.getElementById('buyerBalance').textContent = '0.0000 BNB';
+          if (document.getElementById('buyerTotalSpent')) document.getElementById('buyerTotalSpent').textContent = '0 BNB';
+          if (document.getElementById('buyerOrders')) document.getElementById('buyerOrders').textContent = '0';
+          if (document.getElementById('buyerServices')) document.getElementById('buyerServices').textContent = '0';
           showTab('myagent');
         } else {
           showError(data.error || '注册失败');
@@ -3501,7 +3511,10 @@ async function confirmDepositModal() {
         const res = await fetch('/api/balances');
         const data = await res.json();
         const agent = Object.values(data).find(a => a.addr.toLowerCase() === wallet);
-        document.getElementById('buyerBalance').textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
+        if (activeTab === 'myagent') {
+          const balEl = document.getElementById('buyerBalance');
+          if (balEl) balEl.textContent = agent ? parseFloat(agent.balance).toFixed(4) + ' BNB' : '0.0000 BNB';
+        }
       } catch(e) {}
 
       // 加载通知
@@ -3697,6 +3710,8 @@ async function confirmDepositModal() {
       // --- 从真实购买订单计算 ---
       fetch('/api/purchases').then(r => r.json()).then(purchases => {
         const allOrders = purchases.filter(p => p.status === 'completed' || p.status === 'delivered' || p.status === 'demo-completed');
+
+        if (activeTab !== 'market') return; // tab 已切走，不写市场指标
 
         // 24h 订单
         const recent24h = allOrders.filter(p => {
