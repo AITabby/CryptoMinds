@@ -749,6 +749,8 @@
         trend.style.color = '';
       }
       lucide.createIcons();
+      // 如果已有缓存的市场指标，立即应用（避免从其他tab切回来时显示初始值）
+      applyMarketMetrics();
     }
 
     // 买家指标（我的Agent页）
@@ -790,7 +792,6 @@
         // 余额
         const balRes = await fetch(`/api/balance?wallet=${currentAccount}`);
         const balData = await balRes.json();
-        if (activeTab !== 'myagent') return; // tab 已切走，不写
         const balEl = document.getElementById('buyerBalance');
         if (balEl && balData.ok) balEl.textContent = parseFloat(balData.balance).toFixed(4) + ' BNB';
 
@@ -815,9 +816,14 @@
     }
 
     // 渲染买家消费记录表
+    let _lastRenderedTxHash = '';
     function renderBuyerTxTable(orders) {
       const tbody = document.getElementById('myTxBody');
       if (!tbody) return;
+      // 数据没变就跳过渲染，避免闪跳
+      const hash = orders.map(o => o.id || o.txHash || o.time).join(',');
+      if (hash === _lastRenderedTxHash) return;
+      _lastRenderedTxHash = hash;
       tbody.innerHTML = '';
       const noTx = document.getElementById('noMyTxs');
       if (orders.length === 0) {
@@ -2147,79 +2153,11 @@
           if (activeTab === 'myagent') document.getElementById('buyerBalance').textContent = '加载失败';
         }
 
-        // 从 purchases.json 和 tx-log 合并消费记录
-        try {
-          const svcRes = await fetch('/api/services');
-          const allServices = await svcRes.json();
-          const myNames = allServices
-            .filter(s => s.wallet && s.wallet.toLowerCase() === currentAccount.toLowerCase())
-            .map(s => s.expert);
-          const myName = myNames[0] || '';
-
-          // 也从 agents.json 查注册名
-          const agentsRes = await fetch('/api/agents').catch(() => null);
-          const allAgents = agentsRes ? await agentsRes.json() : [];
-          const agentNames = allAgents
-            .filter(a => a.wallet && a.wallet.toLowerCase() === currentAccount.toLowerCase())
-            .map(a => a.name);
-
-          const txsRes = await fetch('/api/txs');
-          const allTxs = await txsRes.json();
-
-          const addrLower = currentAccount.toLowerCase();
-          const matchNames = new Set([myName, ...agentNames].filter(Boolean));
-          const myTxs = allTxs.filter(tx => {
-            const from = (tx.from || '');
-            const fromLower = from.toLowerCase();
-            // 匹配钱包地址
-            if (fromLower === addrLower || (tx.fromWallet || '').toLowerCase() === addrLower) return true;
-            // 匹配任意已知名字（agent名、注册名等）
-            if (matchNames.has(from)) return true;
-            return false;
-          });
-
-          const bnbTxs = myTxs.filter(tx => (tx.currency || 'BNB') === 'BNB');
-          const usdcTxs = myTxs.filter(tx => (tx.currency || 'BNB') === 'USDC');
-          // 更新顶部买家指标
-          const buyerTotalSpentEl = document.getElementById('buyerTotalSpent');
-          if (buyerTotalSpentEl) buyerTotalSpentEl.textContent = bnbTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
-          const buyerOrdersEl = document.getElementById('buyerOrders');
-          if (buyerOrdersEl) buyerOrdersEl.textContent = myTxs.length;
-          const buyerServicesEl = document.getElementById('buyerServices');
-          if (buyerServicesEl) buyerServicesEl.textContent = new Set(myTxs.map(t => t.reason)).size;
-
-          const tbody = document.getElementById('myTxBody');
-          tbody.innerHTML = '';
-          if (myTxs.length === 0) {
-            document.getElementById('noMyTxs').style.display = 'block';
-          } else {
-            document.getElementById('noMyTxs').style.display = 'none';
-            myTxs.forEach((tx, idx) => {
-              const chainLink = tx.tx && /^0x[a-fA-F0-9]{64}$/.test(tx.tx)
-                ? `<a href="https://bscscan.com/tx/${tx.tx}" target="_blank" style="color:#8b5cf6"><i data-lucide="external-link" class="icon-inline"></i></a>`
-                : `<span style="color:#475569">${tx.tx || '--'}</span>`;
-              const receiptId = tx.receipt || tx.tx || '';
-              const txHash = (tx.tx && /^0x[a-fA-F0-9]{64}$/.test(tx.tx)) ? tx.tx : '';
-              window['_myTxs'] = window['_myTxs'] || {};
-              window['_myTxs'][idx] = { id: receiptId, serviceName: tx.reason, expert: tx.to, price: tx.amount, priceCurrency: 'BNB', time: tx.timestamp || null, buyerWallet: currentAccount, expertWallet: '', txHash };
-              tbody.innerHTML += `<tr>
-                <td class="time">${tx.time || '--'}</td>
-                <td class="flow">${tx.to || '--'}</td>
-                <td class="amount">${tx.amount || 0} BNB</td>
-                <td class="reason">${tx.route_type ? tx.route_type + '/' + (tx.chain||'BSC') + '/' + (tx.symbol||'BNB') : 'BNB/BSC/BNB'}</td>
-                <td><a href="javascript:void(0)" onclick="showReceipt(window._myTxs[${idx}])" style="color:#a78bfa;cursor:pointer;" title="查看凭证"><i data-lucide="receipt-text" class="icon-inline"></i></a></td>
-                <td>${chainLink}</td>
-              </tr>`;
-            });
-            lucide.createIcons();
-          }
+        // 消费记录由 loadBuyerStats 统一渲染（showTab('myagent') 会调用）
         // 自动切到我的 Agent
         showTab('myagent');
-      } catch (e) {
-        console.error(e);
-      }
     } catch (e) {
-        console.error('connectWallet outer error:', e);
+        console.error('connectWallet error:', e);
         if (e.code === 4001) {
           showError('已取消连接，请在 MetaMask 中点击"连接"');
         } else if (e.code === -32002) {
@@ -3517,6 +3455,9 @@ async function confirmDepositModal() {
         }
       } catch(e) {}
 
+      // 钱包连上了，刷新买家统计数据（订单、消费、已购服务）
+      loadBuyerStats();
+
       // 加载通知
       loadNotifications();
       setInterval(loadNotifications, 10000); // 10秒轮询
@@ -3551,36 +3492,13 @@ async function confirmDepositModal() {
 
         const bnbTxs2 = myTxs.filter(tx => (tx.currency || 'BNB') === 'BNB');
         const usdcTxs2 = myTxs.filter(tx => (tx.currency || 'BNB') === 'USDC');
-        // 更新顶部买家指标
+        // 更新顶部买家指标（详细消费记录由 loadBuyerStats 统一渲染）
         const buyerTotalSpent2 = document.getElementById('buyerTotalSpent');
         if (buyerTotalSpent2) buyerTotalSpent2.textContent = bnbTxs2.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
         const buyerOrders2 = document.getElementById('buyerOrders');
         if (buyerOrders2) buyerOrders2.textContent = myTxs.length;
         const buyerServices2 = document.getElementById('buyerServices');
         if (buyerServices2) buyerServices2.textContent = new Set(myTxs.map(t => t.reason)).size;
-
-        const tbody = document.getElementById('myTxBody');
-        tbody.innerHTML = '';
-        document.getElementById('noMyTxs').style.display = myTxs.length === 0 ? 'block' : 'none';
-
-        myTxs.forEach((tx, idx) => {
-          const chainLink = tx.tx && /^0x[a-fA-F0-9]{64}$/.test(tx.tx)
-            ? `<a href="https://bscscan.com/tx/${tx.tx}" target="_blank" style="color:#8b5cf6"><i data-lucide="external-link" class="icon-inline"></i></a>`
-            : `<span style="color:#475569">${tx.tx || '--'}</span>`;
-          const receiptId = tx.receipt || tx.tx || '';
-          const txHash = (tx.tx && /^0x[a-fA-F0-9]{64}$/.test(tx.tx)) ? tx.tx : '';
-          window['_myTxs2'] = window['_myTxs2'] || {};
-          window['_myTxs2'][idx] = { id: receiptId, serviceName: tx.reason, expert: tx.to, price: tx.amount, priceCurrency: 'BNB', time: tx.timestamp || null, buyerWallet: wallet, expertWallet: '', txHash };
-          tbody.innerHTML += `<tr>
-            <td class="time">${tx.time || '--'}</td>
-            <td class="flow">${tx.to || '--'}</td>
-            <td class="amount">${tx.amount || 0} BNB</td>
-            <td class="reason">${tx.route_type ? tx.route_type + '/' + (tx.chain||'BSC') + '/' + (tx.symbol||'BNB') : 'BNB/BSC/BNB'}</td>
-            <td><a href="javascript:void(0)" onclick="showReceipt(window._myTxs2[${idx}])" style="color:#a78bfa;cursor:pointer;" title="查看凭证"><i data-lucide="receipt-text" class="icon-inline"></i></a></td>
-            <td>${chainLink}</td>
-          </tr>`;
-        });
-        lucide.createIcons();
       } catch(e) { console.error(e); }
     }
 
@@ -3683,6 +3601,9 @@ async function confirmDepositModal() {
     // 初始化metrics
       lucide.createIcons();
 
+    // 缓存市场指标数据，切tab时可立即恢复
+    let cachedMarketMetrics = null;
+
     function updateMetrics(transactions, services) {
       const now = Date.now();
       const h24 = 24 * 60 * 60 * 1000;
@@ -3711,8 +3632,6 @@ async function confirmDepositModal() {
       fetch('/api/purchases').then(r => r.json()).then(purchases => {
         const allOrders = purchases.filter(p => p.status === 'completed' || p.status === 'delivered' || p.status === 'demo-completed');
 
-        if (activeTab !== 'market') return; // tab 已切走，不写市场指标
-
         // 24h 订单
         const recent24h = allOrders.filter(p => {
           const t = new Date(p.time).getTime();
@@ -3726,67 +3645,91 @@ async function confirmDepositModal() {
 
         // 24h 交易额
         const vol24h = recent24h.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
-        const _mv = document.getElementById('metricVolume'); if (_mv) _mv.textContent = vol24h > 0 ? vol24h.toFixed(4) + ' BNB' : '0 BNB';
-
-        // 涨幅：24h vs 前24h
         const volPrev24h = prev24h.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
-        const trendVol = document.getElementById('trendVolume');
-        let pctVol;
-        if (volPrev24h > 0) {
-          pctVol = ((vol24h - volPrev24h) / volPrev24h * 100).toFixed(1);
-        } else {
-          pctVol = vol24h > 0 ? null : '0'; // null 表示新币式 N/A
-        }
-        if (trendVol) {
-          if (pctVol !== null) {
-            const numPct = parseFloat(pctVol);
-            const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
-            const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
-            const sign = numPct > 0 ? '+' : '';
-            trendVol.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctVol}%`;
-            trendVol.className = `trend ${cls}`;
-          } else {
-            trendVol.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
-            trendVol.className = 'trend up';
-          }
-        }
-
-        // 24h 交易笔数
-        const _mt = document.getElementById('metricTxs'); if (_mt) _mt.textContent = recent24h.length > 0 ? recent24h.length + ' 笔' : '0 笔';
-        const trendTxs = document.getElementById('trendTxs');
-        let pctTxs;
-        if (prev24h.length > 0) {
-          pctTxs = ((recent24h.length - prev24h.length) / prev24h.length * 100).toFixed(1);
-        } else {
-          pctTxs = recent24h.length > 0 ? null : '0';
-        }
-        if (trendTxs) {
-          if (pctTxs !== null) {
-            const numPct = parseFloat(pctTxs);
-            const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
-            const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
-            const sign = numPct > 0 ? '+' : '';
-            trendTxs.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctTxs}%`;
-            trendTxs.className = `trend ${cls}`;
-          } else {
-            trendTxs.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
-            trendTxs.className = 'trend up';
-          }
-        }
-
-        // 总交易额 + 总笔数
         const totalVol = allOrders.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
-        const _mtv = document.getElementById('metricTotalVolume'); if (_mtv) _mtv.textContent = totalVol.toFixed(4) + ' BNB';
-        const trendTotal = document.getElementById('trendTotalVolume');
-        if (trendTotal) {
-          trendTotal.textContent = allOrders.length + ' 笔';
-          trendTotal.className = 'trend';
-          trendTotal.style.color = '#64748b';
-        }
 
-        lucide.createIcons();
-        initMetricsBackup(); // 备份已填充数据的指标卡片
+        // 缓存所有计算结果
+        cachedMarketMetrics = { totalAgents, todayNew, vol24h, volPrev24h, recent24h: recent24h.length, prev24h: prev24h.length, totalVol, totalOrders: allOrders.length };
+
+        // 只在市场 tab 写 DOM
+        if (activeTab !== 'market') return;
+        applyMarketMetrics();
       }).catch(() => {});
+    }
+
+    // 将缓存的市场指标应用到 DOM
+    function applyMarketMetrics() {
+      if (!cachedMarketMetrics) return;
+      const m = cachedMarketMetrics;
+
+      const metricAgentsEl = document.getElementById('metricAgents');
+      if (metricAgentsEl) metricAgentsEl.textContent = m.totalAgents;
+      const trendEl = document.getElementById('trendAgents');
+      if (trendEl) {
+        if (m.todayNew > 0) {
+          trendEl.innerHTML = `<i data-lucide="trending-up" class="icon-inline"></i> 今日 +${m.todayNew}`;
+          trendEl.className = 'trend up';
+        } else {
+          trendEl.textContent = '稳定运行中';
+          trendEl.className = 'trend';
+          trendEl.style.color = '#64748b';
+        }
+      }
+
+      const _mv = document.getElementById('metricVolume'); if (_mv) _mv.textContent = m.vol24h > 0 ? m.vol24h.toFixed(4) + ' BNB' : '0 BNB';
+      const trendVol = document.getElementById('trendVolume');
+      let pctVol;
+      if (m.volPrev24h > 0) {
+        pctVol = ((m.vol24h - m.volPrev24h) / m.volPrev24h * 100).toFixed(1);
+      } else {
+        pctVol = m.vol24h > 0 ? null : '0';
+      }
+      if (trendVol) {
+        if (pctVol !== null) {
+          const numPct = parseFloat(pctVol);
+          const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
+          const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
+          const sign = numPct > 0 ? '+' : '';
+          trendVol.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctVol}%`;
+          trendVol.className = `trend ${cls}`;
+        } else {
+          trendVol.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
+          trendVol.className = 'trend up';
+        }
+      }
+
+      const _mt = document.getElementById('metricTxs'); if (_mt) _mt.textContent = m.recent24h > 0 ? m.recent24h + ' 笔' : '0 笔';
+      const trendTxs = document.getElementById('trendTxs');
+      let pctTxs;
+      if (m.prev24h > 0) {
+        pctTxs = ((m.recent24h - m.prev24h) / m.prev24h * 100).toFixed(1);
+      } else {
+        pctTxs = m.recent24h > 0 ? null : '0';
+      }
+      if (trendTxs) {
+        if (pctTxs !== null) {
+          const numPct = parseFloat(pctTxs);
+          const arrow = numPct > 0 ? 'trending-up' : numPct < 0 ? 'trending-down' : 'minus';
+          const cls = numPct > 0 ? 'up' : numPct < 0 ? 'down' : '';
+          const sign = numPct > 0 ? '+' : '';
+          trendTxs.innerHTML = `<i data-lucide="${arrow}" class="icon-inline"></i> ${sign}${pctTxs}%`;
+          trendTxs.className = `trend ${cls}`;
+        } else {
+          trendTxs.innerHTML = '<i data-lucide="trending-up" class="icon-inline"></i> NEW';
+          trendTxs.className = 'trend up';
+        }
+      }
+
+      const _mtv = document.getElementById('metricTotalVolume'); if (_mtv) _mtv.textContent = m.totalVol.toFixed(4) + ' BNB';
+      const trendTotal = document.getElementById('trendTotalVolume');
+      if (trendTotal) {
+        trendTotal.textContent = m.totalOrders + ' 笔';
+        trendTotal.className = 'trend';
+        trendTotal.style.color = '#64748b';
+      }
+
+      lucide.createIcons();
+      initMetricsBackup();
     }
 
     // ========== 国际化 i18n ==========
