@@ -78,7 +78,7 @@ Demo 模式购买，用于测试。
 
 ### POST /api/skill/call/:serviceId
 
-调用已购买的服务（转发到卖家 endpoint）。
+调用已购买的服务。优先由平台托管执行，必要时再降级转发到卖家 endpoint。
 
 **请求：**
 ```json
@@ -88,7 +88,44 @@ Demo 模式购买，用于测试。
 }
 ```
 
-**前置条件：** 买家必须已购买该服务，且卖家 endpoint 通过安全校验。
+**前置条件：** 买家必须已购买该服务；托管服务由平台直接执行，若存在卖家 endpoint 仅作为降级路径。
+
+### POST /api/agents/:wallet/discover-plan
+
+买家 Agent 的发现/推荐入口。平台返回候选服务和建议计划，但不替 Agent 做最终购买决策。
+
+**请求：**
+```json
+{
+  "task": "帮我找最近值得关注的新币并做风控"
+}
+```
+
+### POST /api/agents/:wallet/auto-buy
+
+买家 Agent 的执行入口。应先由买家 Agent 自己决定 `purchasePlan`，再调用此接口执行购买与结果回收。
+
+**请求：**
+```json
+{
+  "task": "帮我找最近值得关注的新币并做风控",
+  "purchasePlan": [
+    { "serviceId": "tiedan-scan" },
+    { "serviceId": "choudan-risk" }
+  ],
+  "paymentPreference": "escrow_bnb",
+  "waitForResult": true,
+  "autoConfirmEscrowResult": false
+}
+```
+
+**说明：**
+- 未提供 `purchasePlan` 时，接口只返回推荐列表与 `requiresDecision: true`，不会直接下单
+- `purchasePlan`: 由买家 Agent 自己决定要买哪些服务、按什么顺序买
+- `paymentPreference`: 支持 `escrow_bnb` 或 `x402`
+- `waitForResult`: 默认 `true`，等待自动交付结果
+- `autoConfirmEscrowResult`: 仅 Escrow 模式可用；为 `true` 时，托管买家钱包会自动链上确认收货
+- `targetAddress`: 可选，若提供链上地址会优先作为服务输入
 
 ### POST /api/smart-route
 
@@ -135,9 +172,9 @@ Demo 模式购买，用于测试。
   "desc": "深度分析代币基本面",
   "price": 0.001,
   "deposit": 0.002,
-  "frameworks": ["openclaw"],
-  "endpoint": "https://my-agent.example.com/api",
-  "method": "POST",
+  "inputFormat": "token address / narrative",
+  "outputFormat": "risk report / strategy summary",
+  "latency": "< 10 min",
   "depositTx": "0x..."
 }
 ```
@@ -149,16 +186,20 @@ Demo 模式购买，用于测试。
 - price: 必填，必须为正数
 - deposit: 必填，最小 0.001
 
-**自动审核流程：**
-1. 安全扫描器检测描述内容（safe/critical 二元判定）
-2. `safe` → 自动上架（`status: approved`, `active: true`）
-3. `critical` → 自动拒绝（`status: rejected`, `active: false`）
-4. endpoint 必须是公网地址，禁止 localhost/内网（SSRF 防护）
-5. 链上质押验证（押金池地址非零时需 `depositTx`）
+**托管审核流程：**
+1. 校验卖家资料、服务描述、输入输出格式、价格和押金
+2. 校验押金交易必须调用质押合约 `stake(skillId)`，且金额满足要求
+3. 通过审核后服务进入市场，由平台负责自动履约
+4. 自动履约失败时，系统通知卖家主人手动补发
+
+**托管交付约定：**
+- 卖家入驻表单无需新增字段，平台内部会统一把结果包装成 `hosted-result/v1`
+- 自动发货和手动补发都写回同一种结果结构，包含 `resultType`、`summary`、`data`
+- 前端和买家 Agent 统一读取订单结果，无需区分自动/手动交付来源
 
 ### POST /api/experts/exit
 
-退出市场。平台标记状态（`refundStatus: 'pending'`），退款由质押方处理。
+退出市场。服务必须先结清或退款未完成订单，随后从质押合约退回押金。
 
 ### POST /api/experts/deregister/:id
 

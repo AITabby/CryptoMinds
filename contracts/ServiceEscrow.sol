@@ -38,7 +38,8 @@ contract ServiceEscrow {
         uint256 amount;         // 担保金额 (wei)
         uint256 createdAt;      // 创建时间
         uint256 deliveredAt;    // 卖家提交时间
-        uint256 timeoutAt;      // 超时时间
+        uint256 timeoutAt;      // 确认截止时间（卖家交付后才开始计时）
+        uint256 timeoutSeconds; // 确认窗口时长（秒）
         OrderStatus status;     // 当前状态
         string deliverResult;   // 卖家提交的结果（哈希或简述）
     }
@@ -116,7 +117,8 @@ contract ServiceEscrow {
             amount: msg.value,
             createdAt: block.timestamp,
             deliveredAt: 0,
-            timeoutAt: block.timestamp + timeout,
+            timeoutAt: 0,
+            timeoutSeconds: timeout,
             status: OrderStatus.Pending,
             deliverResult: ""
         });
@@ -139,6 +141,7 @@ contract ServiceEscrow {
         
         order.status = OrderStatus.Delivered;
         order.deliveredAt = block.timestamp;
+        order.timeoutAt = block.timestamp + order.timeoutSeconds;
         order.deliverResult = result;
         
         emit OrderDelivered(orderId, result);
@@ -205,6 +208,33 @@ contract ServiceEscrow {
         require(ok, "Transfer to seller failed");
         
         emit OrderExpired(orderId, amount);
+    }
+
+    /**
+     * 卖家超时未交付 —— 自动退款给买家
+     * 任何人都可以调用
+     * @param orderId 订单 ID
+     */
+    function claimNoDeliveryRefund(bytes32 orderId) external {
+        Order storage order = orders[orderId];
+        require(
+            order.status == OrderStatus.Pending,
+            "Order not pending"
+        );
+        require(
+            block.timestamp >= order.createdAt + order.timeoutSeconds,
+            "Delivery window not expired"
+        );
+
+        order.status = OrderStatus.Refunded;
+        uint256 amount = order.amount;
+        order.amount = 0;
+        totalRefunded += amount;
+
+        (bool ok, ) = payable(order.buyer).call{value: amount}("");
+        require(ok, "Transfer to buyer failed");
+
+        emit OrderRefunded(orderId, amount, "Seller did not deliver in time");
     }
     
     /**

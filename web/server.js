@@ -72,6 +72,18 @@ const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
 const SDK_DIR = path.join(__dirname, '..', 'agentpay_sdk');
 const X402_VERIFY_SCRIPT = path.join(SDK_DIR, 'x402_verify.py');
 const SMART_ROUTER_SCRIPT = path.join(SDK_DIR, 'smart_router.py');
+const MANAGED_X402_SCRIPT = path.join(__dirname, '..', 'scripts', 'managed_x402_payment.py');
+const ESCROW_DEPLOYMENT_FILE = path.join(__dirname, '..', 'escrow_deployment.json');
+const ESCROW_ABI_FILE = path.join(__dirname, '..', 'build', 'contracts_ServiceEscrow_sol_ServiceEscrow.abi');
+const STAKE_SELECTOR = '0x46f45b8d';
+
+const ESCROW_STATUS_NAMES = ['None', 'Pending', 'Delivering', 'Delivered', 'Confirmed', 'Disputed', 'Refunded', 'Expired'];
+const AUTO_BUY_KIND_RULES = [
+  { kind: 'scan', keywords: ['scan', 'scanner', 'discover', 'find', 'hunt', 'alpha', 'meme', 'new coin', 'new token', 'pick', '搜', '扫描', '发现', '寻找', '新币', '新 token', '新币机会', '机会'] },
+  { kind: 'risk', keywords: ['risk', 'security', 'safe', 'rug', 'audit', 'contract', '风控', '风险', '安全', '土狗', '审计', '合约'] },
+  { kind: 'deep', keywords: ['holder', 'holders', 'whale', 'depth', 'distribution', 'on-chain', '持仓', '巨鲸', '筹码', '分布', '链上数据', '深度'] },
+  { kind: 'report', keywords: ['report', 'strategy', 'advice', 'analysis', 'research', 'summary', '投研', '报告', '策略', '建议', '分析', '总结'] },
+];
 
 function isValidAddress(address) {
   return typeof address === 'string' && w3.utils.isAddress(address);
@@ -243,6 +255,225 @@ function buildExecutionPreview(route, service) {
   };
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function callLocalMarketApi(apiPath, payload) {
+  const response = await fetch(`http://127.0.0.1:${PORT}${apiPath}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  return response.json();
+}
+
+function getPurchaseById(purchaseId) {
+  if (!purchaseId) return null;
+  return getPurchases().find(item => item.id === purchaseId) || null;
+}
+
+async function waitForPurchaseState(purchaseId, options = {}) {
+  const timeoutMs = Number(options.timeoutMs || 30000);
+  const intervalMs = Number(options.intervalMs || 1500);
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt <= timeoutMs) {
+    const purchase = getPurchaseById(purchaseId);
+    if (purchase && ['delivered', 'completed', 'rejected', 'demo-completed'].includes(purchase.status)) {
+      return purchase;
+    }
+    await sleep(intervalMs);
+  }
+
+  return getPurchaseById(purchaseId);
+}
+
+function summarizeAutoResult(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim().slice(0, 180);
+  if (typeof value.summary === 'string') return value.summary.trim().slice(0, 180);
+  if (typeof value.report === 'string') return value.report.trim().slice(0, 180);
+  if (typeof value.message === 'string') return value.message.trim().slice(0, 180);
+  if (value.result && typeof value.result === 'object') {
+    return summarizeAutoResult(value.result);
+  }
+  try {
+    return JSON.stringify(value).slice(0, 180);
+  } catch {
+    return '';
+  }
+}
+
+function getServiceKind(service) {
+  const searchable = `${service.id || ''} ${service.name || ''} ${service.desc || ''} ${service.outputFormat || ''}`.toLowerCase();
+  if (/(scan|scanner|扫描|新币|meme|alpha)/.test(searchable)) return 'scan';
+  if (/(risk|security|audit|风控|风险|安全|合约)/.test(searchable)) return 'risk';
+  if (/(deep|holder|whale|持仓|巨鲸|分布)/.test(searchable)) return 'deep';
+  if (/(report|strategy|analysis|research|报告|策略|建议|分析)/.test(searchable)) return 'report';
+  return 'generic';
+}
+
+function scoreServiceForTask(service, task) {
+  const taskLower = String(task || '').toLowerCase();
+  const haystack = `${service.id || ''} ${service.name || ''} ${service.desc || ''} ${service.inputFormat || ''} ${service.outputFormat || ''}`.toLowerCase();
+  let score = 0;
+
+  for (const rule of AUTO_BUY_KIND_RULES) {
+    const taskMatched = rule.keywords.some(keyword => taskLower.includes(keyword.toLowerCase()));
+    if (!taskMatched) continue;
+    if (getServiceKind(service) === rule.kind) score += 80;
+    for (const keyword of rule.keywords) {
+      if (haystack.includes(keyword.toLowerCase())) score += 8;
+    }
+  }
+
+  const taskTokens = taskLower.split(/[\s,.;:!?，。；：！？、()（）/\\-]+/).filter(Boolean);
+  for (const token of taskTokens) {
+    if (token.length < 2) continue;
+    if (haystack.includes(token)) score += 4;
+  }
+
+  score += Math.round((Number(service.effectiveRate || 0) * 100) * 0.4);
+  score += Math.min(Number(service.totalCalls || 0), 100) * 0.1;
+  score += Math.min(Number(service.deposit || 0) * 1000, 20);
+  return score;
+}
+
+function buildAutoBuyPlan(task, services, maxServices = 3) {
+  const activeServices = services
+    .filter(service => service.active && !['rejected', 'deregistered'].includes(service.status))
+    .map(service => ({ ...service, _kind: getServiceKind(service), _score: scoreServiceForTask(service, task) }));
+
+  const requestedKinds = [];
+  const taskLower = String(task || '').toLowerCase();
+  for (const rule of AUTO_BUY_KIND_RULES) {
+    if (rule.keywords.some(keyword => taskLower.includes(keyword.toLowerCase()))) {
+      requestedKinds.push(rule.kind);
+    }
+  }
+
+  const plan = [];
+  for (const kind of [...new Set(requestedKinds)]) {
+    const best = activeServices
+      .filter(service => service._kind === kind)
+      .sort((a, b) => (b._score || 0) - (a._score || 0))[0];
+    if (best && !plan.some(item => item.id === best.id)) plan.push(best);
+  }
+
+  if (plan.length === 0 && activeServices.length > 0) {
+    const bestOverall = [...activeServices].sort((a, b) => (b._score || 0) - (a._score || 0))[0];
+    if (bestOverall) plan.push(bestOverall);
+  }
+
+  return plan.slice(0, Math.max(1, Math.min(Number(maxServices) || 1, 3)));
+}
+
+function buildAgentRecommendations(task, services, maxCandidates = 8) {
+  const activeServices = services
+    .filter(service => service.active && !['rejected', 'deregistered'].includes(service.status))
+    .map(service => {
+      const kind = getServiceKind(service);
+      const score = scoreServiceForTask(service, task);
+      const reasons = [];
+      if (score >= 80) reasons.push('任务语义高度匹配');
+      if (Number(service.effectiveRate || 0) >= 0.8) reasons.push(`有效率 ${(Number(service.effectiveRate || 0) * 100).toFixed(0)}%`);
+      if (Number(service.totalCalls || 0) > 0) reasons.push(`累计调用 ${service.totalCalls}`);
+      if (Number(service.deposit || 0) > 0) reasons.push(`质押 ${service.deposit} BNB`);
+      return { ...service, _kind: kind, _score: score, _reasons: reasons };
+    })
+    .sort((a, b) => (b._score || 0) - (a._score || 0));
+
+  return activeServices.slice(0, Math.max(1, Math.min(Number(maxCandidates) || 8, 12)));
+}
+
+function normalizePurchasePlan(rawPlan, fallbackPlan) {
+  if (Array.isArray(rawPlan) && rawPlan.length > 0) {
+    return rawPlan
+      .map(item => typeof item === 'string' ? { serviceId: item } : item)
+      .filter(item => item && typeof item.serviceId === 'string')
+      .map(item => ({
+        serviceId: sanitizeText(item.serviceId, 120),
+        input: sanitizeText(item.input, 240),
+        paymentPreference: sanitizeText(item.paymentPreference, 40).toLowerCase() || '',
+      }))
+      .filter(item => item.serviceId);
+  }
+  return fallbackPlan.map(service => ({ serviceId: service.id }));
+}
+
+function resolvePlanServices(planItems, services, buyerWallet) {
+  const resolved = [];
+  for (const item of planItems) {
+    const service = services.find(candidate => candidate.id === item.serviceId);
+    if (!service || !service.active || ['rejected', 'deregistered'].includes(service.status)) {
+      throw new Error(`服务不存在或不可购买: ${item.serviceId}`);
+    }
+    if (service.wallet?.toLowerCase() === buyerWallet.toLowerCase()) {
+      throw new Error(`不能购买自己的服务: ${item.serviceId}`);
+    }
+    resolved.push({ ...item, service });
+  }
+  return resolved;
+}
+
+function buildAutoStepInput(task, previousStep, explicitTargetAddress) {
+  if (explicitTargetAddress && isValidAddress(explicitTargetAddress)) return explicitTargetAddress;
+  if (!previousStep) return String(task || '').trim().slice(0, 240);
+  const summary = summarizeAutoResult(previousStep.result || previousStep.invocation || previousStep.purchase?.result || previousStep.purchase?.report);
+  return `${String(task || '').trim()}\n\n上一步结果摘要：${summary}`.slice(0, 240);
+}
+
+function inferServiceResultType(service) {
+  const searchable = `${service?.id || ''} ${service?.name || ''} ${service?.outputFormat || ''}`.toLowerCase();
+  if (/(json|api|结构化|结构)/.test(searchable)) return 'json';
+  if (/(report|报告|strategy|analysis|summary|建议)/.test(searchable)) return 'report';
+  if (/(scan|scanner|risk|table|list|列表|风控)/.test(searchable)) return 'analysis';
+  return 'text';
+}
+
+function normalizeHostedDeliveryOutput(service, payload, context = {}) {
+  const resultType = service?.resultType || inferServiceResultType(service);
+  const summary = summarizeAutoResult(payload) || `${service?.name || '服务'} 已生成结果`;
+  const normalized = {
+    version: 'hosted-result/v1',
+    serviceId: service?.id || '',
+    serviceName: service?.name || '',
+    seller: service?.expert || '',
+    resultType,
+    title: service?.name || '服务结果',
+    summary,
+    input: context.input || '',
+    generatedAt: new Date().toISOString(),
+    deliveryMode: service?.deliveryMode || 'auto_with_manual_fallback',
+    data: payload,
+  };
+
+  if (payload && typeof payload === 'object') {
+    if (typeof payload.report === 'string' && payload.report.trim()) normalized.summary = payload.report.trim().slice(0, 180);
+    else if (typeof payload.summary === 'string' && payload.summary.trim()) normalized.summary = payload.summary.trim().slice(0, 180);
+    else if (payload.result && typeof payload.result === 'object') {
+      const nested = summarizeAutoResult(payload.result);
+      if (nested) normalized.summary = nested;
+    }
+  }
+
+  return normalized;
+}
+
+async function createManagedX402Payment(service, buyerWallet, description) {
+  const fromName = getManagedWalletNameByAddress(buyerWallet);
+  const toName = getManagedWalletNameByAddress(service.wallet);
+  if (!fromName || !toName) {
+    throw new Error('缺少托管钱包映射，无法自动发起 x402 支付');
+  }
+  return runPythonJson(
+    MANAGED_X402_SCRIPT,
+    [fromName, toName, String(service.price), service.id, description || service.name],
+    60000
+  );
+}
+
 async function resolveSelectedRoute(serviceId, walletAddress, selectedRoute) {
   if (!selectedRoute) return null;
   const services = getServices();
@@ -310,6 +541,129 @@ async function verifySplitHeaders(paymentHeaders, serviceId, expectedBuyerWallet
 }
 
 async function verifyPaymentTx(txHash, buyerWallet, service) {
+  return verifyEscrowPaymentTx(txHash, buyerWallet, service, null);
+}
+
+function normalizeEscrowStatus(rawStatus) {
+  if (typeof rawStatus === 'string' && Number.isNaN(Number(rawStatus))) {
+    return rawStatus;
+  }
+  return ESCROW_STATUS_NAMES[Number(rawStatus)] || 'Unknown';
+}
+
+function decodeSingleStringArg(txInput, selector) {
+  if (typeof txInput !== 'string' || !txInput.toLowerCase().startsWith(selector.toLowerCase())) {
+    return null;
+  }
+  try {
+    const decoded = w3.eth.abi.decodeParameters(['string'], `0x${txInput.slice(10)}`);
+    return decoded[0] || null;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function fetchEscrowOrder(orderId) {
+  const contract = new w3.eth.Contract(ESCROW_ABI, ESCROW_CONFIG.address);
+  const order = await contract.methods.getOrder(orderId).call();
+  let timeoutSeconds = ESCROW_CONFIG.defaultTimeout;
+  try {
+    const raw = await contract.methods.orders(orderId).call();
+    timeoutSeconds = Number(raw[7] ?? raw.timeoutSeconds ?? ESCROW_CONFIG.defaultTimeout);
+  } catch (err) {}
+  return {
+    buyer: order[0],
+    seller: order[1],
+    serviceId: order[2],
+    amount: order[3],
+    amountBNB: w3.utils.fromWei(order[3], 'ether'),
+    createdAt: Number(order[4]),
+    deliveredAt: Number(order[5]),
+    timeoutAt: Number(order[6]),
+    timeoutSeconds,
+    status: normalizeEscrowStatus(order[7]),
+    deliverResult: order[8],
+  };
+}
+
+function getEscrowContract() {
+  return new w3.eth.Contract(ESCROW_ABI, ESCROW_CONFIG.address);
+}
+
+async function sendEscrowSignedTx(methodName, args, signer) {
+  const wallet = typeof signer === 'string'
+    ? findManagedWalletByAddress(signer)
+    : signer;
+  if (!wallet?.privateKey || !wallet?.address) {
+    throw new Error('未找到可用的托管钱包签名该 Escrow 交易');
+  }
+
+  const account = w3.eth.accounts.privateKeyToAccount(wallet.privateKey);
+  const contract = getEscrowContract();
+  const method = contract.methods[methodName](...args);
+  const gas = await method.estimateGas({ from: account.address });
+  const gasPrice = await w3.eth.getGasPrice();
+  const nonce = await w3.eth.getTransactionCount(account.address, 'pending');
+  const signed = await account.signTransaction({
+    from: account.address,
+    to: ESCROW_CONFIG.address,
+    data: method.encodeABI(),
+    gas: Number(gas) + 200000,
+    gasPrice,
+    nonce,
+    chainId: ESCROW_CONFIG.chainId,
+    value: '0x0',
+  });
+
+  return w3.eth.sendSignedTransaction(signed.rawTransaction);
+}
+
+async function createEscrowOrderForBuyer(service, buyerWallet, timeoutSeconds = ESCROW_CONFIG.defaultTimeout) {
+  const wallet = findManagedWalletByAddress(buyerWallet);
+  if (!wallet?.privateKey || !wallet?.address) {
+    throw new Error('买家钱包未托管，无法自动发起 Escrow 下单');
+  }
+
+  const account = w3.eth.accounts.privateKeyToAccount(wallet.privateKey);
+  const contract = getEscrowContract();
+  const value = w3.utils.toWei(String(service.price), 'ether');
+  const method = contract.methods.createOrder(service.wallet, service.id, timeoutSeconds);
+  const gas = await method.estimateGas({ from: account.address, value });
+  const gasPrice = await w3.eth.getGasPrice();
+  const nonce = await w3.eth.getTransactionCount(account.address, 'pending');
+  const signed = await account.signTransaction({
+    from: account.address,
+    to: ESCROW_CONFIG.address,
+    data: method.encodeABI(),
+    gas: Number(gas) + 200000,
+    gasPrice,
+    nonce,
+    chainId: ESCROW_CONFIG.chainId,
+    value,
+  });
+
+  const receipt = await w3.eth.sendSignedTransaction(signed.rawTransaction);
+  const orderId = receipt?.events?.OrderCreated?.returnValues?.orderId || '';
+  if (!orderId) {
+    throw new Error('Escrow 下单成功，但未解析到 orderId');
+  }
+
+  return {
+    txHash: receipt.transactionHash,
+    escrowOrderId: orderId,
+  };
+}
+
+async function confirmEscrowOrderAsBuyer(orderId, buyerWallet) {
+  const wallet = findManagedWalletByAddress(buyerWallet);
+  if (!wallet?.privateKey || !wallet?.address) {
+    throw new Error('买家钱包未托管，无法自动确认 Escrow 订单');
+  }
+  const receipt = await sendEscrowSignedTx('confirm', [orderId], wallet);
+  return { txHash: receipt.transactionHash };
+}
+
+async function verifyEscrowPaymentTx(txHash, buyerWallet, service, escrowOrderId) {
   if (!isValidTxHash(txHash)) {
     return { ok: false, error: 'txHash 格式无效' };
   }
@@ -322,22 +676,44 @@ async function verifyPaymentTx(txHash, buyerWallet, service) {
     if (Number(receipt.status) !== 1) return { ok: false, error: '链上交易执行失败' };
     if (!tx.to) return { ok: false, error: '交易缺少接收地址' };
 
-    const expectedTo = service.wallet.toLowerCase();
     const actualTo = tx.to.toLowerCase();
     const actualFrom = tx.from.toLowerCase();
     const expectedFrom = buyerWallet.toLowerCase();
     const expectedValueWei = BigInt(w3.utils.toWei(String(service.price), 'ether'));
     const actualValueWei = BigInt(tx.value.toString());
-    const isEscrowPayment = actualTo === ESCROW_CONFIG.address.toLowerCase();
+    const expectedEscrowTo = ESCROW_CONFIG.address.toLowerCase();
 
-    if (actualTo !== expectedTo && !isEscrowPayment) {
-      return { ok: false, error: '收款地址不匹配服务提供者' };
+    if (actualTo !== expectedEscrowTo) {
+      return { ok: false, error: 'BNB 支付必须进入 Escrow 担保合约' };
     }
     if (actualFrom !== expectedFrom) {
       return { ok: false, error: '付款地址不匹配 buyerWallet' };
     }
     if (actualValueWei < expectedValueWei) {
       return { ok: false, error: '链上支付金额不足' };
+    }
+    if (!escrowOrderId) {
+      return { ok: false, error: '缺少 escrowOrderId，无法校验担保订单' };
+    }
+
+    const order = await fetchEscrowOrder(escrowOrderId);
+    if (!order || order.buyer === '0x0000000000000000000000000000000000000000') {
+      return { ok: false, error: 'Escrow 订单不存在' };
+    }
+    if (order.buyer.toLowerCase() !== expectedFrom) {
+      return { ok: false, error: 'Escrow 订单买家与 buyerWallet 不一致' };
+    }
+    if (order.seller.toLowerCase() !== service.wallet.toLowerCase()) {
+      return { ok: false, error: 'Escrow 订单卖家与服务提供者不一致' };
+    }
+    if (order.serviceId !== service.id) {
+      return { ok: false, error: 'Escrow 订单 serviceId 不匹配' };
+    }
+    if (BigInt(order.amount) < expectedValueWei) {
+      return { ok: false, error: 'Escrow 订单锁定金额不足' };
+    }
+    if (order.status !== 'Pending' && order.status !== 'Delivered') {
+      return { ok: false, error: `Escrow 订单状态异常: ${order.status}` };
     }
 
     return {
@@ -349,18 +725,7 @@ async function verifyPaymentTx(txHash, buyerWallet, service) {
         value: actualValueWei.toString(), // BigInt转字符串
         blockNumber: Number(tx.blockNumber),
         gasUsed: Number(receipt.gasUsed),
-      }
-    };
-
-    return {
-      ok: true,
-      tx: {
-        hash: tx.hash,
-        from: tx.from,
-        to: tx.to,
-        valueWei: tx.value.toString(),
-        valueBnb: w3.utils.fromWei(tx.value.toString(), 'ether'),
-        blockNumber: receipt.blockNumber,
+        escrowOrderId,
       }
     };
   } catch (err) {
@@ -381,7 +746,46 @@ const AGENTS = {
 
 // 专家服务列表（支持入驻）
 const SERVICES_FILE = path.join(__dirname, '..', 'services.json');
-const AGENTS_FILE = path.join(__dirname, '..', 'agents.json');
+const WALLETS_FILE = path.join(__dirname, '..', 'wallets.json');
+
+function getWallets() {
+  try {
+    if (fs.existsSync(WALLETS_FILE)) {
+      return JSON.parse(fs.readFileSync(WALLETS_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return {};
+}
+
+function findManagedWalletByAddress(address) {
+  if (!address) return null;
+  const normalized = address.toLowerCase();
+  const wallets = Object.values(getWallets());
+  const found = wallets.find(item => item?.address && item.address.toLowerCase() === normalized);
+  if (!found?.private_key) return null;
+  return {
+    address: found.address,
+    privateKey: found.private_key.startsWith('0x') ? found.private_key : `0x${found.private_key}`,
+  };
+}
+
+function getEscrowExecutorWallet() {
+  const wallets = getWallets();
+  const deployer = wallets.four_meme;
+  if (!deployer?.address || !deployer?.private_key) return null;
+  return {
+    address: deployer.address,
+    privateKey: deployer.private_key.startsWith('0x') ? deployer.private_key : `0x${deployer.private_key}`,
+  };
+}
+
+function getManagedWalletNameByAddress(address) {
+  if (!address) return '';
+  const normalized = address.toLowerCase();
+  const entries = Object.entries(getWallets());
+  const found = entries.find(([, wallet]) => wallet?.address?.toLowerCase() === normalized);
+  return found?.[0] || '';
+}
 
 function getAgents() {
   try {
@@ -463,6 +867,10 @@ function addNotification(notification) {
       icon = '✅'; title = '订单确认'; body = `${notification.serviceName || '服务'} 已确认`;
     } else if (notification.type === 'order_result') {
       icon = '📦'; title = '结果已出'; body = `${notification.serviceName || '服务'} 结果已交付`;
+    } else if (notification.type === 'manual_delivery_required') {
+      icon = '🧑'; title = '需要人工发货'; body = `${notification.serviceName || '服务'} 自动交付失败，请手动处理`;
+    } else if (notification.type === 'order_refunded') {
+      icon = '💸'; title = '订单已退款'; body = `${notification.serviceName || '服务'} 因超时未交付已退款`;
     }
     sendPushNotification(notification.targetWallet, { icon, title, body, notificationId: notifications[0].id }).catch(() => {});
   }
@@ -486,6 +894,10 @@ function addPurchase(purchase) {
   const purchases = getPurchases();
   purchases.unshift(purchase);
   if (purchases.length > 50) purchases.length = 50;
+  fs.writeFileSync(PURCHASES_FILE, JSON.stringify(purchases, null, 2));
+}
+
+function savePurchases(purchases) {
   fs.writeFileSync(PURCHASES_FILE, JSON.stringify(purchases, null, 2));
 }
 
@@ -743,6 +1155,276 @@ async function generateReport(serviceType, buyerWallet, targetAddress = null) {
   }
 }
 
+function getPurchaseInput(purchase) {
+  if (!purchase) return '';
+  if (typeof purchase.input === 'string' && purchase.input.trim()) return purchase.input.trim();
+  if (typeof purchase.task === 'string' && purchase.task.trim()) return purchase.task.trim();
+  return '';
+}
+
+function resolveTargetAddress(input) {
+  if (!input || typeof input !== 'string') return null;
+  const trimmed = input.trim();
+  return isValidAddress(trimmed) ? trimmed : null;
+}
+
+// 沙箱执行卖家上传的代码（托管模式）
+async function runSandboxed(skillFilePath, payload, ext) {
+  const startTime = Date.now();
+  const timeout = 30000; // 30秒超时
+  const inputJson = JSON.stringify(payload);
+
+  return new Promise((resolve, reject) => {
+    let cmd, args;
+    if (ext === '.py') {
+      cmd = 'python3';
+      args = ['-u', skillFilePath];
+    } else if (ext === '.js') {
+      cmd = 'node';
+      args = ['--no-warnings', skillFilePath];
+    } else {
+      return reject(new Error(`不支持的文件类型: ${ext}`));
+    }
+
+    const child = spawn(cmd, args, {
+      timeout,
+      env: { ...process.env, TASK_INPUT: inputJson },
+      stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: path.dirname(skillFilePath),
+    });
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => { stdout += d; });
+    child.stderr.on('data', (d) => { stderr += d; });
+
+    child.on('close', (code) => {
+      const elapsed = Date.now() - startTime;
+      if (code !== 0) {
+        return reject(new Error(`沙箱执行失败 (exit ${code}, ${elapsed}ms): ${stderr.slice(0, 500)}`));
+      }
+      try {
+        const result = JSON.parse(stdout.trim());
+        resolve(result);
+      } catch(e) {
+        // 如果不是 JSON，包装为文本结果
+        resolve({ ok: true, output: stdout.trim(), format: 'text', elapsed });
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(new Error(`沙箱启动失败: ${err.message}`));
+    });
+
+    // 通过 stdin 传输入
+    child.stdin.write(inputJson);
+    child.stdin.end();
+  });
+}
+
+async function executeServiceForPurchase(service, purchase) {
+  const input = getPurchaseInput(purchase);
+  const targetAddress = resolveTargetAddress(input);
+
+  // 内置服务（铁蛋扫链、臭蛋风控、卤蛋报告）— 兼容旧数据
+  if (service.id.includes('scan') || service.id.includes('risk') || service.id.includes('report')) {
+    const reportType = service.id.includes('scan') ? 'scanning'
+      : service.id.includes('risk') ? 'risk'
+      : 'report';
+    const report = await generateReport(reportType, purchase.buyerWallet, targetAddress);
+    const normalized = normalizeHostedDeliveryOutput(service, report, { input, purchaseId: purchase.id });
+    return {
+      output: normalized,
+      report: normalized,
+      rawOutput: report,
+    };
+  }
+
+  // 自托管模式：调用卖家 API
+  if (service.deliveryMode === 'self_hosted' && service.api && service.api.endpoint) {
+    const method = (service.api.method || 'POST').toUpperCase();
+    const payload = {
+      orderId: purchase.id,
+      buyerWallet: purchase.buyerWallet,
+      serviceId: service.id,
+      input,
+      task: input,
+    };
+    const fetchOptions = { method, headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30000) };
+    let url = service.api.endpoint;
+    if (method === 'POST') {
+      fetchOptions.body = JSON.stringify(payload);
+    } else {
+      const params = new URLSearchParams(payload).toString();
+      url += (url.includes('?') ? '&' : '?') + params;
+    }
+    const response = await fetch(url, fetchOptions);
+    if (!response.ok) {
+      throw new Error(`卖家 API 返回 ${response.status}`);
+    }
+    const data = await response.json().catch(() => null);
+    const normalized = normalizeHostedDeliveryOutput(service, data || { ok: true }, { input, purchaseId: purchase.id });
+    return {
+      output: normalized,
+      report: normalized,
+      rawOutput: data || null,
+    };
+  }
+
+  // 托管模式：沙箱执行卖家上传的代码
+  if (service.deliveryMode === 'hosted' && service.skillFilePath && fs.existsSync(service.skillFilePath)) {
+    const ext = service.api?.skillExt || path.extname(service.skillFilePath);
+    const payload = {
+      orderId: purchase.id,
+      buyerWallet: purchase.buyerWallet,
+      serviceId: service.id,
+      input: input,
+      task: input,
+      targetAddress: targetAddress || '',
+    };
+    const result = await runSandboxed(service.skillFilePath, payload, ext);
+    const normalized = normalizeHostedDeliveryOutput(service, result, { input, purchaseId: purchase.id });
+    return {
+      output: normalized,
+      report: normalized,
+      rawOutput: result,
+    };
+  }
+
+  throw new Error('该服务暂不支持自动交付');
+}
+
+async function markPurchaseDelivered(purchaseId, output, options = {}) {
+  const purchases = getPurchases();
+  const purchase = purchases.find(item => item.id === purchaseId);
+  if (!purchase) throw new Error('订单不存在');
+  if (purchase.status !== 'pending') return purchase;
+
+  const services = getServices();
+  const service = services.find(item => item.id === purchase.serviceId) || null;
+  const normalizedOutput = output?.version === 'hosted-result/v1'
+    ? output
+    : normalizeHostedDeliveryOutput(service, output, {
+        input: getPurchaseInput(purchase),
+        purchaseId: purchase.id,
+      });
+
+  purchase.result = normalizedOutput;
+  purchase.resultRaw = options.rawOutput || output || null;
+  purchase.resultAt = new Date().toISOString();
+  purchase.status = 'delivered';
+  purchase.autoDelivered = options.autoDelivered === true;
+  purchase.deliveryTxHash = options.deliveryTxHash || purchase.deliveryTxHash || '';
+  purchase.resultType = normalizedOutput.resultType || purchase.resultType || inferServiceResultType(service);
+  purchase.resultSummary = normalizedOutput.summary || summarizeAutoResult(normalizedOutput);
+  if (options.report) purchase.report = options.report;
+  savePurchases(purchases);
+
+  addNotification({
+    type: 'order_result',
+    targetWallet: purchase.buyerWallet,
+    orderId: purchase.id,
+    serviceId: purchase.serviceId,
+    serviceName: purchase.serviceName,
+    sellerWallet: purchase.expertWallet,
+    sellerName: purchase.expert,
+  });
+
+  return purchase;
+}
+
+async function attemptAutoDeliverPurchase(purchaseId) {
+  const purchases = getPurchases();
+  const purchase = purchases.find(item => item.id === purchaseId);
+  if (!purchase || purchase.status !== 'pending') return;
+
+  const services = getServices();
+  const service = services.find(item => item.id === purchase.serviceId && item.active);
+  if (!service) return;
+
+  try {
+    const result = await executeServiceForPurchase(service, purchase);
+    let deliveryTxHash = '';
+    if (purchase.escrowOrderId) {
+      const managedSeller = findManagedWalletByAddress(purchase.expertWallet);
+      if (!managedSeller) {
+        throw new Error('卖家钱包未托管，需主人手动确认发货');
+      }
+      const receipt = await sendEscrowSignedTx('deliver', [purchase.escrowOrderId, JSON.stringify(result.output)], managedSeller);
+      deliveryTxHash = receipt.transactionHash;
+    }
+    await markPurchaseDelivered(purchase.id, result.output, {
+      autoDelivered: true,
+      deliveryTxHash,
+      report: result.report,
+    });
+  } catch (error) {
+    addNotification({
+      type: 'manual_delivery_required',
+      targetWallet: purchase.expertWallet,
+      orderId: purchase.id,
+      serviceId: purchase.serviceId,
+      serviceName: purchase.serviceName,
+      buyerWallet: purchase.buyerWallet,
+      buyerName: purchase.buyerName,
+      reason: error.message,
+    });
+  }
+}
+
+let escrowReconcileRunning = false;
+async function reconcileEscrowOrders() {
+  if (escrowReconcileRunning) return;
+  escrowReconcileRunning = true;
+  try {
+    const executor = getEscrowExecutorWallet();
+    if (!executor) return;
+
+    const purchases = getPurchases();
+    for (const purchase of purchases) {
+      if (!purchase.escrowOrderId || !purchase.escrowAddress) continue;
+      try {
+        const order = await fetchEscrowOrder(purchase.escrowOrderId);
+        if (purchase.status === 'pending' && order.status === 'Pending') {
+          const deadline = order.createdAt + (order.timeoutSeconds || ESCROW_CONFIG.defaultTimeout);
+          if (deadline > 0 && Math.floor(Date.now() / 1000) >= deadline) {
+            const receipt = await sendEscrowSignedTx('claimNoDeliveryRefund', [purchase.escrowOrderId], executor);
+            purchase.status = 'rejected';
+            purchase.refundedAt = new Date().toISOString();
+            purchase.escrowStatus = 'Refunded';
+            purchase.refundTxHash = receipt.transactionHash;
+            addNotification({
+              type: 'order_refunded',
+              targetWallet: purchase.buyerWallet,
+              orderId: purchase.id,
+              serviceId: purchase.serviceId,
+              serviceName: purchase.serviceName,
+            });
+          }
+        } else if (purchase.status === 'delivered' && order.status === 'Delivered' && order.timeoutAt > 0 && Math.floor(Date.now() / 1000) >= order.timeoutAt) {
+          const receipt = await sendEscrowSignedTx('claimTimeout', [purchase.escrowOrderId], executor);
+          purchase.status = 'completed';
+          purchase.confirmedAt = new Date().toISOString();
+          purchase.escrowStatus = 'Expired';
+          purchase.timeoutReleaseTxHash = receipt.transactionHash;
+        } else if (order.status === 'Refunded') {
+          purchase.status = 'rejected';
+          purchase.escrowStatus = 'Refunded';
+        } else if (order.status === 'Confirmed' || order.status === 'Expired') {
+          if (purchase.status === 'delivered') {
+            purchase.status = 'completed';
+            purchase.confirmedAt = new Date().toISOString();
+          }
+          purchase.escrowStatus = order.status;
+        }
+      } catch (err) {}
+    }
+    savePurchases(purchases);
+  } finally {
+    escrowReconcileRunning = false;
+  }
+}
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.json({ limit: '256kb' }));
@@ -752,36 +1434,30 @@ app.use(express.static(path.join(__dirname, 'public')));
 const TX_LOG = path.join(__dirname, '..', 'tx-log.json');
 const AGENT_EVENTS_FILE = path.join(__dirname, '..', 'agent_events.json');
 
-// Escrow 合约配置
+function loadEscrowDeployment() {
+  try {
+    return JSON.parse(fs.readFileSync(ESCROW_DEPLOYMENT_FILE, 'utf8'));
+  } catch (err) {
+    return {};
+  }
+}
+
+function loadEscrowAbi() {
+  try {
+    return JSON.parse(fs.readFileSync(ESCROW_ABI_FILE, 'utf8'));
+  } catch (err) {
+    const deployment = loadEscrowDeployment();
+    return deployment.abi || [];
+  }
+}
+
+const ESCROW_DEPLOYMENT = loadEscrowDeployment();
 const ESCROW_CONFIG = {
-  address: '0x1A81a18dFC26676AC30f95f4659Fe4c0b4355EC3',
-  chainId: 56,
-  defaultTimeout: 86400,  // 24h
+  address: process.env.ESCROW_ADDRESS || ESCROW_DEPLOYMENT.contractAddress || '0x47e1904364391f00147b9a77af9cf23cfd1b113c',
+  chainId: Number(process.env.ESCROW_CHAIN_ID || ESCROW_DEPLOYMENT.chainId || 56),
+  defaultTimeout: Number(process.env.ESCROW_DEFAULT_TIMEOUT || ESCROW_DEPLOYMENT.defaultTimeout || 86400),
 };
-const ESCROW_ABI = [
-  {"inputs":[{"internalType":"uint256","name":"_defaultTimeout","type":"uint256"}],"stateMutability":"nonpayable","type":"constructor"},
-  {"inputs":[{"internalType":"address","name":"seller","type":"address"},{"internalType":"string","name":"serviceId","type":"string"},{"internalType":"uint256","name":"timeoutSeconds","type":"uint256"}],"name":"createOrder","outputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"stateMutability":"payable","type":"function"},
-  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"},{"internalType":"string","name":"result","type":"string"}],"name":"deliver","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"confirm","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"dispute","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"claimTimeout","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"},{"internalType":"string","name":"reason","type":"string"}],"name":"arbitrateRefund","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"arbitrateRelease","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"bytes32","name":"orderId","type":"bytes32"}],"name":"getOrder","outputs":[{"internalType":"address","name":"buyer"},{"internalType":"address","name":"seller"},{"internalType":"string","name":"serviceId"},{"internalType":"uint256","name":"amount"},{"internalType":"uint256","name":"createdAt"},{"internalType":"uint256","name":"deliveredAt"},{"internalType":"uint256","name":"timeoutAt"},{"internalType":"enum ServiceEscrow.OrderStatus","name":"status"},{"internalType":"string","name":"deliverResult"}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"getOrderCount","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":""}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"defaultTimeout","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"totalEscrowed","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"totalReleased","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"totalRefunded","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
-  {"inputs":[],"name":"totalDisputed","outputs":[{"internalType":"uint256","name":""}],"stateMutability":"view","type":"function"},
-  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"indexed":true,"name":"buyer","type":"address"},{"indexed":true,"name":"seller","type":"address"},{"name":"serviceId","type":"string"},{"name":"amount","type":"uint256"}],"name":"OrderCreated","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"name":"deliverResult","type":"string"}],"name":"OrderDelivered","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"name":"amount","type":"uint256"}],"name":"OrderConfirmed","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"name":"amount","type":"uint256"}],"name":"OrderExpired","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"name":"amount","type":"uint256"},{"name":"reason","type":"string"}],"name":"OrderRefunded","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"bytes32"},{"indexed":true,"name":"buyer","type":"address"}],"name":"OrderDisputed","type":"event"}
-];
+const ESCROW_ABI = loadEscrowAbi();
 function getTxs() {
   try { return JSON.parse(fs.readFileSync(TX_LOG, 'utf8')); } catch(e) { return []; }
 }
@@ -1038,24 +1714,16 @@ app.post('/api/orders/:orderId/result', (req, res) => {
   if (purchase.expertWallet?.toLowerCase() !== sellerWallet.toLowerCase()) {
     return res.json({ ok: false, error: '只有卖家能提交结果' });
   }
+  if (purchase.status !== 'pending') {
+    return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法提交结果` });
+  }
 
-  purchase.result = output;
-  purchase.resultAt = new Date().toISOString();
-  purchase.status = 'delivered';
-  savePurchases(purchases);
-
-  // 通知买家：结果已出
-  addNotification({
-    type: 'order_result',
-    targetWallet: purchase.buyerWallet,
-    orderId: purchase.id,
-    serviceId: purchase.serviceId,
-    serviceName: purchase.serviceName,
-    sellerWallet: purchase.expertWallet,
-    sellerName: purchase.expert,
+    Promise.resolve().then(async () => {
+    await markPurchaseDelivered(orderId, output, { autoDelivered: false, rawOutput: output });
+    res.json({ ok: true, escrowOrderId: purchase.escrowOrderId || '' });
+  }).catch(err => {
+    res.json({ ok: false, error: err.message });
   });
-
-  res.json({ ok: true });
 });
 
 // 查询订单结果（买家调用）
@@ -1095,6 +1763,7 @@ app.get('/api/my-services/:wallet', (req, res) => {
 app.get('/api/config/deposit', (req, res) => {
   res.json({
     depositPoolAddress: DEPOSIT_POOL_ADDRESS,
+    stakingAddress: DEPOSIT_POOL_ADDRESS,
     isOnChain: DEPOSIT_POOL_ADDRESS !== '0x0000000000000000000000000000000000000000'
   });
 });
@@ -1118,16 +1787,17 @@ app.post('/api/skills/scan', upload.single('skillFile'), (req, res) => {
   }
 });
 
-app.post('/api/experts/register', upload.none(), async (req, res) => {
-  const { expert, wallet, name, desc, price, deposit, depositTx, inputFormat, outputFormat, latency } = req.body;
+app.post('/api/experts/register', upload.single('skillFile'), async (req, res) => {
+  const { expert, wallet, name, desc, price, deposit, depositTx, inputFormat, outputFormat, latency, deliveryMode, endpoint } = req.body;
   const expertName = sanitizeText(expert, 40);
   const skillName = sanitizeText(name, 80);
   const description = sanitizeText(desc, 240);
-  const normalizedWallet = typeof wallet === 'string' ? wallet.trim() : '';
+  let normalizedWallet = typeof wallet === 'string' ? wallet.trim() : '';
   const parsedPrice = parsePositiveNumber(price);
   const parsedDeposit = parseNonNegativeNumber(deposit, 0.001);
   const depositTxHash = typeof depositTx === 'string' ? depositTx.trim() : '';
-  // 不再需要框架筛选（服务契约模式）
+  const deliveryModeValue = deliveryMode === 'self_hosted' ? 'self_hosted' : 'hosted';
+  const endpointUrl = deliveryModeValue === 'self_hosted' ? sanitizeText(endpoint, 240) : '';
 
   const inputFmt = sanitizeText(inputFormat, 120);
   const outputFmt = sanitizeText(outputFormat, 120);
@@ -1150,7 +1820,9 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
   if (hasActive) {
     return res.json({ ok: false, error: '该钱包已发布服务，一个钱包只能发布一个服务' });
   }
-  // 服务契约（不再上传文件）
+  // 平台托管服务 ID
+  const id = `${expertName}-${skillName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
+
   // 验证押金交易（非零地址时需要链上验证，pending_deposit 状态跳过验证）
   if (!initialStatus && DEPOSIT_POOL_ADDRESS !== '0x0000000000000000000000000000000000000000') {
     if (!isChainTxHash(depositTxHash)) {
@@ -1167,6 +1839,13 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
       }
       if (tx.to && tx.to.toLowerCase() !== DEPOSIT_POOL_ADDRESS.toLowerCase()) {
         return res.json({ ok: false, error: '押金未发送到正确的押金池地址' });
+      }
+      if (!tx.input || !tx.input.toLowerCase().startsWith(STAKE_SELECTOR)) {
+        return res.json({ ok: false, error: '押金交易必须调用质押合约的 stake(skillId)' });
+      }
+      const stakedSkillId = decodeSingleStringArg(tx.input, STAKE_SELECTOR);
+      if (stakedSkillId && stakedSkillId !== id) {
+        return res.json({ ok: false, error: '押金交易绑定的 skillId 与当前服务不一致' });
       }
       const depositAmount = parseFloat(w3.utils.fromWei(tx.value, 'ether'));
       if (depositAmount < parsedDeposit) {
@@ -1197,19 +1876,71 @@ app.post('/api/experts/register', upload.none(), async (req, res) => {
     return res.json({ ok: false, error: '该服务已存在，请更换名称' });
   }
 
-  // 无需安全扫描（不再上传文件，服务契约模式）
-  let securityScan = { level: 'safe', score: 100, issues: [], summary: '✅ 服务契约模式' };
+  // 安全扫描 + 交付方式验证（必须通过才能上架）
+  let securityScan = { level: 'unsafe', score: 0, issues: [], summary: '❌ 未扫描' };
+  let skillFilePath = '';
+  let skillFileExt = '';
 
-  const id = `${expertName}-${skillName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
-  // 入驻后需审核
+  if (deliveryModeValue === 'hosted') {
+    // 托管模式：必须上传代码文件
+    if (!req.file) {
+      return res.json({ ok: false, error: '托管模式必须上传服务代码文件（.py 或 .js）' });
+    }
+    skillFileExt = path.extname(req.file.originalname).toLowerCase();
+    if (!['.py', '.js'].includes(skillFileExt)) {
+      try { fs.unlinkSync(req.file.path); } catch(e) {}
+      return res.json({ ok: false, error: '只支持 .py 或 .js 文件' });
+    }
+    // 安全扫描（必须通过）
+    try {
+      const code = fs.readFileSync(req.file.path, 'utf8');
+      const { scan } = require('../security/scanner');
+      securityScan = scan(code, skillFileExt === '.py' ? 'py' : 'js');
+      if (securityScan.level !== 'safe') {
+        try { fs.unlinkSync(req.file.path); } catch(e2) {}
+        return res.json({ ok: false, error: '安全扫描未通过，服务不允许上架', scan: securityScan });
+      }
+    } catch(e) {
+      try { fs.unlinkSync(req.file.path); } catch(e2) {}
+      return res.json({ ok: false, error: '安全扫描失败: ' + e.message });
+    }
+  } else {
+    // 自托管模式：必须填 endpoint，并做可达性验证
+    if (!endpointUrl) {
+      return res.json({ ok: false, error: '自托管模式必须填写 API Endpoint' });
+    }
+    const endpointValidation = await validateServiceEndpoint(endpointUrl);
+    if (!endpointValidation.ok) {
+      return res.json({ ok: false, error: endpointValidation.error });
+    }
+    securityScan = { level: 'safe', score: 80, issues: [], summary: '✅ 自托管服务（API 安全由卖家负责）' };
+  }
+
+  // 保存上传的代码文件（托管模式）
+  if (deliveryModeValue === 'hosted' && req.file) {
+    const skillsDir = path.join(__dirname, '..', 'skills');
+    if (!fs.existsSync(skillsDir)) fs.mkdirSync(skillsDir, { recursive: true });
+    skillFilePath = path.join(skillsDir, `${id}${skillFileExt}`);
+    fs.copyFileSync(req.file.path, skillFilePath);
+    try { fs.unlinkSync(req.file.path); } catch(e) {} // 清理临时文件
+  }
 
   const newService = {
     id, expert: expertName, wallet: normalizedWallet, service: 'service', name: skillName,
     desc: description || '', price: parsedPrice, deposit: parsedDeposit,
     inputFormat: inputFmt, outputFormat: outputFmt, latency: latencyEst || '',
-    api: { endpoint: '', method: 'POST' },
+    deliveryMode: deliveryModeValue,
+    executionMode: deliveryModeValue === 'hosted' ? 'hosted' : 'self_hosted',
+    resultType: inferServiceResultType({ id, name: skillName, outputFormat: outputFmt }),
+    api: {
+      endpoint: deliveryModeValue === 'self_hosted' ? endpointUrl : '',
+      method: 'POST',
+      skillFile: deliveryModeValue === 'hosted',
+      skillExt: deliveryModeValue === 'hosted' ? skillFileExt : '',
+    },
+    skillFilePath: deliveryModeValue === 'hosted' ? skillFilePath : '',
     depositTx: depositTxHash || null,
-    security: { level: 'safe', score: 100, summary: '✅ 服务契约模式' },
+    security: securityScan,
     totalCalls: 0, effectiveCalls: 0, effectiveRate: 0,
     rating: 0, sales: 0, active: true,
     status: initialStatus || 'pending',
@@ -1241,6 +1972,13 @@ app.post('/api/services/:id/deposit', async (req, res) => {
     if (tx.to && tx.to.toLowerCase() !== DEPOSIT_POOL_ADDRESS.toLowerCase()) {
       return res.json({ ok: false, error: '押金未发送到正确地址' });
     }
+    if (!tx.input || !tx.input.toLowerCase().startsWith(STAKE_SELECTOR)) {
+      return res.json({ ok: false, error: '押金交易必须调用质押合约的 stake(skillId)' });
+    }
+    const stakedSkillId = decodeSingleStringArg(tx.input, STAKE_SELECTOR);
+    if (!stakedSkillId || stakedSkillId !== svc.id) {
+      return res.json({ ok: false, error: '押金交易未绑定当前服务 skillId' });
+    }
     const depositAmount = parseFloat(w3.utils.fromWei(tx.value, 'ether'));
     if (depositAmount < 0.001) {
       return res.json({ ok: false, error: '押金金额不足' });
@@ -1263,32 +2001,52 @@ app.post('/api/purchases/confirm/:purchaseId', (req, res) => {
   const purchases = getPurchases();
   const purchase = purchases.find(p => p.id === req.params.purchaseId);
   if (!purchase) return res.json({ ok: false, error: '订单不存在' });
-  if (purchase.status !== 'pending_confirm') return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法确认` });
-
-  purchase.status = purchase.payment?.verified ? 'completed' : 'demo-completed';
-  purchase.confirmedAt = new Date().toISOString();
-  savePurchases(purchases);
-
-  const services = getServices();
-  const service = services.find(s => s.id === purchase.serviceId);
-  if (service) {
-    service.sales += 1;
-    saveServices(services);
+  if (purchase.status !== 'delivered' && purchase.status !== 'pending_confirm') {
+    return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法确认` });
   }
 
-  addTx({
-    time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
-    from: purchase.buyerName || '未知',
-    fromWallet: purchase.buyerWallet,
-    to: purchase.expert,
-    amount: purchase.price,
-    reason: `${purchase.serviceName} [确认购买]`,
-    tx: purchase.txHash || purchase.id,
-    verified: purchase.payment?.verified ? '✅ 已验证' : '🧪 模拟',
-    receipt: purchase.id
-  });
+  Promise.resolve().then(async () => {
+    if (purchase.escrowOrderId) {
+      const order = await fetchEscrowOrder(purchase.escrowOrderId);
+      if (order.status !== 'Confirmed' && order.status !== 'Expired') {
+        return res.json({ ok: false, error: `Escrow 链上状态为 ${order.status}，请先完成链上确认或等待超时释放` });
+      }
+      purchase.escrowStatus = order.status;
+      purchase.escrowSettledAt = new Date().toISOString();
+      purchase.payment = {
+        ...(purchase.payment || {}),
+        mode: 'escrow',
+        verified: true,
+      };
+    }
 
-  res.json({ ok: true, purchase });
+    purchase.status = purchase.payment?.verified ? 'completed' : 'demo-completed';
+    purchase.confirmedAt = new Date().toISOString();
+    savePurchases(purchases);
+
+    const services = getServices();
+    const service = services.find(s => s.id === purchase.serviceId);
+    if (service) {
+      service.sales += 1;
+      saveServices(services);
+    }
+
+    addTx({
+      time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
+      from: purchase.buyerName || '未知',
+      fromWallet: purchase.buyerWallet,
+      to: purchase.expert,
+      amount: purchase.price,
+      reason: `${purchase.serviceName} [确认购买]`,
+      tx: purchase.txHash || purchase.id,
+      verified: purchase.payment?.verified ? '✅ 已验证' : '🧪 模拟',
+      receipt: purchase.id
+    });
+
+    res.json({ ok: true, purchase });
+  }).catch(err => {
+    res.json({ ok: false, error: err.message });
+  });
 });
 
 // 拒绝购买（待确认订单 → 取消）
@@ -1296,7 +2054,8 @@ app.post('/api/purchases/reject/:purchaseId', (req, res) => {
   const purchases = getPurchases();
   const purchase = purchases.find(p => p.id === req.params.purchaseId);
   if (!purchase) return res.json({ ok: false, error: '订单不存在' });
-  if (purchase.status !== 'pending_confirm') return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法拒绝` });
+  if (purchase.escrowOrderId) return res.json({ ok: false, error: 'Escrow 订单请走链上 dispute() 争议流程' });
+  if (purchase.status !== 'delivered' && purchase.status !== 'pending_confirm') return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法拒绝` });
 
   purchase.status = 'rejected';
   purchase.rejectedAt = new Date().toISOString();
@@ -1308,7 +2067,7 @@ app.post('/api/purchases/reject/:purchaseId', (req, res) => {
 // 获取待确认订单列表
 app.get('/api/purchases/pending', (req, res) => {
   const purchases = getPurchases();
-  const pending = purchases.filter(p => p.status === 'pending_confirm');
+  const pending = purchases.filter(p => p.status === 'delivered' || p.status === 'pending_confirm');
   res.json({ ok: true, count: pending.length, purchases: pending });
 });
 
@@ -1324,7 +2083,7 @@ app.post('/api/experts/exit', (req, res) => {
 
   // 检查是否有未完成的订单
   const purchases = getPurchases();
-  const pending = purchases.filter(p => p.expert === expert && p.status === 'pending');
+  const pending = purchases.filter(p => p.expert === expert && !['completed', 'demo-completed', 'rejected'].includes(p.status));
   if (pending.length > 0) return res.json({ ok: false, error: `有 ${pending.length} 笔订单未完成，无法退出` });
 
   svc.active = false;
@@ -1414,6 +2173,13 @@ app.post('/api/services/buy', async (req, res) => {
   const normalizedServiceId = sanitizeText(serviceId, 120);
   const normalizedBuyerWallet = typeof buyerWallet === 'string' ? buyerWallet.trim() : '';
   const normalizedPaymentMode = typeof paymentMode === 'string' ? paymentMode.trim().toLowerCase() : '';
+  const normalizedInput = sanitizeText(
+    typeof req.body.input === 'string' ? req.body.input
+    : typeof req.body.task === 'string' ? req.body.task
+    : typeof req.body.targetAddress === 'string' ? req.body.targetAddress
+    : '',
+    240
+  );
   // 优先用前端传的名字，否则从 agents.json 反查
   let normalizedBuyerName = sanitizeText(buyerName, 60);
   if (!normalizedBuyerName) {
@@ -1450,12 +2216,12 @@ app.post('/api/services/buy', async (req, res) => {
 
   let payment = { mode: demoRequested ? 'demo' : 'pending', verified: false };
   if (txHash) {
-    const verification = await verifyPaymentTx(txHash, normalizedBuyerWallet, service);
+    const verification = await verifyEscrowPaymentTx(txHash, normalizedBuyerWallet, service, escrowOrderId);
     if (!verification.ok) {
       return res.json({ ok: false, error: verification.error });
     }
     payment = {
-      mode: 'onchain',
+      mode: 'escrow',
       verified: true,
       ...verification.tx,
     };
@@ -1492,13 +2258,14 @@ app.post('/api/services/buy', async (req, res) => {
     buyerWallet: normalizedBuyerWallet,
     buyerName: normalizedBuyerName,
     price: service.price,
-    status: autoConfirm ? (payment.verified ? 'completed' : 'demo-completed') : 'pending_confirm',
+    status: autoConfirm ? (payment.verified ? 'completed' : 'demo-completed') : 'pending',
     payment,
     selectedRoute: route,
     report,
     txHash: txHash || '',
     escrowOrderId: escrowOrderId || '',
     escrowAddress: escrowOrderId ? ESCROW_CONFIG.address : '',
+    input: normalizedInput,
     time: new Date().toISOString(),
     autoConfirm
   };
@@ -1516,7 +2283,7 @@ app.post('/api/services/buy', async (req, res) => {
     input: purchase.input || '',
   });
 
-  // 通知买家：订单已确认
+  // 通知买家：订单已创建
   addNotification({
     type: 'order_confirmed',
     targetWallet: normalizedBuyerWallet,
@@ -1558,8 +2325,11 @@ app.post('/api/services/buy', async (req, res) => {
     });
     res.json({ ok: true, purchase, serviceApi: service.api || null });
   } else {
-    // 待确认模式：等待人工确认
-    res.json({ ok: true, purchase, needConfirm: true, message: '购买请求已提交，等待确认' });
+    setTimeout(() => {
+      attemptAutoDeliverPurchase(purchase.id).catch(() => {});
+    }, 1000);
+    // Escrow / demo 模式：等待卖家先交付
+    res.json({ ok: true, purchase, needConfirm: false, message: '购买请求已提交，等待卖家交付结果' });
   }
 });
 
@@ -2019,8 +2789,8 @@ app.get('/api/seller-stats', (req, res) => {
   const services = getServices().filter(s => s.wallet?.toLowerCase() === wallet);
   const depositTotal = services.reduce((sum, s) => sum + (s.deposit || 0), 0);
   const incomeTotal = mine.reduce((sum, p) => sum + (p.price || 0), 0);
-  const completedOrders = mine.filter(p => p.status === 'completed' || p.status === 'delivered').length;
-  const pendingOrders = mine.filter(p => p.status !== 'completed' && p.status !== 'delivered' && p.status !== 'rejected').length;
+  const completedOrders = mine.filter(p => p.status === 'completed' || p.status === 'demo-completed').length;
+  const pendingOrders = mine.filter(p => !['completed', 'demo-completed', 'rejected'].includes(p.status)).length;
   res.json({ ok: true, income: incomeTotal, deposit: depositTotal, net: incomeTotal - depositTotal, completedOrders, pendingOrders, totalOrders: mine.length });
 });
 
@@ -2066,26 +2836,8 @@ app.get('/api/escrow/config', (req, res) => {
 // 验证链上 Escrow 订单
 app.get('/api/escrow/order/:orderId', async (req, res) => {
   try {
-    const { Web3 } = await import('web3');
-    const w3 = new Web3('https://bsc-dataseed1.binance.org');
-    const contract = new w3.eth.Contract(ESCROW_ABI, ESCROW_CONFIG.address);
-    const order = await contract.methods.getOrder(req.params.orderId).call();
-    const statusNames = ['None','Pending','Delivering','Delivered','Confirmed','Disputed','Refunded','Expired'];
-    res.json({
-      ok: true,
-      order: {
-        buyer: order[0],
-        seller: order[1],
-        serviceId: order[2],
-        amount: order[3],
-        amountBNB: w3.utils.fromWei(order[3], 'ether'),
-        createdAt: Number(order[4]),
-        deliveredAt: Number(order[5]),
-        timeoutAt: Number(order[6]),
-        status: statusNames[Number(order[7])] || 'Unknown',
-        deliverResult: order[8],
-      }
-    });
+    const order = await fetchEscrowOrder(req.params.orderId);
+    res.json({ ok: true, order });
   } catch(e) {
     res.json({ ok: false, error: e.message });
   }
@@ -2230,6 +2982,250 @@ app.get('/api/agents/:wallet/skills', (req, res) => {
   }
 });
 
+app.post('/api/agents/:wallet/discover-plan', (req, res) => {
+  const requestedWallet = typeof req.params.wallet === 'string' ? req.params.wallet.trim().toLowerCase() : '';
+  const task = sanitizeText(req.body.task || req.body.prompt, 500);
+  const maxCandidates = Number(req.body.maxCandidates || 8);
+  const maxPlan = Number(req.body.maxPlan || 3);
+
+  if (!requestedWallet || !isValidAddress(requestedWallet)) {
+    return res.json({ ok: false, error: '买家钱包地址无效' });
+  }
+  if (!task) {
+    return res.json({ ok: false, error: '缺少任务描述 task' });
+  }
+
+  const agents = getAgents();
+  const buyerAgent = agents.find(agent => agent.active && agent.wallet === requestedWallet);
+  if (!buyerAgent) {
+    return res.json({ ok: false, error: '该买家 Agent 未注册' });
+  }
+
+  const services = getServices();
+  const recommendations = buildAgentRecommendations(task, services, maxCandidates)
+    .filter(service => service.wallet?.toLowerCase() !== requestedWallet);
+  const suggestedPlan = buildAutoBuyPlan(task, recommendations, maxPlan).map(service => ({
+    serviceId: service.id,
+    name: service.name,
+    expert: service.expert,
+    kind: getServiceKind(service),
+    why: service._reasons || [],
+  }));
+
+  res.json({
+    ok: true,
+    buyer: { wallet: requestedWallet, name: buyerAgent.name },
+    task,
+    candidates: recommendations.map(service => ({
+      id: service.id,
+      name: service.name,
+      expert: service.expert,
+      kind: service._kind,
+      score: service._score,
+      price: service.price,
+      effectiveRate: service.effectiveRate || 0,
+      totalCalls: service.totalCalls || 0,
+      reasons: service._reasons || [],
+      inputFormat: service.inputFormat || '',
+      outputFormat: service.outputFormat || '',
+      desc: service.desc || '',
+    })),
+    suggestedPlan,
+  });
+});
+
+app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
+  const requestedWallet = typeof req.params.wallet === 'string' ? req.params.wallet.trim().toLowerCase() : '';
+  const task = sanitizeText(req.body.task || req.body.prompt, 500);
+  const paymentPreference = sanitizeText(req.body.paymentPreference || req.body.paymentMode, 40).toLowerCase() || 'escrow_bnb';
+  const explicitTargetAddress = typeof req.body.targetAddress === 'string' ? req.body.targetAddress.trim() : '';
+  const buyerNameInput = sanitizeText(req.body.buyerName, 60);
+  const waitForResult = req.body.waitForResult !== false;
+  const autoConfirmEscrowResult = req.body.autoConfirmEscrowResult === true;
+  const maxServices = Number(req.body.maxServices || 3);
+  const autoExecute = req.body.autoExecute === true;
+
+  if (!requestedWallet || !isValidAddress(requestedWallet)) {
+    return res.json({ ok: false, error: '买家钱包地址无效' });
+  }
+  if (!task) {
+    return res.json({ ok: false, error: '缺少任务描述 task' });
+  }
+
+  const agents = getAgents();
+  const buyerAgent = agents.find(agent => agent.active && agent.wallet === requestedWallet);
+  if (!buyerAgent) {
+    return res.json({ ok: false, error: '该买家 Agent 未注册' });
+  }
+
+  const services = getServices();
+  const recommendedServices = buildAgentRecommendations(task, services, Math.max(maxServices * 2, 6))
+    .filter(service => service.wallet?.toLowerCase() !== requestedWallet);
+  if (recommendedServices.length === 0) {
+    return res.json({ ok: false, error: '未找到可推荐的服务' });
+  }
+
+  const fallbackPlan = buildAutoBuyPlan(task, recommendedServices, maxServices).filter(service => service.wallet?.toLowerCase() !== requestedWallet);
+  const planItems = normalizePurchasePlan(req.body.purchasePlan || req.body.serviceIds, fallbackPlan);
+  if (!req.body.purchasePlan && !req.body.serviceIds && !autoExecute) {
+    return res.json({
+      ok: true,
+      requiresDecision: true,
+      buyer: { wallet: requestedWallet, name: buyerAgent.name },
+      task,
+      paymentPreference,
+      recommendedServices: recommendedServices.map(service => ({
+        id: service.id,
+        name: service.name,
+        expert: service.expert,
+        kind: service._kind,
+        score: service._score,
+        reasons: service._reasons || [],
+        price: service.price,
+        inputFormat: service.inputFormat || '',
+        outputFormat: service.outputFormat || '',
+      })),
+      suggestedPlan: fallbackPlan.map(service => ({
+        serviceId: service.id,
+        name: service.name,
+        expert: service.expert,
+        kind: getServiceKind(service),
+      })),
+      message: '请由买家 Agent 根据候选列表自主决定 purchasePlan，再调用 auto-buy 执行购买',
+    });
+  }
+
+  let plan;
+  try {
+    plan = resolvePlanServices(planItems, services, requestedWallet);
+  } catch (error) {
+    return res.json({ ok: false, error: error.message });
+  }
+
+  const steps = [];
+  let previousStep = null;
+
+  try {
+    for (const item of plan) {
+      const service = item.service;
+      const stepInput = item.input || buildAutoStepInput(task, previousStep, explicitTargetAddress);
+      let purchaseResponse = null;
+      let purchase = null;
+      let invocation = null;
+      let paymentMeta = null;
+      const stepPaymentPreference = item.paymentPreference || paymentPreference;
+
+      if (stepPaymentPreference === 'escrow' || stepPaymentPreference === 'escrow_bnb' || stepPaymentPreference === 'bnb_escrow' || stepPaymentPreference === 'bnb') {
+        paymentMeta = await createEscrowOrderForBuyer(service, requestedWallet, ESCROW_CONFIG.defaultTimeout);
+        purchaseResponse = await callLocalMarketApi('/api/services/buy', {
+          serviceId: service.id,
+          buyerWallet: requestedWallet,
+          buyerName: buyerNameInput || buyerAgent.name,
+          paymentMode: 'onchain',
+          txHash: paymentMeta.txHash,
+          escrowOrderId: paymentMeta.escrowOrderId,
+          input: stepInput,
+        });
+        if (!purchaseResponse.ok) {
+          throw new Error(purchaseResponse.error || `自动购买 ${service.name} 失败`);
+        }
+        purchase = purchaseResponse.purchase || null;
+
+        if (purchase && waitForResult) {
+          purchase = await waitForPurchaseState(purchase.id, { timeoutMs: Number(req.body.waitTimeoutMs || 30000) });
+          if (purchase?.status === 'delivered' && autoConfirmEscrowResult) {
+            await confirmEscrowOrderAsBuyer(purchase.escrowOrderId, requestedWallet);
+            const confirmResp = await callLocalMarketApi(`/api/purchases/confirm/${purchase.id}`, {});
+            if (!confirmResp.ok) {
+              throw new Error(confirmResp.error || `自动确认 ${service.name} 失败`);
+            }
+            purchase = getPurchaseById(purchase.id) || purchase;
+          }
+        }
+      } else if (stepPaymentPreference === 'x402') {
+        const providedHeader = typeof req.body.paymentHeader === 'string' ? req.body.paymentHeader : '';
+        const providedHeaders = Array.isArray(req.body.paymentHeaders) ? req.body.paymentHeaders : null;
+
+        if (providedHeaders && providedHeaders.length > 1) {
+          purchaseResponse = await callLocalMarketApi('/api/pay/x402/split', {
+            serviceId: service.id,
+            buyerWallet: requestedWallet,
+            paymentHeaders: providedHeaders,
+          });
+        } else {
+          let paymentHeader = providedHeader;
+          if (!paymentHeader) {
+            const managedPayment = await createManagedX402Payment(service, requestedWallet, task);
+            if (!managedPayment.ok) {
+              throw new Error(managedPayment.error || '自动生成 x402 支付失败');
+            }
+            paymentHeader = JSON.stringify(managedPayment.payment_info || {});
+            paymentMeta = managedPayment;
+          }
+          purchaseResponse = await callLocalMarketApi('/api/pay/x402', {
+            serviceId: service.id,
+            buyerWallet: requestedWallet,
+            paymentHeader,
+          });
+        }
+
+        if (!purchaseResponse.ok) {
+          throw new Error(purchaseResponse.error || `x402 自动购买 ${service.name} 失败`);
+        }
+        purchase = purchaseResponse.purchase || null;
+        invocation = await callLocalMarketApi(`/api/skill/call/${service.id}`, {
+          buyer: requestedWallet,
+          task: stepInput,
+          targetAddress: explicitTargetAddress,
+        });
+      } else {
+        throw new Error(`暂不支持的支付偏好: ${paymentPreference}`);
+      }
+
+      const stepResult = {
+        serviceId: service.id,
+        serviceName: service.name,
+        expert: service.expert,
+        paymentPreference: stepPaymentPreference,
+        input: stepInput,
+        purchase,
+        invocation,
+        paymentMeta,
+        result: purchase?.result || purchase?.report || invocation?.data || invocation || null,
+      };
+      steps.push(stepResult);
+      previousStep = stepResult;
+    }
+
+    res.json({
+      ok: true,
+      buyer: {
+        wallet: requestedWallet,
+        name: buyerNameInput || buyerAgent.name,
+      },
+      task,
+      paymentPreference,
+      plannedServices: plan.map(item => ({
+        id: item.service.id,
+        name: item.service.name,
+        expert: item.service.expert,
+        kind: getServiceKind(item.service),
+      })),
+      steps,
+      finalResult: previousStep?.result || null,
+    });
+  } catch (error) {
+    res.json({
+      ok: false,
+      error: error.message,
+      task,
+      paymentPreference,
+      plannedServices: plan.map(item => ({ id: item.service.id, name: item.service.name, expert: item.service.expert })),
+      steps,
+    });
+  }
+});
+
 // 获取购买技能（公开）
 // BUY_SERVICE_SKILL + agents/:id/skill 已移除（未使用）
 
@@ -2320,4 +3316,8 @@ app.get('/api/sync-chain', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`CryptoMinds Marketplace running on http://localhost:${PORT}`);
+  reconcileEscrowOrders().catch(() => {});
+  setInterval(() => {
+    reconcileEscrowOrders().catch(() => {});
+  }, 60_000);
 });

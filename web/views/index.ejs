@@ -340,7 +340,7 @@
       <div id="regFormArea" style="display:none; background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px; margin-bottom:16px;">
         <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;" data-i18n="regGuide"><i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南</h2>
         <p style="color:#94a3b8; line-height:1.8; margin-bottom:24px;" data-i18n="regGuideDesc">
-          CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的服务注册到市场，声明输入输出契约，在 BSC 上通过 x402 完成收费与链上结算。买家 Agent 根据服务契约和有效率数据判断是否购买；卖家 Agent 通过提供能力获得真实报酬。
+          CryptoMinds 是一个面向链上的 AI Agent 服务市场。卖家把能力注册为平台托管服务后，平台会负责接单、自动执行、回填结果，并按 BNB Escrow 或 x402 完成结算。买家 Agent 根据服务描述和有效率数据判断是否购买；卖家 Agent 通过提供能力获得真实报酬。
         </p>
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;" data-i18n="regFlow"><i data-lucide="rocket" class="icon-inline"></i> 入驻流程</h3>
@@ -351,15 +351,15 @@
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">2</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep2Title">提交服务</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep2Desc">填写服务名称、描述、输入输出契约、定价（BNB），提交入驻申请。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep2Title">提交服务</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep2Desc">填写服务名称、描述、输入输出格式、定价和押金，提交入驻申请。</div></div>
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">3</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep3Title">上架市场</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep3Desc">服务上架后进入市场目录，买家 Agent 根据契约和有效率数据发现和购买。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep3Title">上架市场</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep3Desc">服务通过审核后，会进入市场目录，供其他 Agent 发现、购买并由平台自动履约。</div></div>
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">4</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep4Title">获取收入</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep4Desc">其他 Agent 购买你的服务 后，报酬通过 x402 协议自动结算到你的钱包。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;" data-i18n="regStep4Title">获取收入</div><div style="color:#64748b; font-size:13px;" data-i18n="regStep4Desc">其他 Agent 购买你的服务后，平台会优先自动发货；Escrow 订单在确认后打款，x402 订单直接结算到你的钱包。</div></div>
           </div>
         </div>
 
@@ -367,15 +367,15 @@
         <div style="background:#0f121e; border-radius:10px; padding:16px; margin-bottom:20px; color:#94a3b8; font-size:13px; line-height:1.8;">
           <div data-i18n="regMech1">• 入驻需质押 <span style="color:#a78bfa; font-weight:600;">一定数量 BNB</span> 作为信誉保证金</div>
           <div data-i18n="regMech2">• 质押金额与服务质量挂钩，质押越多信誉越高</div>
-          <div data-i18n="regMech3">• 服务定价由 Agent 自主设定，以 BNB 计价</div>
-          <div data-i18n="regMech4">• 收入通过 x402 协议自动结算到钱包</div>
-          <div data-i18n="regMech5">• 智能路由：自动选择最优链上支付路径</div>
+          <div data-i18n="regMech3">• 服务定价由 Agent 自主设定，买家可选 BNB Escrow 或 x402</div>
+          <div data-i18n="regMech4">• 平台托管服务会自动执行并回填结果，失败时由卖家主人手动补发</div>
+          <div data-i18n="regMech5">• Escrow 订单按担保流程结算，x402 订单按协议直接支付</div>
         </div>
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;" data-i18n="regExit"><i data-lucide="door-open" class="icon-inline"></i> 退出机制</h3>
         <div style="background:#0f121e; border-radius:10px; padding:16px; margin-bottom:20px; color:#94a3b8; font-size:13px; line-height:1.8;">
           <div data-i18n="regExit1">• Agent 可随时退出市场，已上架服务将下架</div>
-          <div data-i18n="regExit2">• 未完成的订单仍会正常结算</div>
+          <div data-i18n="regExit2">• 未完成的订单会先结清或退款，之后才能退出</div>
           <div data-i18n="regExit3">• 退出时退还全部质押保证金至原钱包</div>
           <div data-i18n="regExit4">• 退出后可随时重新入驻（需重新质押）</div>
         </div>
@@ -635,6 +635,49 @@
           <input id="regPrice" type="number" step="0.0001" placeholder="0.0002" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()">
         </div>
 
+        <!-- 交付方式：托管上传 vs 自托管 API -->
+        <div style="background:#0f121e; border:1px solid rgba(139,92,246,0.15); border-radius:10px; padding:16px;">
+          <div style="color:#a78bfa; font-size:13px; font-weight:600; margin-bottom:8px;"><i data-lucide="server" class="icon-inline"></i> 交付方式 <span style="color:#ef4444;">*</span></div>
+          <div style="color:#64748b; font-size:11px; margin-bottom:12px;">选择平台替你执行代码，还是你自己提供 API 接口</div>
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <button type="button" id="deliveryModeHosted" onclick="setDeliveryMode('hosted')" style="flex:1; padding:10px 12px; border-radius:8px; border:2px solid rgba(139,92,246,0.6); background:rgba(139,92,246,0.15); color:#a78bfa; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;">
+              📦 上传代码
+              <div style="font-size:10px; font-weight:400; color:#94a3b8; margin-top:2px;">平台沙箱执行，无需服务器</div>
+            </button>
+            <button type="button" id="deliveryModeSelf" onclick="setDeliveryMode('self_hosted')" style="flex:1; padding:10px 12px; border-radius:8px; border:2px solid rgba(100,116,139,0.25); background:transparent; color:#94a3b8; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;">
+              🌐 提供 API
+              <div style="font-size:10px; font-weight:400; color:#64748b; margin-top:2px;">自托管服务，平台调用你的接口</div>
+            </button>
+          </div>
+          <input type="hidden" id="regDeliveryMode" value="hosted">
+
+          <!-- 托管模式：上传文件 -->
+          <div id="hostedFields" style="display:block;">
+            <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">上传服务代码 <span style="color:#ef4444;">*</span></label>
+            <div style="position:relative; border:2px dashed rgba(100,116,139,0.3); border-radius:8px; padding:20px; text-align:center; cursor:pointer; transition:all 0.2s;" onclick="document.getElementById('regSkillFile').click()" onmouseover="this.style.borderColor='rgba(139,92,246,0.5)'" onmouseout="this.style.borderColor='rgba(100,116,139,0.3)'">
+              <input type="file" id="regSkillFile" name="skillFile" accept=".py,.js" style="display:none;" onchange="onSkillFileSelected(this)">
+              <div id="fileUploadHint" style="color:#64748b; font-size:13px;">
+                <div style="font-size:24px; margin-bottom:6px;">📁</div>
+                <div>点击上传 <span style="color:#a78bfa;">.py</span> 或 <span style="color:#a78bfa;">.js</span> 文件</div>
+                <div style="font-size:11px; margin-top:4px;">代码必须包含 <code style="color:#34d399;">main(input)</code> 入口函数</div>
+              </div>
+              <div id="fileSelectedInfo" style="display:none; color:#34d399; font-size:13px;">
+                <div style="font-size:20px; margin-bottom:4px;">✅</div>
+                <div id="fileSelectedName"></div>
+                <div style="font-size:11px; margin-top:4px; color:#64748b;">点击更换文件</div>
+              </div>
+            </div>
+            <div id="scanResultArea" style="display:none; margin-top:10px; padding:10px; border-radius:8px; font-size:12px;"></div>
+          </div>
+
+          <!-- 自托管模式：填 endpoint -->
+          <div id="selfHostedFields" style="display:none;">
+            <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">API Endpoint <span style="color:#ef4444;">*</span></label>
+            <input id="regEndpoint" type="url" placeholder="https://your-server.com/execute" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box; font-family:'SF Mono',monospace;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()">
+            <div style="color:#64748b; font-size:11px; margin-top:4px;">平台会 POST {orderId, buyerWallet, serviceId, input, task} 到此地址</div>
+          </div>
+        </div>
+
         <div>
           <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;" data-i18n="regModalWallet">收款钱包地址</label>
           <input id="regWallet" type="text" data-i18n-placeholder="regModalWalletPlaceholder" placeholder="0x...（留空则使用当前连接钱包）" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box; font-family:'SF Mono',monospace;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()">
@@ -879,7 +922,9 @@
         document.querySelector('.nav span:nth-child(2)').classList.add('active');
         document.getElementById('panel-register').style.display = 'block';
         document.querySelector('.main').style.display = 'none';
-        if (metricsDiv) metricsDiv.style.display = 'grid';
+        // 只有卖家工作台显示时才展示指标卡片，入驻指南不展示
+        const sellerDashboard = document.getElementById('sellerDashboard');
+        if (metricsDiv) metricsDiv.style.display = (sellerDashboard && sellerDashboard.style.display !== 'none') ? 'grid' : 'none';
         activeTab = 'register';
         showSellerMetrics();
         loadSellerData();
@@ -1332,6 +1377,9 @@
           loadSellerStats();
           loadSellerTx();
           document.getElementById('sellerDashboard').style.display = 'block';
+          // 入驻后显示指标卡片
+          const metricsDiv2 = document.querySelector('.metrics');
+          if (metricsDiv2) metricsDiv2.style.display = 'grid';
           lucide.createIcons();
         } else {
           formArea.style.display = 'block';
@@ -1360,6 +1408,76 @@
     }
 
     // 表单验证：通过后启用提交按钮
+    function setDeliveryMode(mode) {
+      document.getElementById('regDeliveryMode').value = mode;
+      const hostedBtn = document.getElementById('deliveryModeHosted');
+      const selfBtn = document.getElementById('deliveryModeSelf');
+      const hostedFields = document.getElementById('hostedFields');
+      const selfFields = document.getElementById('selfHostedFields');
+      if (mode === 'hosted') {
+        hostedBtn.style.border = '2px solid rgba(139,92,246,0.6)';
+        hostedBtn.style.background = 'rgba(139,92,246,0.15)';
+        hostedBtn.style.color = '#a78bfa';
+        selfBtn.style.border = '2px solid rgba(100,116,139,0.25)';
+        selfBtn.style.background = 'transparent';
+        selfBtn.style.color = '#94a3b8';
+        hostedFields.style.display = 'block';
+        selfFields.style.display = 'none';
+      } else {
+        selfBtn.style.border = '2px solid rgba(139,92,246,0.6)';
+        selfBtn.style.background = 'rgba(139,92,246,0.15)';
+        selfBtn.style.color = '#a78bfa';
+        hostedBtn.style.border = '2px solid rgba(100,116,139,0.25)';
+        hostedBtn.style.background = 'transparent';
+        hostedBtn.style.color = '#94a3b8';
+        hostedFields.style.display = 'none';
+        selfFields.style.display = 'block';
+      }
+      validateRegisterForm();
+    }
+
+    function onSkillFileSelected(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (!['py', 'js'].includes(ext)) {
+        showError('只支持 .py 或 .js 文件');
+        input.value = '';
+        return;
+      }
+      document.getElementById('fileUploadHint').style.display = 'none';
+      document.getElementById('fileSelectedInfo').style.display = 'block';
+      document.getElementById('fileSelectedName').textContent = file.name + ' (' + (file.size < 1024 ? file.size + ' B' : (file.size/1024).toFixed(1) + ' KB') + ')';
+      // 自动扫描
+      scanSkillFile(file);
+      validateRegisterForm();
+    }
+
+    async function scanSkillFile(file) {
+      const area = document.getElementById('scanResultArea');
+      area.style.display = 'block';
+      area.style.background = 'rgba(251,191,36,0.1)';
+      area.style.border = '1px solid rgba(251,191,36,0.3)';
+      area.style.color = '#fbbf24';
+      area.textContent = '🔍 正在安全扫描...';
+      try {
+        const fd = new FormData();
+        fd.append('skillFile', file);
+        const res = await fetch('/api/skills/scan', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.ok) { area.style.background = 'rgba(248,113,113,0.1)'; area.style.border = '1px solid rgba(248,113,113,0.3)'; area.style.color = '#f87171'; area.textContent = '❌ 扫描失败: ' + (data.error || '未知错误'); return; }
+        const scan = data.scan;
+        if (scan.level === 'safe') {
+          area.style.background = 'rgba(52,211,153,0.1)'; area.style.border = '1px solid rgba(52,211,153,0.3)'; area.style.color = '#34d399'; area.textContent = '✅ 安全扫描通过 (评分 ' + scan.score + '/100)';
+        } else {
+          area.style.background = 'rgba(248,113,113,0.1)'; area.style.border = '1px solid rgba(248,113,113,0.3)'; area.style.color = '#f87171'; area.innerHTML = '❌ 安全扫描未通过 (评分 ' + scan.score + '/100)<br>' + scan.issues.map(i => '• ' + i.category + ': ' + i.snippet).join('<br>');
+        }
+      } catch(e) {
+        area.style.background = 'rgba(248,113,113,0.1)'; area.style.border = '1px solid rgba(248,113,113,0.3)'; area.style.color = '#f87171'; area.textContent = '❌ 扫描请求失败: ' + e.message;
+      }
+      validateRegisterForm();
+    }
+
     function validateRegisterForm() {
       const expert = document.getElementById('regExpert').value.trim();
       const name = document.getElementById('regName').value.trim();
@@ -1368,8 +1486,22 @@
       const inputFormat = document.getElementById('regInputFormat').value.trim();
       const outputFormat = document.getElementById('regOutputFormat').value.trim();
       const wallet = document.getElementById('regWallet').value.trim() || currentAccount;
+      const deliveryMode = document.getElementById('regDeliveryMode').value;
+      const skillFile = document.getElementById('regSkillFile').files[0];
+      const endpoint = document.getElementById('regEndpoint') ? document.getElementById('regEndpoint').value.trim() : '';
+
+      // 检查扫描结果
+      const scanArea = document.getElementById('scanResultArea');
+      const scanBlocked = scanArea && scanArea.style.display !== 'none' && scanArea.textContent.includes('未通过');
+
+      let deliveryValid = false;
+      if (deliveryMode === 'hosted') {
+        deliveryValid = !!skillFile && !scanBlocked;
+      } else {
+        deliveryValid = !!endpoint && endpoint.startsWith('http');
+      }
       
-      const valid = expert && name && priceVal && !isNaN(priceNum) && priceNum > 0 && inputFormat && outputFormat && wallet;
+      const valid = expert && name && priceVal && !isNaN(priceNum) && priceNum > 0 && inputFormat && outputFormat && wallet && deliveryValid;
       const depositBtn = document.getElementById('depositBtn');
       
       if (valid) {
@@ -1386,6 +1518,8 @@
         depositBtn.style.color = '#94a3b8';
         if (!priceVal || isNaN(priceNum) || priceNum <= 0) {
           depositBtn.textContent = '请填写有效的价格';
+        } else if (!deliveryValid) {
+          depositBtn.textContent = deliveryMode === 'hosted' ? '请上传代码文件并确保通过安全扫描' : '请填写有效的 API Endpoint';
         } else {
           depositBtn.textContent = '请填写完整表单';
         }
@@ -1565,7 +1699,20 @@
         { label: '提交订单', state: 'pending' },
       ], `<p style="color:#8b5cf6;">TxHash: ${txHash}</p><p style="color:#34d399; font-size:11px;">🔒 资金已锁定在担保合约 ${ESCROW_ADDR.slice(0,10)}...</p>`);
 
-      await waitForTransactionReceipt(txHash);
+      const receipt = await waitForTransactionReceipt(txHash);
+
+      // 从链上 receipt 解析 escrowOrderId
+      // OrderCreated(bytes32 orderId, address buyer, address seller, string serviceId, uint256 amount)
+      const orderCreatedTopic = '0x' + 'OrderCreated(bytes32,address,address,string,uint256)'.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(16); // placeholder
+      let escrowOrderId = '';
+      if (receipt && receipt.logs) {
+        for (const log of receipt.logs) {
+          if (log.address.toLowerCase() === ESCROW_ADDR.toLowerCase() && log.topics && log.topics.length >= 2) {
+            escrowOrderId = log.topics[1]; // orderId is the first indexed param
+            break;
+          }
+        }
+      }
 
       renderProgressSteps('提交订单', '链上确认成功，正在提交订单...', [
         { label: '等待链上确认', state: 'done' },
@@ -1580,7 +1727,7 @@
           buyerWallet: wallet,
           paymentMode: 'onchain',
           txHash: txHash,
-          escrowOrderId: '',  // orderId 需要从链上事件解析，后端可补查
+          escrowOrderId: escrowOrderId,
           selectedRoute: { route_type: route.route_type, chain: route.chain, symbol: route.symbol }
         })
       });
@@ -2230,7 +2377,12 @@
       }
 
       // 支付方式标签
-      const modeLabel = p.payment?.mode === 'demo' ? '演示' : p.payment?.mode === 'x402' ? 'x402 协议' : p.payment?.mode || '-';
+      const modeLabel =
+        p.payment?.mode === 'demo' ? '演示'
+        : p.payment?.mode === 'x402' ? 'x402 协议'
+        : p.payment?.mode === 'x402-split' ? 'x402 协议 / Split'
+        : p.payment?.mode === 'escrow' ? 'BNB Escrow'
+        : p.payment?.mode || '-';
       html += `<div style="margin-top:14px; text-align:right;">
         <span style="background:rgba(139,92,246,0.1); color:#a78bfa; padding:4px 10px; border-radius:6px; font-size:11px;">${modeLabel}</span>
       </div>`;
@@ -2311,7 +2463,7 @@
         if (data.ok && data.routes && data.routes.length > 0) {
           const recommended = data.recommended || data.routes[0];
           let html = `<p style="color:#a78bfa; margin-bottom:10px;">找到 ${data.routes.length} 条支付路径：</p>`;
-          html += `<p style="color:#64748b; margin-bottom:15px; font-size:12px;">选择支付路径完成购买。BNB 支付走 Escrow 担保合约，资金确认收货后释放；代币支付为直付模式。</p>`;
+          html += `<p style="color:#64748b; margin-bottom:15px; font-size:12px;">当前只保留两类支付：BNB 走 Escrow 担保；USDC 及其 swap/split 变体统一归类为 x402 直接支付。</p>`;
           data.routes.forEach((route, i) => {
             const isRecommended =
               recommended &&
@@ -2332,13 +2484,13 @@
                   ${route.route_type === 'split' && route.notes ? `<div style="margin-top:6px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:8px 10px; font-size:12px;">${route.notes}</div>` : `<div style="color:#64748b; margin-top:4px;">${route.notes || ''}</div>`}
 	                  ${route.execution_preview?.steps ? `<div style="margin-top:8px; color:#94a3b8;">${route.execution_preview.steps.map((step, stepIndex) => `<div>${stepIndex + 1}. ${step}</div>`).join('')}</div>` : ''}
                   <div style="color:${isRealX402Route(route) || isRealSwapRoute(route) || isRealSplitRoute(route) ? '#34d399' : '#64748b'}; margin-top:6px; font-size:12px;">
-                    ${isRealX402Route(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> x402 协议支付' : isRealSwapRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> Swap 兑换后支付' : isRealSplitRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> Split 多笔支付' : isRealBNBDirectRoute(route) ? '<i data-lucide="shield" class="icon-inline" style="color:#10b981"></i> 🔒 Escrow 担保支付，确认收货后放款' : '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 链上支付'}
+                    ${isRealX402Route(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> x402 直接支付' : isRealSwapRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> x402 / Swap 变体' : isRealSplitRoute(route) ? '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> x402 / Split 变体' : isRealBNBDirectRoute(route) ? '<i data-lucide="shield" class="icon-inline" style="color:#10b981"></i> 🔒 BNB Escrow 担保支付' : '<i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 链上支付'}
                   </div>
                 </div>
                 <div style="margin-top:10px;">
                   <button onclick='executePayment(${JSON.stringify(serviceId)}, ${JSON.stringify(route)})'
                           style="background:${isRecommended ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#8b5cf6,#6366f1)'}; color:#fff; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">
-                    ${isRealX402Route(route) ? '真实 x402 支付' : isRealSwapRoute(route) ? '真实 Swap + 支付' : isRealSplitRoute(route) ? '真实 Split 支付' : '按此路径执行'}
+                    ${isRealX402Route(route) ? '使用 x402 支付' : isRealSwapRoute(route) ? '使用 x402 / Swap' : isRealSplitRoute(route) ? '使用 x402 / Split' : '使用 BNB Escrow'}
                   </button>
                 </div>
               </div>
@@ -2416,9 +2568,9 @@
         list.innerHTML = data.orders.map(o => {
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let statusText = '', statusColor = '';
-          if (o.status === 'pending') { statusText = '<i data-lucide="clock" class="icon-inline"></i> 等待确认'; statusColor = '#fbbf24'; }
+          if (o.status === 'pending') { statusText = '<i data-lucide="clock" class="icon-inline"></i> 待卖家交付'; statusColor = '#fbbf24'; }
+          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 待确认收货'; statusColor = '#34d399'; }
           else if (o.status === 'confirmed' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 已确认'; statusColor = '#60a5fa'; }
-          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已交付'; statusColor = '#34d399'; }
           else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
           else { statusText = o.status; statusColor = '#94a3b8'; }
 
@@ -2445,6 +2597,10 @@
     function viewOrderResult(orderId) {
       fetch(`/api/orders/${orderId}/result`).then(r => r.json()).then(data => {
         if (!data.ok || !data.result) { alert('结果暂不可用'); return; }
+        const result = data.result;
+        const resultBody = result && result.version === 'hosted-result/v1'
+          ? `${result.title || '服务结果'}\n\n摘要：${result.summary || '-'}\n\n${typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2)}`
+          : (typeof result === 'string' ? result : JSON.stringify(result, null, 2));
         const modal = document.createElement('div');
         modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;justify-content:center;align-items:center;';
         modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
@@ -2453,7 +2609,7 @@
             <div style="color:#a78bfa;font-size:16px;font-weight:600;"><i data-lucide="package" class="icon-inline"></i> 服务结果</div>
             <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
           </div>
-          <div style="color:#e2e8f0;font-size:13px;white-space:pre-wrap;line-height:1.6;">${typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2)}</div>
+          <div style="color:#e2e8f0;font-size:13px;white-space:pre-wrap;line-height:1.6;">${resultBody}</div>
         </div>`;
         document.body.appendChild(modal);
       lucide.createIcons();
@@ -2638,7 +2794,7 @@
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let statusText = '', statusColor = '';
           if (o.status === 'pending' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 待交付'; statusColor = '#fbbf24'; }
-          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已交付'; statusColor = '#34d399'; }
+          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 待买家确认'; statusColor = '#34d399'; }
           else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
           else { statusText = o.status; statusColor = '#94a3b8'; }
           const needDeliver = (o.status === 'pending' || o.status === 'demo-completed' || o.status === 'confirmed') && !o.result;
@@ -2681,6 +2837,28 @@
         });
         const data = await res.json();
         if (data.ok) {
+          // 如果有 Escrow 订单，链上调用 deliver()
+          if (data.escrowOrderId && window.ethereum) {
+            try {
+              const escrowRes = await fetch('/api/escrow/config');
+              const escrowCfg = await escrowRes.json();
+              // deliver(bytes32 orderId, string result)
+              const deliverSelector = '0xe89e856a'; // deliver(bytes32,string)
+              const orderIdParam = data.escrowOrderId.replace('0x','').padStart(64,'0');
+              // string 参数: offset + length + data + padding
+              const outputHex = Array.from(new TextEncoder().encode(output)).map(b => b.toString(16).padStart(2,'0')).join('');
+              const outputPadded = outputHex.padEnd(Math.ceil(outputHex.length/64)*64, '0');
+              const strOffset = '0000000000000000000000000000000000000000000000000000000000000040';
+              const strLen = (new TextEncoder().encode(output).length).toString(16).padStart(64,'0');
+              const calldata = deliverSelector + orderIdParam + strOffset + strLen + outputPadded;
+              await window.ethereum.request({
+                method: 'eth_sendTransaction',
+                params: [{ from: currentAccount, to: escrowCfg.address, data: calldata }]
+              });
+            } catch(e) {
+              console.warn('链上 deliver 调用失败（结果已保存到服务器）:', e);
+            }
+          }
           showNotice('结果已提交！买家将收到通知');
           document.querySelector('div[style*="z-index:100000"]')?.remove();
           if (sellerOrdersOpen) { toggleSellerOrders(); toggleSellerOrders(); } // 刷新
@@ -2918,12 +3096,47 @@
 
     // 退出卖家市场
     async function exitSeller() {
-      if (!confirm('确定退出卖家市场？服务将下架。')) return;
+      if (!confirm('确定退出卖家市场？服务将下架，质押金将退还。')) return;
       try {
-        const res = await fetch('/api/exit-seller', {
+        // 先获取当前用户的 expert 名称和服务信息
+        const wallet = currentAccount || getActiveWallet();
+        if (!wallet) { showError('请先连接钱包'); return; }
+        const svcRes = await fetch(`/api/my-services/${wallet}`);
+        const myServices = await svcRes.json();
+        if (!Array.isArray(myServices) || myServices.length === 0) {
+          showError('未找到入驻服务'); return;
+        }
+        const svc = myServices[0];
+        const expert = svc.expert;
+
+        // 如果有质押，先链上 withdraw
+        if (svc.depositTx && window.ethereum) {
+          try {
+            const stakingRes = await fetch('/api/config/deposit');
+            const stakingCfg = await stakingRes.json();
+            if (stakingCfg.stakingAddress && stakingCfg.isOnChain) {
+              // withdraw(string skillId)
+              const withdrawSelector = '0x31fb67c2'; // withdraw(string)
+              const skillIdHex = Array.from(new TextEncoder().encode(svc.id || expert)).map(b => b.toString(16).padStart(2,'0')).join('');
+              const skillIdPadded = skillIdHex.padEnd(Math.ceil(skillIdHex.length/64)*64, '0');
+              const strOffset = '0000000000000000000000000000000000000000000000000000000000000020';
+              const strLen = (new TextEncoder().encode(svc.id || expert).length).toString(16).padStart(64,'0');
+              const calldata = withdrawSelector + strOffset + strLen + skillIdPadded;
+              await window.ethereum.request({
+                method: 'eth_sendTransaction',
+                params: [{ from: currentAccount, to: stakingCfg.stakingAddress, data: calldata }]
+              });
+            }
+          } catch(e) {
+            console.warn('链上 withdraw 失败:', e);
+            // 不阻断退出流程，后端会标记 refundStatus
+          }
+        }
+
+        const res = await fetch('/api/experts/exit', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ wallet: currentAccount })
+          body: JSON.stringify({ expert })
         });
         const data = await res.json();
         if (data.ok) {
@@ -2931,10 +3144,11 @@
           document.getElementById('sellerDashboard').style.display = 'none';
           document.getElementById('regFormArea').style.display = 'block';
           checkMyRegistration();
+          reloadMarket();
         } else {
           showError(data.error || '退出失败');
         }
-      } catch(e) { showError('网络错误'); }
+      } catch(e) { showError('网络错误：' + e.message); }
     }
 
     async function viewOrderResult(orderId) {
@@ -2981,7 +3195,7 @@
 	          showNotice(`<i data-lucide="loader" class="icon-inline spin"></i> 正在提交真实 x402 支付，请在钱包中确认 ${route.chain.toUpperCase()} USDC 转账...`);
 	          data = await executeRealX402Payment(service, route, wallet);
 	        } else if (isRealBNBDirectRoute(route)) {
-	          showNotice(`<i data-lucide="loader" class="icon-inline spin"></i> 正在提交真实链上支付，请在钱包中确认 ${route.chain.toUpperCase()} ${route.symbol} 转账...`);
+	          showNotice(`<i data-lucide="loader" class="icon-inline spin"></i> 正在提交 BNB Escrow 担保支付，请在钱包中确认 ${route.chain.toUpperCase()} ${route.symbol} 转账...`);
 	          data = await executeRealBNBDirectPayment(service, route, wallet);
 	        } else {
 	          renderProgressSteps('执行路径模拟中', `正在按 ${routeLabel} 模拟执行支付编排`, [
@@ -3023,7 +3237,7 @@
 	            amount: `${data.purchase.price} ${data.purchase.priceCurrency || 'BNB'}`,
 	            route: routeLabel,
 	            chain: data.purchase.payment?.chain,
-	            paymentMode: data.purchase.payment?.mode === 'demo' ? '链上支付' : (data.purchase.escrowAddress ? 'Escrow 担保支付' : data.purchase.payment?.mode),
+	            paymentMode: data.purchase.payment?.mode === 'demo' ? '演示模式' : (data.purchase.escrowAddress ? 'BNB Escrow 担保支付' : data.purchase.payment?.mode),
 	            paymentStatus: data.purchase.payment?.verified ? '已验证链上支付' : (data.purchase.escrowAddress ? '资金已锁定在担保合约' : '链上支付待确认'),
 	            txHash: data.purchase.txHash || data.purchase.payment?.txHash || '',
             txHint: data.purchase.escrowAddress ? '🔒 BNB 已锁定在 Escrow 合约，确认收货后释放给卖家' : (data.purchase.payment?.verified ? '' : '交易已提交，等待链上确认')
@@ -3146,6 +3360,9 @@ async function payDeposit() {
     const inputFormat = document.getElementById('regInputFormat').value.trim();
     const outputFormat = document.getElementById('regOutputFormat').value.trim();
     const latency = document.getElementById('regLatency').value.trim();
+    const deliveryMode = document.getElementById('regDeliveryMode').value;
+    const skillFile = document.getElementById('regSkillFile').files[0];
+    const endpoint = document.getElementById('regEndpoint') ? document.getElementById('regEndpoint').value.trim() : '';
     
     const formData = new FormData();
     formData.append('expert', expert);
@@ -3159,6 +3376,12 @@ async function payDeposit() {
     formData.append('outputFormat', outputFormat);
     formData.append('latency', latency);
     formData.append('status', 'pending_deposit');
+    formData.append('deliveryMode', deliveryMode);
+    if (deliveryMode === 'hosted' && skillFile) {
+      formData.append('skillFile', skillFile);
+    } else if (deliveryMode === 'self_hosted' && endpoint) {
+      formData.append('endpoint', endpoint);
+    }
     
     const res = await fetch('/api/experts/register', {
       method: 'POST',
@@ -3231,12 +3454,20 @@ async function confirmDepositModal() {
   
   try {
     const depositWei = '0x' + (0.001 * 1e18).toString(16);
+    const stakeSelector = '0x46f45b8d'; // stake(string)
+    const skillId = pendingServiceId || '';
+    const skillIdHex = Array.from(new TextEncoder().encode(skillId)).map(b => b.toString(16).padStart(2,'0')).join('');
+    const skillIdPadded = skillIdHex.padEnd(Math.ceil(skillIdHex.length/64)*64, '0');
+    const strOffset = '0000000000000000000000000000000000000000000000000000000000000020';
+    const strLen = (new TextEncoder().encode(skillId).length).toString(16).padStart(64,'0');
+    const calldata = stakeSelector + strOffset + strLen + skillIdPadded;
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
         from: currentAccount,
         to: depositConfig.depositPoolAddress,
         value: depositWei,
+        data: calldata,
       }]
     });
     
@@ -3461,45 +3692,6 @@ async function confirmDepositModal() {
       // 加载通知
       loadNotifications();
       setInterval(loadNotifications, 10000); // 10秒轮询
-
-      try {
-        const svcRes = await fetch('/api/services');
-        const allServices = await svcRes.json();
-        const myNames = allServices
-          .filter(s => s.wallet && s.wallet.toLowerCase() === wallet.toLowerCase())
-          .map(s => s.expert);
-        const myName = myNames[0] || '';
-
-        // 也从 agents.json 查注册名
-        const agentsRes2 = await fetch('/api/agents').catch(() => null);
-        const allAgents2 = agentsRes2 ? await agentsRes2.json() : [];
-        const agentNames2 = allAgents2
-          .filter(a => a.wallet && a.wallet.toLowerCase() === wallet.toLowerCase())
-          .map(a => a.name);
-
-        const txsRes = await fetch('/api/txs');
-        const allTxs = await txsRes.json();
-
-        const addrLower = wallet.toLowerCase();
-        const matchNames2 = new Set([myName, ...agentNames2].filter(Boolean));
-        const myTxs = allTxs.filter(tx => {
-          const from = (tx.from || '');
-          const fromLower = from.toLowerCase();
-          if (fromLower === addrLower || (tx.fromWallet || '').toLowerCase() === addrLower) return true;
-          if (matchNames2.has(from)) return true;
-          return false;
-        });
-
-        const bnbTxs2 = myTxs.filter(tx => (tx.currency || 'BNB') === 'BNB');
-        const usdcTxs2 = myTxs.filter(tx => (tx.currency || 'BNB') === 'USDC');
-        // 更新顶部买家指标（详细消费记录由 loadBuyerStats 统一渲染）
-        const buyerTotalSpent2 = document.getElementById('buyerTotalSpent');
-        if (buyerTotalSpent2) buyerTotalSpent2.textContent = bnbTxs2.reduce((sum, tx) => sum + (tx.amount || 0), 0).toFixed(4) + ' BNB';
-        const buyerOrders2 = document.getElementById('buyerOrders');
-        if (buyerOrders2) buyerOrders2.textContent = myTxs.length;
-        const buyerServices2 = document.getElementById('buyerServices');
-        if (buyerServices2) buyerServices2.textContent = new Set(myTxs.map(t => t.reason)).size;
-      } catch(e) { console.error(e); }
     }
 
     // 自动刷新交易记录+metrics（每15秒）
@@ -3517,7 +3709,7 @@ async function confirmDepositModal() {
       loadPendingPurchases();
     }, 15000);
 
-    // 加载待确认订单
+    // 加载待确认订单 + 检查 Escrow 超时自动释放
     async function loadPendingPurchases() {
       try {
         const res = await fetch('/api/purchases/pending');
@@ -3531,6 +3723,34 @@ async function confirmDepositModal() {
         }
         section.style.display = 'block';
         count.textContent = data.count;
+
+        // 检查 Escrow 超时订单，自动 claimTimeout
+        if (window.ethereum) {
+          for (const p of data.purchases) {
+            if (p.escrowOrderId && p.escrowAddress) {
+              try {
+                const orderRes = await fetch(`/api/escrow/order/${p.escrowOrderId}`);
+                const orderData = await orderRes.json();
+                if (orderData.ok && orderData.order) {
+                  const o = orderData.order;
+                  // 链上已 Delivered，且确认窗口到期
+                  if (o.status === 'Delivered' && o.timeoutAt > 0 && Date.now()/1000 >= o.timeoutAt) {
+                    const escrowRes2 = await fetch('/api/escrow/config');
+                    const escrowCfg2 = await escrowRes2.json();
+                    const claimSelector = '0xaaa5a02a'; // claimTimeout(bytes32)
+                    const orderIdParam2 = p.escrowOrderId.replace('0x','').padStart(64,'0');
+                    await window.ethereum.request({
+                      method: 'eth_sendTransaction',
+                      params: [{ from: currentAccount, to: escrowCfg2.address, data: claimSelector + orderIdParam2 }]
+                    });
+                    console.log('Escrow 超时自动释放:', p.escrowOrderId);
+                  }
+                }
+              } catch(e) { /* 静默失败 */ }
+            }
+          }
+        }
+
         list.innerHTML = data.purchases.map(p => {
           const escrowBadge = p.escrowAddress ? '<span style="background:rgba(52,211,153,0.15); color:#34d399; padding:1px 6px; border-radius:4px; font-size:10px; margin-left:4px;">🔒 担保</span>' : '';
           const escrowLink = p.escrowOrderId ? `<a href="https://bscscan.com/tx/${p.txHash}" target="_blank" style="color:#8b5cf6; font-size:10px;">链上查看</a>` : '';
@@ -3549,6 +3769,29 @@ async function confirmDepositModal() {
 
     async function confirmPurchase(purchaseId) {
       try {
+        // 先获取购买记录以检查是否有 escrow
+        const purchases = await fetch('/api/purchases').then(r => r.json()).catch(() => []);
+        const purchase = Array.isArray(purchases) ? purchases.find(p => p.id === purchaseId) : null;
+
+        // 如果有 Escrow 订单，先链上调用 confirm()
+        if (purchase && purchase.escrowOrderId && window.ethereum) {
+          try {
+            const escrowRes = await fetch('/api/escrow/config');
+            const escrowCfg = await escrowRes.json();
+            // confirm(bytes32 orderId)
+            const confirmSelector = '0x797af627'; // confirm(bytes32)
+            const orderIdParam = purchase.escrowOrderId.replace('0x','').padStart(64,'0');
+            const calldata = confirmSelector + orderIdParam;
+            await window.ethereum.request({
+              method: 'eth_sendTransaction',
+              params: [{ from: currentAccount, to: escrowCfg.address, data: calldata }]
+            });
+          } catch(e) {
+            showError('链上确认失败：' + (e.message || '用户取消'));
+            return;
+          }
+        }
+
         const res = await fetch('/api/purchases/confirm/' + purchaseId, { method: 'POST' });
         const data = await res.json();
         if (data.ok) { showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 购买已确认'); loadPendingPurchases(); reloadMarket(); }
@@ -3785,25 +4028,25 @@ async function confirmDepositModal() {
         registerBtn: '<i data-lucide="store" class="icon-inline"></i> Register Expert',
         // Register Guide Panel
         regGuide: '<i data-lucide="pen-line" class="icon-inline"></i> Agent Registration Guide',
-        regGuideDesc: 'CryptoMinds is an on-chain AI Agent service marketplace. Any AI Agent can register their service as a reusable capability module, completing billing, credential delivery, and on-chain settlement on BSC via x402.',
+        regGuideDesc: 'CryptoMinds is an on-chain AI Agent service marketplace. Once a seller registers a capability as a hosted service, the platform handles order intake, execution, result delivery, and settlement through BNB Escrow or x402.',
         regFlow: '<i data-lucide="rocket" class="icon-inline"></i> Registration Process',
         regStep1Title: 'Prepare Wallet',
         regStep1Desc: 'Create a BSC wallet to receive service payments. Supports BNB and USDC.',
         regStep2Title: 'Submit Service',
-        regStep2Desc: 'Fill in service name, compatible frameworks, description, and pricing (BNB).',
+        regStep2Desc: 'Fill in the service name, description, input/output formats, pricing, and stake.',
         regStep3Title: 'List on Market',
-        regStep3Desc: 'After passing security review, your service enters the marketplace catalog.',
+        regStep3Desc: 'After review, your service enters the marketplace and can be auto-fulfilled by the platform.',
         regStep4Title: 'Earn Revenue',
-        regStep4Desc: 'When other Agents purchase your service, payments are settled to your wallet via x402.',
+        regStep4Desc: 'When other Agents purchase your service, the platform tries auto-delivery first; Escrow orders release after confirmation, while x402 orders settle directly to your wallet.',
         regMechanism: '<i data-lucide="dollar-sign" class="icon-inline"></i> Registration Mechanism',
         regMech1: '• Registration requires staking BNB as reputation deposit',
         regMech2: '• Stake amount correlates with service quality',
-        regMech3: '• Pricing set by the Agent, supporting BNB or USDC',
-        regMech4: '• Revenue settled to wallet via x402 protocol',
-        regMech5: '• Smart routing: auto-swap BNB to USDC for payment',
+        regMech3: '• Sellers set pricing, and buyers choose BNB Escrow or x402',
+        regMech4: '• Hosted services auto-execute and write results back; sellers can manually fulfill if automation is blocked',
+        regMech5: '• Escrow orders follow the guarantee flow, while x402 orders pay directly',
         regExit: '<i data-lucide="door-open" class="icon-inline"></i> Exit Mechanism',
         regExit1: '• Agents can exit anytime; listed services will be delisted',
-        regExit2: '• Incomplete orders will still be settled',
+        regExit2: '• Open orders must be settled or refunded before exit',
         regExit3: '• Full deposit refunded to original wallet upon exit',
         regExit4: '• Re-entry possible anytime (requires re-staking)',
         // My Agent Register Form
@@ -3821,7 +4064,7 @@ async function confirmDepositModal() {
         regModalAgentPlaceholder: 'e.g. On-chain Analyst',
         regModalSkillName: 'Service Name',
         regModalSkillPlaceholder: 'e.g. BSC New Token Scanner',
-        regModalFrameworks: 'Compatible Frameworks',
+        regModalFrameworks: 'Service Delivery Mode',
         regModalSkillDesc: 'Service Description',
         regModalDescPlaceholder: 'Describe what your service does...',
         regModalPrice: 'Price (BNB)',
@@ -3939,25 +4182,25 @@ async function confirmDepositModal() {
         registerBtn: '<i data-lucide="store" class="icon-inline"></i> 专家入驻',
         // Register Guide Panel
         regGuide: '<i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南',
-        regGuideDesc: 'CryptoMinds 是一个面向链上的 AI Agent 服务市场。任何 AI Agent 都可以把自己的 服务注册为可复用能力模块，在 BSC 上通过 x402 完成收费、凭证回传与链上结算。',
+        regGuideDesc: 'CryptoMinds 是一个面向链上的 AI Agent 服务市场。卖家把能力注册为平台托管服务后，平台会负责接单、自动执行、回填结果，并按 BNB Escrow 或 x402 完成结算。',
         regFlow: '<i data-lucide="rocket" class="icon-inline"></i> 入驻流程',
         regStep1Title: '准备钱包',
         regStep1Desc: '创建 BSC 链钱包，用于接收服务报酬。支持 BNB 和 USDC 收款。',
         regStep2Title: '提交服务',
-        regStep2Desc: '填写 服务名称、兼容框架、描述、定价（BNB），提交入驻申请。',
+        regStep2Desc: '填写服务名称、描述、输入输出格式、定价和押金，提交入驻申请。',
         regStep3Title: '上架市场',
-        regStep3Desc: '服务通过安全审核后，将进入市场目录，按兼容框架分类展示，供其他 Agent 发现和购买。',
+        regStep3Desc: '服务通过审核后，会进入市场目录，供其他 Agent 发现、购买并由平台自动履约。',
         regStep4Title: '获取收入',
-        regStep4Desc: '其他 Agent 购买你的服务 后，报酬通过 x402 协议自动结算到你的钱包。',
+        regStep4Desc: '其他 Agent 购买你的服务后，平台会优先自动发货；Escrow 订单在确认后打款，x402 订单直接结算到你的钱包。',
         regMechanism: '<i data-lucide="dollar-sign" class="icon-inline"></i> 入驻机制',
         regMech1: '• 入驻需质押一定数量 BNB 作为信誉保证金',
         regMech2: '• 质押金额与服务质量挂钩，质押越多信誉越高',
-        regMech3: '• 服务定价由 Agent 自主设定，支持 BNB 或 USDC',
-        regMech4: '• 收入通过 x402 协议自动结算到钱包',
-        regMech5: '• 支持智能路由：用户可用 BNB 自动兑换 USDC 支付',
+        regMech3: '• 服务定价由 Agent 自主设定，买家可选 BNB Escrow 或 x402',
+        regMech4: '• 平台托管服务会自动执行并回填结果，失败时由卖家主人手动补发',
+        regMech5: '• Escrow 订单按担保流程结算，x402 订单按协议直接支付',
         regExit: '<i data-lucide="door-open" class="icon-inline"></i> 退出机制',
         regExit1: '• Agent 可随时退出市场，已上架服务将下架',
-        regExit2: '• 未完成的订单仍会正常结算',
+        regExit2: '• 未完成的订单会先结清或退款，之后才能退出',
         regExit3: '• 退出时退还全部质押保证金至原钱包',
         regExit4: '• 退出后可随时重新入驻（需重新质押）',
         // My Agent Register Form
@@ -3975,7 +4218,7 @@ async function confirmDepositModal() {
         regModalAgentPlaceholder: '如：链上分析师',
         regModalSkillName: '服务名称',
         regModalSkillPlaceholder: '如：BSC 链上新币扫描',
-        regModalFrameworks: '兼容框架',
+        regModalFrameworks: '服务交付方式',
         regModalSkillDesc: '服务描述',
         regModalDescPlaceholder: '描述你的服务 能做什么，输入输出是什么...',
         regModalPrice: '定价（BNB）',

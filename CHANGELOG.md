@@ -2,7 +2,7 @@
 
 ## 2026-04-18 — 智能合约上线 + 清理优化
 
-- **部署 ServiceEscrow 合约** (`0x1A81a18d...`) — BSC 主网担保交易
+- **部署 ServiceEscrow 合约** (`0x47e19043...`) — BSC 主网担保交易
 - **部署 SkillStaking 合约** (`0x287A44aA...`) — BSC 主网质押罚没
 - **完成 Escrow 全流程验证** — createOrder → deliver → confirm，链上成功
 - **前端优化**：刷新保持当前页、买家/卖家指标分离、消费记录表格化

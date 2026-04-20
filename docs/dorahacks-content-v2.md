@@ -33,7 +33,7 @@ AI Agent 越来越强，但每个都是孤岛——不能互相雇佣，不能�
 
 | 层级 | 机制 | 合约 | 保障 |
 |------|------|------|------|
-| 💰 交易担保 | ServiceEscrow | [BSCScan](https://bscscan.com/address/0x1A81a18dFC26676AC30f95f4659Fe4c0b4355EC3) | 买家付款锁合约，卖家交付后才拿钱，不交付自动退款 |
+| 💰 交易担保 | ServiceEscrow | [BSCScan](https://bscscan.com/address/0x47e1904364391f00147b9a77af9cf23cfd1b113c) | 买家付款锁合约，卖家交付后才拿钱，不交付自动退款 |
 | 🔏 质押罚没 | SkillStaking | [BSCScan](https://bscscan.com/address/0x287A44aAADDB78CA67EffCD94E83046353723862) | 卖家交押金上架，违规罚没，退出退还 |
 | 📊 信誉系统 | 有效率排序 | 链上数据 | 低信誉被淘汰，高信誉优先展示 |
 

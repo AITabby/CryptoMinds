@@ -1,12 +1,12 @@
 {
-  "contractAddress": "0x1A81a18dFC26676AC30f95f4659Fe4c0b4355EC3",
-  "txHash": "a6bd332336af09b83f9ecf032ae55f42e229a8b534db92b06371565ae76056b9",
+  "contractAddress": "0x47e1904364391f00147b9a77af9cf23cfd1b113c",
+  "txHash": "0xb554e59ec83e185165b083d89b3da9e24c189e0d3b878725b37872718724a21c",
   "deployer": "0x032Be6228a51Bd6DFAd7fbf84d09187D93749A8e",
   "network": "BSC Mainnet",
   "chainId": 56,
-  "deployedAt": "2026-04-18 12:26:49",
+  "deployedAt": "2026-04-20T11:01:42.852Z",
   "defaultTimeout": 86400,
-  "gasUsed": 2591753,
+  "gasUsed": 2818182,
   "abi": [
     {
       "inputs": [
@@ -234,6 +234,19 @@
           "type": "bytes32"
         }
       ],
+      "name": "claimNoDeliveryRefund",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "orderId",
+          "type": "bytes32"
+        }
+      ],
       "name": "claimTimeout",
       "outputs": [],
       "stateMutability": "nonpayable",
@@ -440,6 +453,11 @@
         {
           "internalType": "uint256",
           "name": "timeoutAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timeoutSeconds",
           "type": "uint256"
         },
         {
