@@ -847,14 +847,14 @@
       if (!currentAccount) return;
       const tabSnapshot = activeTab;
       try {
-        // 余额
+        // 余额（始终加载，不受 tab 限制）
         const balRes = await fetch(`/api/balance?wallet=${currentAccount}`);
         const balData = await balRes.json();
-        if (tabSnapshot !== 'myagent') return; // tab 已切走，不写
         const balEl = document.getElementById('buyerBalance');
         if (balEl && balData.ok) balEl.textContent = parseFloat(balData.balance).toFixed(4) + ' BNB';
 
-        // 买家订单
+        // 买家订单（只在 myagent tab 写入）
+        if (tabSnapshot !== 'myagent') return;
         const orderRes = await fetch(`/api/my-orders?wallet=${currentAccount}`);
         const orderData = await orderRes.json();
         if (tabSnapshot !== 'myagent') return; // tab 已切走，不写
