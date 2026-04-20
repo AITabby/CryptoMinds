@@ -800,19 +800,33 @@
     function showBuyerMetrics() {
       const cards = document.querySelectorAll('.metrics .metric-card');
       if (cards.length < 4) return;
-      // 我的余额
+      // 没连接钱包时显示提示状态
+      if (!currentAccount) {
+        cards[0].querySelector('.label').innerHTML = '<i data-lucide="wallet" class="icon-inline"></i> 我的余额';
+        const v0 = cards[0].querySelector('.value'); v0.id = 'buyerBalance'; v0.textContent = '未连接'; v0.style.color = '#64748b';
+        const t0 = cards[0].querySelector('.trend'); t0.id = 'buyerBalanceTrend'; t0.textContent = '\u00a0'; t0.className = 'trend';
+        cards[1].querySelector('.label').innerHTML = '<i data-lucide="clipboard-list" class="icon-inline"></i> 我的订单';
+        const v1 = cards[1].querySelector('.value'); v1.id = 'buyerOrders'; v1.textContent = '--'; v1.style.color = '#64748b';
+        const t1 = cards[1].querySelector('.trend'); t1.id = 'buyerOrdersTrend'; t1.textContent = '\u00a0'; t1.className = 'trend';
+        cards[2].querySelector('.label').innerHTML = '<i data-lucide="coins" class="icon-inline"></i> 总消费';
+        const v2 = cards[2].querySelector('.value'); v2.id = 'buyerTotalSpent'; v2.textContent = '--'; v2.style.color = '#64748b';
+        const t2 = cards[2].querySelector('.trend'); t2.id = 'buyerTotalSpentTrend'; t2.textContent = '--'; t2.className = 'trend'; t2.style.color = '#64748b';
+        cards[3].querySelector('.label').innerHTML = '<i data-lucide="package" class="icon-inline"></i> 已购服务';
+        const v3 = cards[3].querySelector('.value'); v3.id = 'buyerServices'; v3.textContent = '--'; v3.style.color = '#64748b';
+        const t3 = cards[3].querySelector('.trend'); t3.id = 'buyerServicesTrend'; t3.textContent = '--'; t3.className = 'trend'; t3.style.color = '#64748b';
+        lucide.createIcons();
+        return;
+      }
+      // 已连接钱包：显示默认值，等 loadBuyerStats 异步填充
       cards[0].querySelector('.label').innerHTML = '<i data-lucide="wallet" class="icon-inline"></i> 我的余额';
       const v0 = cards[0].querySelector('.value'); v0.id = 'buyerBalance'; v0.textContent = '-- BNB'; v0.style.color = '#34d399';
       const t0 = cards[0].querySelector('.trend'); t0.id = 'buyerBalanceTrend'; t0.textContent = '\u00a0'; t0.className = 'trend';
-      // 我的订单
       cards[1].querySelector('.label').innerHTML = '<i data-lucide="clipboard-list" class="icon-inline"></i> 我的订单';
       const v1 = cards[1].querySelector('.value'); v1.id = 'buyerOrders'; v1.textContent = '0'; v1.style.color = '';
       const t1 = cards[1].querySelector('.trend'); t1.id = 'buyerOrdersTrend'; t1.textContent = '\u00a0'; t1.className = 'trend';
-      // 总消费
       cards[2].querySelector('.label').innerHTML = '<i data-lucide="coins" class="icon-inline"></i> 总消费';
       const v2 = cards[2].querySelector('.value'); v2.id = 'buyerTotalSpent'; v2.textContent = '0 BNB'; v2.style.color = '#f87171';
       const t2 = cards[2].querySelector('.trend'); t2.id = 'buyerTotalSpentTrend'; t2.textContent = '--'; t2.className = 'trend'; t2.style.color = '#64748b';
-      // 已购服务
       cards[3].querySelector('.label').innerHTML = '<i data-lucide="package" class="icon-inline"></i> 已购服务';
       const v3 = cards[3].querySelector('.value'); v3.id = 'buyerServices'; v3.textContent = '0'; v3.style.color = '';
       const t3 = cards[3].querySelector('.trend'); t3.id = 'buyerServicesTrend'; t3.textContent = '--'; t3.className = 'trend'; t3.style.color = '#64748b';
@@ -831,16 +845,19 @@
     // 加载买家统计
     async function loadBuyerStats() {
       if (!currentAccount) return;
+      const tabSnapshot = activeTab;
       try {
         // 余额
         const balRes = await fetch(`/api/balance?wallet=${currentAccount}`);
         const balData = await balRes.json();
+        if (tabSnapshot !== 'myagent') return; // tab 已切走，不写
         const balEl = document.getElementById('buyerBalance');
         if (balEl && balData.ok) balEl.textContent = parseFloat(balData.balance).toFixed(4) + ' BNB';
 
         // 买家订单
         const orderRes = await fetch(`/api/my-orders?wallet=${currentAccount}`);
         const orderData = await orderRes.json();
+        if (tabSnapshot !== 'myagent') return; // tab 已切走，不写
         if (orderData.ok) {
           const orders = orderData.orders || [];
           const orderEl = document.getElementById('buyerOrders');
@@ -936,7 +953,8 @@
         activeTab = 'myagent';
         showBuyerMetrics();
         loadLiveFeed();
-        loadBuyerStats();
+        loadBuyerStats(); // 买家数据写入 myAgent 内容区域
+      }
       } else if (tab === 'admin') {
         document.querySelector('#adminTab').classList.add('active');
         document.getElementById('panel-admin').style.display = 'block';
@@ -1097,10 +1115,12 @@
     }
 
     async function loadLiveFeed() {
+      const tabSnapshot = activeTab;
       try {
         await loadMyAgents();
         const res = await fetch('/api/live-feed');
         const items = await res.json();
+        if (tabSnapshot !== activeTab) return; // tab 已切走
 
         // Stats
         const now = new Date();
@@ -4469,7 +4489,7 @@ async function confirmDepositModal() {
       // 预加载所有tab数据
       loadSellerData();
       loadLiveFeed();
-      loadBuyerStats();
+      // loadBuyerStats 只在切到 myagent tab 时加载，避免异步写入旧数据
       loadTxsFeed();
       // 先渲染页面，再后台重连钱包
       restoreTab();
