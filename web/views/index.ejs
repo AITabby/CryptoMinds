@@ -4451,10 +4451,11 @@ async function confirmDepositModal() {
           currentAccount = accounts[0].toLowerCase();
           walletIsDemo = false;
           await autoLoadWalletData();
-          // 如果当前在 myagent tab，刷新买家指标
+          // 始终加载余额（不管在哪个tab）
+          loadBuyerStats();
+          // 如果当前在 myagent tab，刷新买家指标显示
           if (activeTab === 'myagent') {
             showBuyerMetrics();
-            loadBuyerStats();
           }
         } else {
           // 有钱包但没连接，隐藏加载中
