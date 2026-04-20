@@ -693,8 +693,10 @@
 
   <script>
     let currentAccount = null;
+    let walletIsDemo = true;
     let progressRetryAction = null;
     let isPaymentInProgress = false;
+    const DEMO_WALLET = '0xd2f899ce74320aef9d8f2359183232a554f4c0e1';
     const marketServices = new Map();
     const CHAIN_CONFIG = {
       bsc: {
@@ -1567,7 +1569,7 @@
     }
 
     function getActiveWallet() {
-      return currentAccount;
+      return walletIsDemo || !currentAccount ? DEMO_WALLET : currentAccount;
     }
 
     function sortObjectKeys(value) {
@@ -1640,6 +1642,7 @@
 
     function isRealSwapRoute(route) {
       return Boolean(
+        !walletIsDemo &&
         currentAccount &&
         window.ethereum &&
         route &&
@@ -1651,6 +1654,7 @@
 
     function isRealSplitRoute(route) {
       return Boolean(
+        !walletIsDemo &&
         currentAccount &&
         window.ethereum &&
         route &&
@@ -2006,6 +2010,7 @@
 
     function isRealX402Route(route) {
       return Boolean(
+        !walletIsDemo &&
         currentAccount &&
         window.ethereum &&
         route &&
@@ -2017,6 +2022,7 @@
 
     function isRealBNBDirectRoute(route) {
       return Boolean(
+        !walletIsDemo &&
         currentAccount &&
         window.ethereum &&
         route &&
@@ -2268,6 +2274,7 @@
       try {
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         currentAccount = accounts[0].toLowerCase();
+        walletIsDemo = false;
         document.getElementById('connectBtn').innerHTML = '<i data-lucide="check-circle" class="icon-inline" style="color:#fff"></i> ' + currentAccount.slice(0, 6) + '...' + currentAccount.slice(-4); lucide.createIcons();
         document.getElementById('connectBtn').classList.add('connected');
 
@@ -2464,7 +2471,7 @@
       document.getElementById('smartRouteModal').style.display = 'block';
       
       // 调用智能路由API
-      const wallet = currentAccount;
+      const wallet = currentAccount || DEMO_WALLET;
       fetch('/api/smart-route', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3216,7 +3223,7 @@
 	              state: index === 0 ? 'active' : 'pending'
 	            }))
 	          ]);
-	          if (window.ethereum) {
+	          if (!walletIsDemo && window.ethereum) {
 	            showNotice(`<i data-lucide="flask-conical" class="icon-inline"></i> ${routeLabel} 当前仍走 Demo 订单，但会校验所选路由并记录下来`);
 	          } else {
 	            showNotice(`<i data-lucide="flask-conical" class="icon-inline"></i> 当前为 Demo 支付，将记录已选择的 ${routeLabel} 路由`);
@@ -3664,8 +3671,9 @@ async function confirmDepositModal() {
     // Demo 模式：自动连接钱包并加载数据
     async function autoLoadWalletData() {
       const wallet = getActiveWallet();
+      walletIsDemo = !currentAccount;
       // 只有真正连接了 MetaMask 才更新按钮显示
-      if (currentAccount) {
+      if (currentAccount && !walletIsDemo) {
         document.getElementById('connectBtn').innerHTML = '<i data-lucide="check-circle" class="icon-inline" style="color:#fff"></i> ' + currentAccount.slice(0, 6) + '...' + currentAccount.slice(-4);
         lucide.createIcons();
         document.getElementById('connectBtn').classList.add('connected');
@@ -4444,6 +4452,7 @@ async function confirmDepositModal() {
         console.log('[autoReconnect] eth_accounts returned:', accounts);
         if (accounts && accounts.length > 0) {
           currentAccount = accounts[0].toLowerCase();
+          walletIsDemo = false;
           console.log('[autoReconnect] Setting currentAccount to:', currentAccount);
           await autoLoadWalletData();
           // 始终加载余额（不管在哪个tab）
