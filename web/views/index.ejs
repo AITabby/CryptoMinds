@@ -678,7 +678,15 @@
 
     bootstrapServices(<%- JSON.stringify(SERVICES) %>);
 
-    // 全局指标卡片 - 保存原始文字用于切换
+    // 市场指标默认值（硬编码，不依赖异步备份）
+    const MARKET_DEFAULTS = [
+      { label: '<i data-lucide="bot" class="icon-inline"></i> Agent 总数', valueId: 'metricAgents', trendId: 'trendAgents' },
+      { label: '<i data-lucide="trending-up" class="icon-inline"></i> 近24h 交易额', valueId: 'metricVolume', trendId: 'trendVolume' },
+      { label: '<i data-lucide="zap" class="icon-inline"></i> 近24h 交易', valueId: 'metricTxs', trendId: 'trendTxs' },
+      { label: '<i data-lucide="database" class="icon-inline"></i> 总交易额', valueId: 'metricTotalVolume', trendId: 'trendTotalVolume' },
+    ];
+
+    // 全局指标卡片 - 保存当前市场数据用于切换恢复
     let marketLabels = [];
     function initMetricsBackup() {
       marketLabels = [];
@@ -717,16 +725,26 @@
     // 恢复市场指标（只改属性，不动DOM节点）
     function showMarketMetrics() {
       const cards = document.querySelectorAll('.metrics .metric-card');
-      if (cards.length < 4 || marketLabels.length < 4) return;
+      if (cards.length < 4) return;
+      // 优先用备份的市场数据，否则用硬编码默认值
+      const labels = (marketLabels.length >= 4) ? marketLabels : MARKET_DEFAULTS;
       for (let i = 0; i < 4; i++) {
-        cards[i].querySelector('.label').innerHTML = marketLabels[i].label;
+        cards[i].querySelector('.label').innerHTML = labels[i].label;
         const val = cards[i].querySelector('.value');
-        val.id = marketLabels[i].valueId;
-        val.innerHTML = marketLabels[i].value;
+        val.id = labels[i].valueId;
+        if (marketLabels.length >= 4) {
+          val.innerHTML = labels[i].value;
+        } else {
+          val.textContent = val.textContent || '0'; // 保留当前数值
+        }
         val.style.color = '';
         const trend = cards[i].querySelector('.trend');
-        trend.id = marketLabels[i].trendId;
-        trend.innerHTML = marketLabels[i].trend;
+        trend.id = labels[i].trendId;
+        if (marketLabels.length >= 4) {
+          trend.innerHTML = labels[i].trend;
+        } else {
+          trend.textContent = '\u00a0';
+        }
         trend.className = 'trend';
         trend.style.color = '';
       }
