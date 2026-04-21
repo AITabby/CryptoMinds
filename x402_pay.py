@@ -9,8 +9,8 @@ CryptoMinds x402 支付模块
 
 import os
 
-# 测试模式配置：默认测试模式，设 X402_TEST_MODE=false 启用真实链上交易
-TEST_MODE = os.getenv("X402_TEST_MODE", "true").lower() != "false"
+# 测试模式配置：默认真实链上模式，设 X402_TEST_MODE=true 才启用假交易
+TEST_MODE = os.getenv("X402_TEST_MODE", "false").lower() == "true"
 
 import json
 import time

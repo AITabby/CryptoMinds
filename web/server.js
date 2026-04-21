@@ -2,16 +2,19 @@ const express = require('express');
 const { Web3 } = require('web3');
 const path = require('path');
 const fs = require('fs');
-const { execFile, spawn } = require('child_process');
+const { execFile, execFileSync, spawn } = require('child_process');
 const dns = require('dns').promises;
 const net = require('net');
 const multer = require('multer');
 const { injectCryptoMindsSkill } = require('./inject_skill');
 const webpush = require('web-push');
+const { createAgentBuyHandlers } = require('./lib/agent_buy');
+const { createSellersStore, createSellersMarketHandlers } = require('./lib/sellers_market');
 
 const upload = multer({ dest: '/tmp/cryptominds-uploads/', limits: { fileSize: 100 * 1024 } }); // 100KB max
 
 const app = express();
+const { getSellers, saveSellers } = createSellersStore(__dirname);
 const BSC_RPC = process.env.BSC_RPC || 'https://bsc-dataseed1.binance.org/';
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || '';
 const MINIMAX_BASE_URL = 'https://api.minimaxi.com/v1';
@@ -2211,252 +2214,21 @@ app.get('/api/experts', (req, res) => {
 });
 
 // ===== V2 API =====
-
-// 获取卖家列表
-app.get('/api/sellers', (req, res) => {
-  const data = getSellers();
-  res.json({ ok: true, sellers: data.sellers || [] });
+const sellersMarketHandlers = createSellersMarketHandlers({
+  getSellers,
+  saveSellers,
+  getPurchases,
+  savePurchases,
+  purchasesFile: PURCHASES_FILE,
+  addTx,
 });
 
-// 卖家入驻
-app.post('/api/sellers/register', (req, res) => {
-  const { name, desc, feeRate, wallet, endpoint } = req.body;
-  
-  if (!name || !wallet) {
-    return res.json({ ok: false, error: '缺少必填字段' });
-  }
-  
-  const data = getSellers();
-  
-  // 检查是否已入驻
-  const existing = data.sellers.find(s => s.wallet.toLowerCase() === wallet.toLowerCase());
-  if (existing) {
-    return res.json({ ok: false, error: '该钱包已入驻' });
-  }
-  
-  // 新增卖家
-  const seller = {
-    wallet,
-    name,
-    desc: desc || '',
-    deposit: 0.1, // 基础押金
-    feeRate: feeRate || 0.01,
-    strategy: '智能选币',
-    rating: 5,
-    totalOrders: 0,
-    badRatings: 0,
-    activeOrders: 0,
-    createdAt: new Date().toISOString(),
-    endpoint: endpoint || '',
-    agentMode: endpoint ? '自主' : '平台托管'
-  };
-  
-  data.sellers.push(seller);
-  saveSellers(data);
-  
-  res.json({ ok: true, seller });
-});
-
-// 卖家补押金
-app.post('/api/sellers/:wallet/deposit', (req, res) => {
-  const { wallet } = req.params;
-  const { amount, txHash } = req.body;
-  
-  if (!amount || amount <= 0) {
-    return res.json({ ok: false, error: '无效金额' });
-  }
-  
-  const data = getSellers();
-  const seller = data.sellers.find(s => s.wallet.toLowerCase() === wallet.toLowerCase());
-  
-  if (!seller) {
-    return res.json({ ok: false, error: '卖家不存在' });
-  }
-  
-  seller.deposit = (seller.deposit || 0) + amount;
-  data.deposits.push({
-    wallet: wallet.toLowerCase(),
-    amount,
-    txHash: txHash || null,
-    time: new Date().toISOString()
-  });
-  saveSellers(data);
-  
-  res.json({ ok: true, deposit: seller.deposit });
-});
-
-// 卖家 Agent 执行买币+转币
-app.post('/api/orders/:id/execute', async (req, res) => {
-  const { id } = req.params;
-  const { sellerWallet, buyerWallet, amount } = req.body;
-  
-  const data = getSellers();
-  const order = (data.orders || []).find(o => o.id === id);
-  
-  if (!order) {
-    return res.json({ ok: false, error: '订单不存在' });
-  }
-  
-  if (order.status !== 'pending') {
-    return res.json({ ok: false, error: `订单状态不是 pending: ${order.status}` });
-  }
-  
-  // 模拟卖家 Agent 执行：买币 + 转币
-  // TODO: 接入 PancakeSwap 真实交易
-  const mockBuyTx = '0x' + require('crypto').randomBytes(16).toString('hex');
-  const mockTransferTx = '0x' + require('crypto').randomBytes(16).toString('hex');
-  const mockTokenAmount = (parseFloat(amount) * (Math.random() * 500 + 100)).toFixed(2);
-  
-  // 更新订单
-  order.status = 'completed';
-  order.buyTx = mockBuyTx;
-  order.transferTx = mockTransferTx;
-  order.tokenAddress = '0x' + require('crypto').randomBytes(20).toString('hex');
-  order.tokenAmount = mockTokenAmount;
-  order.completedAt = new Date().toISOString();
-  
-  // 更新卖家统计
-  const seller = data.sellers.find(s => s.wallet.toLowerCase() === sellerWallet?.toLowerCase());
-  if (seller) {
-    seller.totalOrders = (seller.totalOrders || 0) + 1;
-    seller.activeOrders = Math.max(0, (seller.activeOrders || 1) - 1);
-  }
-  
-  saveSellers(data);
-  
-  res.json({
-    ok: true,
-    buy_tx: mockBuyTx,
-    transfer_tx: mockTransferTx,
-    token_address: order.tokenAddress,
-    token_amount: mockTokenAmount
-  });
-});
-
-// 创建订单
-app.post('/api/orders/create', (req, res) => {
-  const { buyerWallet, buyerName, sellerWallet, amount, txHash, paymentMode } = req.body;
-  
-  if (!buyerWallet || !sellerWallet) {
-    return res.json({ ok: false, error: '缺少买家或卖家钱包地址' });
-  }
-  
-  if (!amount || amount <= 0) {
-    return res.json({ ok: false, error: '无效金额' });
-  }
-  
-  const data = getSellers();
-  const seller = data.sellers.find(s => s.wallet.toLowerCase() === sellerWallet.toLowerCase());
-  
-  if (!seller) {
-    return res.json({ ok: false, error: '卖家不存在' });
-  }
-  
-  // 检查可接单额度
-  const activeAmount = (data.orders || []).filter(o => 
-    o.sellerWallet?.toLowerCase() === sellerWallet.toLowerCase() && 
-    o.status === 'pending'
-  ).reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0);
-  const quota = (seller.deposit || 0) - activeAmount;
-  
-  if (quota < amount) {
-    return res.json({ ok: false, error: `卖家可接单额度不足: ${quota.toFixed(4)} BNB < ${amount} BNB` });
-  }
-  
-  // 创建订单
-  const order = {
-    id: 'ORD-' + Date.now(),
-    buyerWallet: buyerWallet.toLowerCase(),
-    buyerName: buyerName || '',
-    sellerWallet: sellerWallet.toLowerCase(),
-    sellerName: seller.name || '',
-    amount: parseFloat(amount),
-    feeRate: seller.feeRate || 0,
-    status: 'pending',
-    txHash: txHash || null,
-    paymentMode: paymentMode || 'direct',
-    createdAt: new Date().toISOString()
-  };
-  
-  data.orders = data.orders || [];
-  data.orders.push(order);
-  
-  // 更新卖家活跃订单
-  seller.activeOrders = (seller.activeOrders || 0) + 1;
-  
-  saveSellers(data);
-  
-  // 同步写入 purchases.json
-  try {
-    const purchases = getPurchases();
-    purchases.push({
-      id: order.id,
-      serviceId: `${seller.name || ''}-svc`,
-      expert: seller.name || '',
-      expertWallet: sellerWallet.toLowerCase(),
-      serviceName: seller.name || '',
-      buyerWallet: buyerWallet.toLowerCase(),
-      buyerName: buyerName || '',
-      price: parseFloat(amount),
-      status: 'pending',
-      time: order.createdAt,
-      txHash: txHash || null,
-      paymentMode: paymentMode || 'direct',
-    });
-    savePurchases(purchases);
-  } catch(e) { console.error('sync purchase error:', e); }
-  
-  // 写入交易记录（Recent Transactions）
-  addTx({
-    time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
-    from: buyerName || buyerWallet.slice(0,10),
-    fromWallet: buyerWallet.toLowerCase(),
-    to: seller.name || sellerWallet.slice(0,10),
-    toWallet: sellerWallet.toLowerCase(),
-    amount: parseFloat(amount),
-    reason: `代执行买币`,
-    tx: txHash || order.id,
-  });
-  
-  res.json({ ok: true, order });
-});
-
-// 卖家退出
-app.post('/api/sellers/exit', (req, res) => {
-  const { wallet } = req.body;
-  
-  const data = getSellers();
-  const idx = data.sellers.findIndex(s => s.wallet.toLowerCase() === wallet.toLowerCase());
-  
-  if (idx === -1) {
-    return res.json({ ok: false, error: '卖家不存在' });
-  }
-  
-  // 检查是否有未完成订单
-  const seller = data.sellers[idx];
-  if (seller.activeOrders > 0) {
-    return res.json({ ok: false, error: '有未完成订单，无法退出' });
-  }
-  
-  // 移除卖家
-  data.sellers.splice(idx, 1);
-  saveSellers(data);
-  
-  res.json({ ok: true });
-});
-
-function getSellers() {
-  try {
-    const data = fs.readFileSync(path.join(__dirname, 'sellers.json'), 'utf8');
-    return JSON.parse(data);
-  } catch (e) {
-    return { sellers: [], orders: [], deposits: [] };
-  }
-}
-
-function saveSellers(data) {
-  fs.writeFileSync(path.join(__dirname, 'sellers.json'), JSON.stringify(data, null, 2));
-}
+app.get('/api/sellers', sellersMarketHandlers.listSellers);
+app.post('/api/sellers/register', sellersMarketHandlers.registerSeller);
+app.post('/api/sellers/:wallet/deposit', sellersMarketHandlers.depositSeller);
+app.post('/api/orders/:id/execute', sellersMarketHandlers.executeOrder);
+app.post('/api/orders/create', sellersMarketHandlers.createOrder);
+app.post('/api/sellers/exit', sellersMarketHandlers.exitSeller);
 
 
 // 购买服务
@@ -3687,257 +3459,23 @@ app.get('/api/sync-chain', async (req, res) => {
 // skills/execute 已移除（未使用，通过 skill/call 调用）
 
 // Agent 买币指令 API（前端按钮触发）
-const { execSync } = require('child_process');
-// 卖家钱包地址 → 钱包名映射
-const SELLER_WALLET_MAP = {
-  '0xd2f899ce74320aef9d8f2359183232a554f4c0e1': 'gangdan',
-  '0xce0de97496c20dd773d75f560d3e4494cf542d96': 'tiedan',
-  '0x40992619077f0e42a1b7713c02b7324fa1d8715c': 'choudan',
-  '0x0badb40bed90515cb436282c1d5be059d17566bc': 'pidan',
-  '0x4190877f1959e260b4613793e3d07e8a332bc44b': 'ludan',
-};
-// 买家 Agent 决策：优先调 endpoint，否则平台托管
-async function buyerAgentPickSeller(sellers, buyerWallet, amount, buyerEndpoint) {
-  // 排除买家自己的卖家（不能选自己）
-  const availableSellers = sellers.filter(s => s.wallet.toLowerCase() !== buyerWallet.toLowerCase());
-  if (!availableSellers.length) {
-    throw new Error('没有可用的卖家');
-  }
-  const sellerList = availableSellers.map((s, i) => String(i+1) + '. ' + s.name + ' | 策略:' + s.strategy + ' | 评分:' + s.rating + ' | 费率:' + s.feeRate + ' | 模式:' + (s.agentMode || '平台托管') + ' | 描述:' + s.desc).join(String.fromCharCode(10));
-
-  // 优先调买家 Agent endpoint
-  if (buyerEndpoint) {
-    try {
-      const resp = await fetch(buyerEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'pickSeller', sellers: sellerList, buyerWallet, amount }),
-        signal: AbortSignal.timeout(10000),
-      });
-      const data = await resp.json();
-      const idx = (data.index || data.choice || 1) - 1;
-      console.log('[agent-buy] 买家Agent(endpoint)选中:', availableSellers[Math.max(0, Math.min(idx, availableSellers.length - 1))]?.name);
-      return availableSellers[Math.max(0, Math.min(idx, availableSellers.length - 1))];
-    } catch(e) {
-      console.log('[agent-buy] 买家Agent endpoint失败，降级平台托管:', e.message);
-    }
-  }
-
-  // 平台托管：调 MiniMax
-  const prompt = `你是买家的 Agent，帮买家从以下卖家中选一个最合适的来执行买币任务。
-
-买家钱包: ${buyerWallet}
-买入金额: ${amount} BNB
-
-可选卖家：
-${sellerList}
-
-请只返回你选的卖家编号（数字），不要其他内容。`;
-  const mmRes = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MINIMAX_API_KEY}` },
-    body: JSON.stringify({ model: 'MiniMax-Text-01', messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 10 }),
-  });
-  const mmData = await mmRes.json();
-  const text = mmData.choices?.[0]?.message?.content?.trim() || '1';
-  const idx = parseInt(text.replace(/[^0-9]/g, '')) - 1;
-  console.log('[agent-buy] 买家Agent(平台托管)选中:', availableSellers[Math.max(0, Math.min(idx, availableSellers.length - 1))]?.name);
-  return availableSellers[Math.max(0, Math.min(idx, availableSellers.length - 1))];
-}
-
-// 卖家 Agent 决策：优先调 endpoint，否则平台托管
-async function sellerAgentPickToken(seller) {
-  const tokens = ['0x3518D7aEE5248b9307b8A82B7c3Fa49e073c4444']; // AIBT
-  const tokenList = tokens.map((t, i) => String(i+1) + '. AIBT (' + t + ') - four.meme已毕业, PancakeSwap V2可买').join(String.fromCharCode(10));
-
-  // 优先调卖家 Agent endpoint
-  if (seller.endpoint) {
-    try {
-      const resp = await fetch(seller.endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'pickToken', sellerName: seller.name, strategy: seller.strategy, tokens: tokenList }),
-        signal: AbortSignal.timeout(10000),
-      });
-      const data = await resp.json();
-      const idx = (data.index || data.choice || 1) - 1;
-      console.log('[agent-buy] 卖家Agent(endpoint)选中代币:', tokens[Math.max(0, Math.min(idx, tokens.length - 1))]);
-      return tokens[Math.max(0, Math.min(idx, tokens.length - 1))];
-    } catch(e) {
-      console.log('[agent-buy] 卖家Agent endpoint失败，降级平台托管:', e.message);
-    }
-  }
-
-  // 平台托管
-  const prompt = `你是卖家「${seller.name}」，策略是「${seller.strategy}」。你要在 BSC 链上帮买家买一个代币。
-
-当前可买：
-${tokenList}
-
-根据策略选一个，只返回编号。`;
-  const mmRes = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MINIMAX_API_KEY}` },
-    body: JSON.stringify({ model: 'MiniMax-Text-01', messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 10 }),
-  });
-  const mmData = await mmRes.json();
-  const text = mmData.choices?.[0]?.message?.content?.trim() || '1';
-  const idx = parseInt(text.replace(/[^0-9]/g, '')) - 1;
-  return tokens[Math.max(0, Math.min(idx, tokens.length - 1))];
-}
-
-app.post('/api/pick-seller', async (req, res) => {
-  try {
-    const { buyerWallet, amount } = req.body;
-    const sellers = getSellers().sellers;
-    if (!sellers.length) {
-      return res.json({ ok: false, error: '暂无可用卖家' });
-    }
-    // 简单选择第一个卖家（可以改成智能选择）
-    const seller = sellers[0];
-    res.json({ ok: true, seller });
-  } catch(e) {
-    res.json({ ok: false, error: e.message });
-  }
+const { pickSellerHandler, agentBuyHandler } = createAgentBuyHandlers({
+  fetchImpl: fetch,
+  minimaxApiKey: MINIMAX_API_KEY,
+  minimaxBaseUrl: MINIMAX_BASE_URL,
+  pythonBin: PYTHON_BIN,
+  execFileSync,
+  getSellers,
+  saveSellers,
+  addPurchase,
+  addTx,
 });
 
-app.post('/api/agent-buy', async (req, res) => {
-  try {
-    const { buyerWallet, amount = 0.001 } = req.body;
-    if (!buyerWallet) {
-      return res.json({ ok: false, error: '请先连接钱包' });
-    }
-    const sellers = getSellers().sellers;
-    if (!sellers.length) {
-      return res.json({ ok: false, error: '暂无可用卖家' });
-    }
-    // 查买家 endpoint
-    const buyerInfo = sellers.find(s => s.wallet.toLowerCase() === buyerWallet.toLowerCase());
-    const buyerEndpoint = buyerInfo?.endpoint || '';
-    // 1. 买家 Agent 自主选卖家
-    const seller = await buyerAgentPickSeller(sellers, buyerWallet, amount, buyerEndpoint);
-    const sellerWalletName = SELLER_WALLET_MAP[seller.wallet.toLowerCase()] || 'gangdan';
-    console.log('[agent-buy] 买家Agent选中卖家:', seller.name, '策略:', seller.strategy);
-    
-    // 2. 买家钱包转BNB给卖家
-    const buyerWalletName = SELLER_WALLET_MAP[buyerWallet.toLowerCase()];
-    if (!buyerWalletName) {
-      return res.json({ ok: false, error: '买家钱包未托管' });
-    }
-    console.log('[agent-buy] 买家', buyerWalletName, '转', amount, 'BNB给卖家', sellerWalletName);
-    const transferCmd = `cd /Users/aitabby/projects/cryptominds-v2 && /usr/bin/python3 transfer_bnb.py ${buyerWalletName} ${seller.wallet} ${amount}`;
-    let transferTxHash = '';
-    try {
-      const transferOut = execSync(transferCmd, { timeout: 30000, encoding: 'utf-8' });
-      const transferResult = JSON.parse(transferOut.trim().split('\n').pop());
-      if (transferResult.ok) {
-        transferTxHash = transferResult.txHash;
-        // 记录买家付给卖家的BNB
-        addTx({
-          time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
-          from: buyerWalletName,
-          to: seller.name,
-          amount: amount,
-          reason: '买币',
-          tx: transferTxHash
-        });
-      }
-    } catch(e) {
-      console.log('[agent-buy] BNB转账失败:', e.message);
-      return res.json({ ok: false, error: 'BNB转账失败: ' + e.message });
-    }
-    
-    // 3. 卖家 Agent 自主选代币
-    const tokenAddr = await sellerAgentPickToken(seller);
-    console.log('[agent-buy] 危家Agent选中代币:', tokenAddr);
-    
-    // 4. 卖家钱包执行买币 + 转币（用刚收到的BNB）
-    const cmd = `cd /Users/aitabby/projects/cryptominds-v2 && /usr/bin/python3 token_buyer.py ${sellerWalletName} ${buyerWallet} ${tokenAddr} ${amount}`;
-    const output = execSync(cmd, { timeout: 120000, encoding: 'utf-8' });
-    const lines = output.trim().split('\n');
-    const lastLine = lines[lines.length - 1];
-    try {
-      const result = JSON.parse(lastLine);
-      result.sellerName = seller.name;
-      result.sellerStrategy = seller.strategy;
-      // 写入购买记录，让前端能查到
-      const orderId = 'buy-' + Date.now();
-      const orderData = {
-        id: orderId,
-        buyerWallet,
-        expertWallet: seller.wallet,
-        expert: seller.name,
-        serviceName: result.symbol || 'Token',
-        price: amount,
-        priceCurrency: 'BNB',
-        status: 'completed',
-        time: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        txHash: result.swapHash,
-        transferHash: result.transferHash,
-        tokenAmount: result.amount,
-        token: result.token,
-        sellerWallet: seller.wallet
-      };
-      try { addPurchase(orderData); } catch(e2) { console.log('[agent-buy] 写入 purchases 失败:', e2.message); }
-      // 写入 sellers.json orders
-      try {
-        const data = getSellers();
-        data.orders = data.orders || [];
-        data.orders.unshift(orderData);
-        if (data.orders.length > 100) data.orders = data.orders.slice(0, 100);
-        saveSellers(data);
-        console.log('[agent-buy] 写入 sellers.json orders 成功:', orderId);
-      } catch(e3) { console.log('[agent-buy] 写入 sellers orders 失败:', e3.message); }
-      // 写入 tx-log.json（Recent Transactions）- 已在上面记录买家付款
-      console.log('[agent-buy] 交易完成');
-      res.json(result);
-    } catch {
-      res.json({ ok: true, raw: output.slice(-300), sellerName: seller.name });
-    }
-  } catch (e) {
-    res.json({ ok: false, error: e.message.slice(0, 200) });
-  }
-});
+app.post('/api/pick-seller', pickSellerHandler);
+app.post('/api/agent-buy', agentBuyHandler);
 
 // 评价订单 API
-app.post('/api/rate-order', (req, res) => {
-  try {
-    const { orderId, rating, rater } = req.body;
-    if (!orderId || !rating || rating < 1 || rating > 5) {
-      return res.json({ ok: false, error: '参数无效' });
-    }
-    const data = getSellers();
-    const order = data.orders.find(o => o.id === orderId);
-    if (!order) {
-      return res.json({ ok: false, error: '订单不存在' });
-    }
-    if (order.rated) {
-      return res.json({ ok: false, error: '已评价' });
-    }
-    // 标记订单已评价
-    order.rated = true;
-    order.rating = rating;
-    // 更新卖家评分
-    const seller = data.sellers.find(s => s.wallet.toLowerCase() === order.sellerWallet?.toLowerCase());
-    if (seller) {
-      const totalRatings = (seller.totalOrders || 0);
-      const oldAvg = seller.rating || 5;
-      seller.rating = Math.round(((oldAvg * totalRatings + rating) / (totalRatings + 1)) * 10) / 10;
-      if (rating <= 2) seller.badRatings = (seller.badRatings || 0) + 1;
-    }
-    saveSellers(data);
-    // 同步更新 purchases.json
-    try {
-      const purchases = getPurchases();
-      const p = purchases.find(x => x.id === orderId);
-      if (p) { p.rated = true; p.rating = rating; fs.writeFileSync(PURCHASES_FILE, JSON.stringify(purchases, null, 2)); }
-    } catch(e2) {}
-    res.json({ ok: true, rating });
-  } catch(e) {
-    res.json({ ok: false, error: e.message });
-  }
-});
+app.post('/api/rate-order', sellersMarketHandlers.rateOrder);
 
 app.listen(PORT, () => {
   console.log(`CryptoMinds Marketplace running on http://localhost:${PORT}`);

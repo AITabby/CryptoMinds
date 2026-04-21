@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 /**
  * CryptoMinds Adapter for Four.meme
- * ⚠️ 注意：此合约为参考设计，尚未部署到任何链上。仅用于展示集成思路。
+ * ⚠️ 注意：此合约为参考设计，尚未部署到任何链上。仅用于展示集成思路，
+ * 不能作为生产合约地址或真实支付入口使用。
  * 这是一个参考合约，展示如何将 Four.meme 项目数据接入 CryptoMinds 经济体系
  * Four.meme 可以调用此合约来：
  * 1. 注册新项目到 CryptoMinds 市场
@@ -36,8 +37,9 @@ contract CryptoMindsAdapter {
         uint256 timestamp
     );
     
-    // CryptoMinds 支付合约地址（示例）
-    address public constant CRYPTO_MINDS_PAY = 0x...; // 需要替换为真实地址
+    // CryptoMinds 支付合约地址（占位符）
+    // 部署前必须替换；当前仓库里没有可直接使用的生产地址。
+    address public constant CRYPTO_MINDS_PAY = 0x...;
     
     // 项目信息结构
     struct Project {

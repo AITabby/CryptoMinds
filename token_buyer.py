@@ -8,11 +8,10 @@ CryptoMinds 真实买币执行器
 import sys, json, time
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
+from config import BSC_RPC, WALLETS_FILE, DEFAULT_SLIPPAGE_BPS
 
-w3 = Web3(Web3.HTTPProvider('https://bsc-dataseed.binance.org'))
+w3 = Web3(Web3.HTTPProvider(BSC_RPC))
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-
-WALLET_FILE = '/Users/aitabby/projects/cryptominds-v2/wallets.json'
 WBNB = Web3.to_checksum_address('0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c')
 
 # four.meme Token Manager (proxy)
@@ -59,6 +58,17 @@ PCS_SWAP_ABI = [{
     "type": "function"
 }]
 
+PCS_QUOTE_ABI = [{
+    "inputs": [
+        {"internalType": "uint256", "name": "amountIn", "type": "uint256"},
+        {"internalType": "address[]", "name": "path", "type": "address[]"}
+    ],
+    "name": "getAmountsOut",
+    "outputs": [{"internalType": "uint256[]", "name": "amounts", "type": "uint256[]"}],
+    "stateMutability": "view",
+    "type": "function"
+}]
+
 ERC20_ABI = [
     {"inputs": [], "name": "symbol", "outputs": [{"internalType": "string", "name": "", "type": "string"}], "stateMutability": "view", "type": "function"},
     {"inputs": [], "name": "decimals", "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}], "stateMutability": "view", "type": "function"},
@@ -68,6 +78,11 @@ ERC20_ABI = [
 # PancakeSwap V2 Factory
 PCS_FACTORY = Web3.to_checksum_address('0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73')
 FACTORY_ABI = [{"inputs":[{"internalType":"address","name":"tokenA","type":"address"},{"internalType":"address","name":"tokenB","type":"address"}],"name":"getPair","outputs":[{"internalType":"address","name":"pair","type":"address"}],"stateMutability":"view","type":"function"}]
+
+
+def apply_slippage(raw_amount, slippage_bps=DEFAULT_SLIPPAGE_BPS):
+    """根据滑点 BPS 计算最小可接受输出。"""
+    return max(1, raw_amount * max(0, 10_000 - slippage_bps) // 10_000)
 
 
 def is_graduated(token_addr):
@@ -85,13 +100,15 @@ def buy_on_fourmeme(seller_key, seller_addr, buyer_addr, token_addr, bnb_amount)
     
     funds_wei = w3.to_wei(bnb_amount, 'ether')
     nonce = w3.eth.get_transaction_count(seller_addr)
+    # four.meme 当前脚本里没有可靠 quote ABI，先避免把 minAmount 彻底设为 0。
+    min_amount = 1
     
     # origin=0 表示标准买币
     tx = mgr.functions.buyTokenAMAP(
         0,  # origin
         token_cs,
         funds_wei,
-        0   # minAmount=0 (slippage 100%)
+        min_amount
     ).build_transaction({
         'from': seller_addr,
         'value': funds_wei,
@@ -118,13 +135,15 @@ def buy_on_fourmeme(seller_key, seller_addr, buyer_addr, token_addr, bnb_amount)
 def buy_on_pancakeswap(seller_key, seller_addr, buyer_addr, token_addr, bnb_amount):
     """在 PancakeSwap V2 买币（已毕业代币）"""
     token_cs = Web3.to_checksum_address(token_addr)
-    router = w3.eth.contract(address=PCS_ROUTER, abi=PCS_SWAP_ABI)
+    router = w3.eth.contract(address=PCS_ROUTER, abi=PCS_SWAP_ABI + PCS_QUOTE_ABI)
     
     bnb_wei = w3.to_wei(bnb_amount, 'ether')
     nonce = w3.eth.get_transaction_count(seller_addr)
+    quoted = router.functions.getAmountsOut(bnb_wei, [WBNB, token_cs]).call()
+    amount_out_min = apply_slippage(quoted[-1])
     
     tx = router.functions.swapExactETHForTokensSupportingFeeOnTransferTokens(
-        0,  # amountOutMin=0
+        amount_out_min,
         [WBNB, token_cs],
         seller_addr,  # 先买给自己，再转给买家
         9999999999,
@@ -220,7 +239,7 @@ def execute_buy(seller_name, buyer_addr, token_addr, bnb_amount):
     token_addr: 代币合约地址
     bnb_amount: BNB 数量 (如 0.001)
     """
-    wallets = json.load(open(WALLET_FILE))
+    wallets = json.load(open(WALLETS_FILE))
     seller_info = wallets[seller_name]
     seller_addr = Web3.to_checksum_address(seller_info['address'])
     key = seller_info.get('private_key') or seller_info.get('privateKey')

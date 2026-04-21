@@ -6,8 +6,8 @@
 import sys, json, time
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
+from config import BSC_RPC, WALLETS_FILE, DEFAULT_SLIPPAGE_BPS
 
-BSC_RPC = 'https://bsc-dataseed1.binance.org'
 ROUTER = Web3.to_checksum_address('0x10ED43C718714eb63d5aA57B78B54704E256024E')
 WBNB = Web3.to_checksum_address('0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c')
 
@@ -31,6 +31,15 @@ ROUTER_ABI = [{
     "outputs": [{"internalType":"uint256[]","name":"amounts","type":"uint256[]"}],
     "stateMutability": "payable",
     "type": "function"
+},{
+    "inputs": [
+        {"internalType":"uint256","name":"amountIn","type":"uint256"},
+        {"internalType":"address[]","name":"path","type":"address[]"}
+    ],
+    "name":"getAmountsOut",
+    "outputs":[{"internalType":"uint256[]","name":"amounts","type":"uint256[]"}],
+    "stateMutability":"view",
+    "type":"function"
 }]
 
 ERC20_ABI = [
@@ -52,7 +61,7 @@ def main():
     w3 = Web3(Web3.HTTPProvider(BSC_RPC))
     w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 
-    wallets = json.load(open('/Users/aitabby/projects/cryptominds-v2/wallets.json'))
+    wallets = json.load(open(WALLETS_FILE))
     seller_info = wallets.get(seller_name)
     if not seller_info:
         print(json.dumps({"ok": False, "error": f"找不到卖家 {seller_name}"}))
@@ -94,9 +103,12 @@ def main():
     nonce = w3.eth.get_transaction_count(seller_addr)
 
     print(f"执行 swapExactETHForTokens...", file=sys.stderr)
+    quoted = router.functions.getAmountsOut(swap_amount, [WBNB, token_addr]).call()
+    amount_out_min = max(1, quoted[-1] * max(0, 10_000 - DEFAULT_SLIPPAGE_BPS) // 10_000)
+
     swap_tx = router.functions.swapExactETHForTokens(
         [WBNB, token_addr],
-        0,  # amountOutMin
+        amount_out_min,
         seller_addr,
         deadline
     ).build_transaction({

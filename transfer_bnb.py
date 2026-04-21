@@ -3,15 +3,14 @@
 import sys, json
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
+from config import BSC_RPC, WALLETS_FILE
 
-w3 = Web3(Web3.HTTPProvider('https://bsc-dataseed.binance.org'))
+w3 = Web3(Web3.HTTPProvider(BSC_RPC))
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-
-WALLET_FILE = '/Users/aitabby/projects/cryptominds-v2/wallets.json'
 
 def transfer_bnb(from_name, to_addr, amount):
     """从 from_name 钱包转 BNB 到 to_addr"""
-    wallets = json.load(open(WALLET_FILE))
+    wallets = json.load(open(WALLETS_FILE))
     if from_name not in wallets:
         return {"ok": False, "error": f"钱包 {from_name} 不存在"}
     
