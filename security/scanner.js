@@ -1,4 +1,5 @@
 /**
+ * ⚠️ DEPRECATED — 旧 Skill 安全扫描器，现由卖家 Agent endpoint 自行负责安全
  * CryptoMinds Skill 静态安全扫描器
  * 
  * 检测危险代码模式，返回安全评级

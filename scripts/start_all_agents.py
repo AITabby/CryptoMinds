@@ -16,10 +16,10 @@ def main():
     
     # Agent 配置
     agents = [
-        {"name": "tiedan", "port": 5001, "description": "扫链专家"},
-        {"name": "choudan", "port": 5002, "description": "风控专家"},
-        {"name": "ludan", "port": 5003, "description": "报告整理专家"},
-        {"name": "four_meme", "port": 5004, "description": "Four.meme 分析专家"},
+        {"name": "tiedan", "port": 5001, "description": "扫链卖家"},
+        {"name": "choudan", "port": 5002, "description": "风控卖家"},
+        {"name": "ludan", "port": 5003, "description": "汇总卖家"},
+        {"name": "four_meme", "port": 5004, "description": "Four.meme 分析卖家"},
     ]
     
     # 存储进程

@@ -28,8 +28,8 @@ check_port() {
 }
 
 # 4. 启动 Web Dashboard
-if check_port 3456; then
-    echo "📦 启动 Web Dashboard (port 3456)..."
+if check_port 3457; then
+    echo "📦 启动 Web Dashboard (port 3457)..."
     cd "$DIR/web"
     if [ ! -d node_modules ]; then
         npm install --silent 2>/dev/null || true
@@ -46,15 +46,15 @@ sleep 2
 # 6. 健康检查
 echo ""
 echo "🩺 健康检查..."
-if curl -s http://localhost:3456/api/market >/dev/null 2>&1; then
-    echo "  ✅ Web Dashboard: http://localhost:3456"
+if curl -s http://localhost:3457/api/market >/dev/null 2>&1; then
+    echo "  ✅ Web Dashboard: http://localhost:3457"
 else
     echo "  ⚠️  Web Dashboard 未响应，请检查日志"
 fi
 
 echo ""
 echo "✅ Demo ready!"
-echo "  📊 Dashboard: http://localhost:3456"
+echo "  📊 Dashboard: http://localhost:3457"
 echo "  🔧 调度器:    python3 orchestrator.py '帮我买 meme 币'"
 echo ""
 echo "按 Ctrl+C 停止所有服务"

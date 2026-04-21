@@ -13,9 +13,13 @@ const OUT_PATH = path.join(ROOT, 'escrow_deployment.json');
 
 async function main() {
   const rpc = process.env.BSC_RPC || 'https://bsc-dataseed1.binance.org/';
-  const defaultTimeout = Number(process.env.ESCROW_DEFAULT_TIMEOUT || 86400);
-  if (!Number.isFinite(defaultTimeout) || defaultTimeout <= 0) {
-    throw new Error('ESCROW_DEFAULT_TIMEOUT must be a positive number');
+  const buyerTimeout = Number(process.env.ESCROW_BUYER_TIMEOUT || 86400);    // 24h
+  const sellerTimeout = Number(process.env.ESCROW_SELLER_TIMEOUT || 1800);    // 30min
+  if (!Number.isFinite(buyerTimeout) || buyerTimeout <= 0) {
+    throw new Error('ESCROW_BUYER_TIMEOUT must be a positive number');
+  }
+  if (!Number.isFinite(sellerTimeout) || sellerTimeout <= 0) {
+    throw new Error('ESCROW_SELLER_TIMEOUT must be a positive number');
   }
 
   const wallets = JSON.parse(fs.readFileSync(WALLETS_PATH, 'utf8'));
@@ -42,7 +46,7 @@ async function main() {
   const contract = new w3.eth.Contract(abi);
   const deployTx = contract.deploy({
     data: `0x${bytecode}`,
-    arguments: [defaultTimeout],
+    arguments: [buyerTimeout, sellerTimeout],
   });
 
   const gas = await deployTx.estimateGas({ from: account.address });
@@ -66,7 +70,8 @@ async function main() {
     network: chainId === 56 ? 'BSC Mainnet' : `Chain ${chainId}`,
     chainId,
     deployedAt: new Date().toISOString(),
-    defaultTimeout,
+    buyerTimeoutSeconds: buyerTimeout,
+    sellerTimeoutSeconds: sellerTimeout,
     gasUsed: Number(receipt.gasUsed),
     abi,
   };

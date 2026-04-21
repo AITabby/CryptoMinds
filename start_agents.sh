@@ -14,6 +14,6 @@ curl -s http://localhost:5002/health
 echo ""
 curl -s http://localhost:5003/health
 echo ""
-echo "=== Test Execute ==="
-curl -s -m 5 -X POST http://localhost:5001/execute -H "Content-Type: application/json" -d '{"task":"test","request_id":"test-007"}'
+echo "=== Test ExecuteOrder ==="
+curl -s -m 10 -X POST http://localhost:5001/executeOrder -H "Content-Type: application/json" -d '{"action":"executeOrder","orderId":"test-001","sellerName":"tiedan","buyerWallet":"0xce0DE97496c20Dd773d75F560d3e4494cF542d96","amount":0.001,"currency":"BNB"}'
 echo ""

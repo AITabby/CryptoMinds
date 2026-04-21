@@ -14,7 +14,7 @@ WBNB = Web3.to_checksum_address('0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c')
 # 有 WBNB 流动性池的代币
 TOKENS = [
     ('0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56', 'BUSD'),
-    ('0x55d398326f99059fF775485246999027B3197955', 'USDT'),
+    ('0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', 'USDC'),
     ('0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', 'USDC'),
     ('0x2170Ed0880ac9A755fd29B2688956BD959F933F8', 'ETH'),
     ('0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c', 'BTCB'),
@@ -51,12 +51,14 @@ ERC20_ABI = [
 
 def main():
     if len(sys.argv) < 4:
-        print("Usage: python3 real_swap.py <seller_name> <buyer_address> <amount_bnb>")
+        print("Usage: python3 real_swap.py <seller_name> <buyer_address> <amount_bnb> [token_address]")
+        print("  token_address: 可选，默认买 USDC")
         sys.exit(1)
 
     seller_name = sys.argv[1]
     buyer_addr = Web3.to_checksum_address(sys.argv[2])
     amount_bnb = float(sys.argv[3])
+    custom_token = sys.argv[4] if len(sys.argv) >= 5 else None
 
     w3 = Web3(Web3.HTTPProvider(BSC_RPC))
     w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
@@ -89,10 +91,19 @@ def main():
             seller_addr = account.address
             print(f"余额不足，改用 four_meme 代执行 ({seller_addr[:10]}...)", file=sys.stderr)
 
-    # 选 USDT（流动性最好）
-    token_addr, token_sym = TOKENS[1]  # USDT
-    token_addr = Web3.to_checksum_address(token_addr)
-    print(f"目标代币: {token_sym} ({token_addr[:10]}...)", file=sys.stderr)
+    # 选目标代币：自定义 > 默认USDC
+    token_addr = None
+    token_sym = None
+    if custom_token:
+        token_addr = Web3.to_checksum_address(custom_token)
+        # 尝试从已知列表找符号，否则链上查
+        known = {t[0].lower(): t[1] for t in TOKENS}
+        token_sym = known.get(custom_token.lower())
+        print(f"使用自定义代币: {custom_token[:10]}...", file=sys.stderr)
+    if not token_addr:
+        token_addr, token_sym = TOKENS[1]  # USDC（流动性最好）
+        token_addr = Web3.to_checksum_address(token_addr)
+        print(f"默认买 USDC（流动性最好，卖家Agent可选择其他代币）", file=sys.stderr)
 
     router = w3.eth.contract(address=ROUTER, abi=ROUTER_ABI)
     token_contract = w3.eth.contract(address=token_addr, abi=ERC20_ABI)

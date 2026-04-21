@@ -487,7 +487,7 @@ class SmartRouter:
         balances = self.scan_balances(wallet_address)
         paths = []
         
-        # 为每个服务价格创建支付路径
+        # 为每个卖家价格创建支付路径
         for price_key, price_amount in service_prices.items():
             # 解析价格键：TOKEN_CHAIN
             if "_" in price_key:
@@ -753,18 +753,18 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="智能路由引擎")
     parser.add_argument("--wallet", required=True, help="钱包地址")
-    parser.add_argument("--service", required=True, help="服务ID")
+    parser.add_argument("--service", required=True, help="卖家ID")
     args = parser.parse_args()
     
-    # 从 services.json 加载服务价格
+    # 从 sellers.json 加载卖家价格
     import json
-    services_path = Path(__file__).resolve().parent.parent / "services.json"
+    services_path = Path(__file__).resolve().parent.parent / "sellers.json"
     try:
         with open(services_path, 'r', encoding="utf-8") as f:
             services = json.load(f)
         service = next((s for s in services if s["id"] == args.service), None)
         if not service:
-            print(json.dumps({"success": False, "error": f"服务 {args.service} 不存在"}))
+            print(json.dumps({"success": False, "error": f"卖家 {args.service} 不存在"}))
             sys.exit(1)
         
         service_prices = service.get("prices", {})
@@ -774,7 +774,7 @@ if __name__ == "__main__":
                 "BNB_BSC": service.get("price", 0),
             }
     except Exception as e:
-        print(json.dumps({"success": False, "error": f"加载服务失败: {str(e)}"}))
+        print(json.dumps({"success": False, "error": f"加载卖家失败: {str(e)}"}))
         sys.exit(1)
     
     # 加载声誉数据

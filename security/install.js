@@ -1,4 +1,5 @@
 /**
+ * ⚠️ DEPRECATED — 旧 Skill 安装器，现已无 Skill 概念
  * CryptoMinds Skill 自动安装器
  * 
  * 购买成功后，自动将 Skill 安装到买家 Agent 的技能库

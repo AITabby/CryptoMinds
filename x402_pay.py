@@ -34,14 +34,14 @@ NATIVE_DECIMALS = 18
 class X402PaymentRequest:
     """x402 支付请求"""
     def __init__(self, chain: str, token: str, to: str, amount: int, 
-                 service_id: str, description: str, nonce: str = None):
+                 order_id: str, description: str, nonce: str = None):
         self.chain = chain
         self.token = token
         self.to = to
         self.amount = amount
         self.nonce = nonce if nonce else hashlib.sha256(f"{time.time()}".encode()).hexdigest()[:16]
         self.timestamp = int(time.time())
-        self.service_id = service_id
+        self.order_id = order_id
         self.description = description
     
     def to_dict(self) -> Dict:
@@ -52,7 +52,7 @@ class X402PaymentRequest:
             "amount": self.amount,
             "nonce": self.nonce,
             "timestamp": self.timestamp,
-            "service_id": self.service_id,
+            "order_id": self.order_id,
             "description": self.description
         }
     
@@ -127,7 +127,7 @@ def get_usdc_balance(address: str) -> float:
 
 
 def x402_pay(from_name: str, to_name: str, amount_bnb: float, 
-             service_id: str, description: str) -> Tuple[bool, str, Dict]:
+             order_id: str, description: str) -> Tuple[bool, str, Dict]:
     """
     执行 x402 支付流程（BNB 原生转账）
     
@@ -151,7 +151,7 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
         token=NATIVE_TOKEN,
         to=to_wallet["address"],
         amount=amount_wei,
-        service_id=service_id,
+        order_id=order_id,
         description=description
     )
     
@@ -180,7 +180,7 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
             "to": to_wallet["address"],
             "amount_bnb": amount_bnb,
             "amount_wei": amount_wei,
-            "service_id": service_id,
+            "order_id": order_id,
             "description": description,
             "nonce": payment_req.nonce,
             "signature": signature,
@@ -230,7 +230,7 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
                 "to": to_wallet["address"],
                 "amount_bnb": amount_bnb,
                 "amount_wei": amount_wei,
-                "service_id": service_id,
+                "order_id": order_id,
                 "description": description,
                 "nonce": payment_req.nonce,
                 "signature": signature,
@@ -298,7 +298,7 @@ def verify_x402_payment(payment_info: Dict) -> Tuple[bool, str]:
             token=payment_info["token"],
             to=payment_info["to"],
             amount=payment_info["amount_wei"],
-            service_id=payment_info["service_id"],
+            order_id=payment_info["order_id"],
             description=payment_info.get("description", ""),
             nonce=payment_info.get("nonce")
         )

@@ -101,7 +101,7 @@ def _notify_dashboard(from_name, to_name, amount, reason, tx_hash):
             'verified': '✅ 已验证',
         }).encode()
         req = urllib.request.Request(
-            'http://localhost:3456/api/tx',
+            'http://localhost:3457/api/tx',
             data=data,
             headers={'Content-Type': 'application/json'}
         )

@@ -36,11 +36,11 @@ def check_health():
     }
 
     # 检查 Web Dashboard
-    web_ok = check_port('127.0.0.1', 3456)
+    web_ok = check_port('127.0.0.1', 3457)
     results["checks"]["web_dashboard"] = {
         "status": "ok" if web_ok else "down",
-        "port": 3456,
-        "detail": "http://localhost:3456" if web_ok else "未运行"
+        "port": 3457,
+        "detail": "http://localhost:3457" if web_ok else "未运行"
     }
 
     # 检查 BSC RPC 连通性
