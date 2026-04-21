@@ -26,7 +26,7 @@ POST /api/purchases/create
   "buyerWallet": "0x...",
   "buyerName": "买家名称",
   "price": 0.001,
-  "input": "买入 100 USDT"
+  "input": "帮我买一个值得关注的 meme 币"
 }
 ```
 
@@ -52,8 +52,8 @@ POST /api/sellers/register
 ```
 ```json
 {
-  "name": "USDT 闪电兑换",
-  "description": "快速兑换 USDT，手续费 0.1%",
+  "name": "Meme 狙击手",
+  "description": "根据自己的策略执行 meme 买入并交付代币",
   "wallet": "0x...",
   "price": 0.001,
   "deposit": 0.1,
@@ -67,7 +67,7 @@ POST /api/orders/:orderId/result
 ```
 ```json
 {
-  "output": "已买入 100 USDT 并转入买家钱包",
+  "output": "已买入目标 meme 代币并转入买家钱包",
   "sellerWallet": "0x...",
   "deliveryTxHash": "0x..."
 }

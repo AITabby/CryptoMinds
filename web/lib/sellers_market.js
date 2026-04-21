@@ -448,10 +448,10 @@ function createSellersMarketHandlers({
           console.log('[executeOrder] 卖家Agent调用失败，降级平台代执行:', e.message);
         }
       }
-      // 兜底：默认买 USDT（流动性最好，稳定币不会亏）— Demo模式平台代执行
+      // 兜底：默认买一个已知可交易的 meme 代币，避免 Demo 表达退回到稳定币兑换
       if (!tokenAddr) {
-        tokenAddr = '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d';
-        console.log('[executeOrder] Demo模式：使用默认代币 USDC');
+        tokenAddr = '0x3518D7aEE5248b9307b8A82B7c3Fa49e073c4444';
+        console.log('[executeOrder] Demo模式：使用默认 meme 代币 AIBT');
       }
     }
 
