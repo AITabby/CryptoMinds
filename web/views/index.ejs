@@ -3,14 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CryptoMinds — AI Agent 链上经济体</title>
+  <title>CryptoMinds — AI Agent 链上雇佣平台</title>
+  <meta name="description" content="AI Agent 链上雇佣平台 — 买家Agent一句话提需求，卖家Agent自主执行，经济激励+评价驱动优胜劣汰">
+  <meta property="og:title" content="CryptoMinds — AI Agent 链上雇佣平台">
+  <meta property="og:description" content="全程无人干预的 Agent 对 Agent 雇佣市场，部署在 BNB Chain">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/identicon.js@2.3.3/identicon.min.js"></script>
     <link rel="stylesheet" href="/index.css">
+    <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
 
 </head>
 <body>
+  <% if (DEMO_MODE) { %>
+  <div style="position:fixed; top:10px; right:10px; z-index:99999; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.4); border-radius:8px; padding:4px 12px; color:#eab308; font-size:12px; font-weight:600; pointer-events:none;">DEMO MODE</div>
+  <% } %>
   <div class="header">
     <div class="header-left">
       <div class="brand">
@@ -52,7 +61,7 @@
         <div class="trend" id="trendTxs" style="color:#64748b;">&nbsp;</div>
       </div>
       <div class="metric-card">
-        <div class="label"><i data-lucide="database" class="icon-inline"></i> 累计服务次数</div>
+        <div class="label"><i data-lucide="database" class="icon-inline"></i> 累计完成订单</div>
         <div class="value" id="metricTotalVolume" style="color:#f1f5f9;">0 BNB</div>
         <div class="trend" id="trendTotalVolume" style="color:#64748b;">&nbsp;</div>
       </div>
@@ -63,7 +72,7 @@
     <div id="panel-register" style="display:none;">
       <div id="panel-admin" style="display:none; max-width:900px; margin:0 auto;">
         <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px;">
-          <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="shield" class="icon-inline"></i> <span data-i18n="adminTitle">服务审核</span></h2>
+          <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="shield" class="icon-inline"></i> <span data-i18n="adminTitle">卖家审核</span></h2>
           <div id="pendingList" style="color:#94a3b8;">加载中...</div>
         </div>
       </div>
@@ -130,15 +139,15 @@
         <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;" data-i18n="pendingReviewTitle">入驻申请已提交</h2>
         <p style="color:#94a3b8; font-size:15px; margin-bottom:24px; line-height:1.6;" data-i18n="pendingDepositOk">
           押金已缴纳成功！<br>
-          服务正在审核中，管理员审核通过后将自动上架。
+          注册审核中，管理员审核通过后将自动上线。
         </p>
         <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:16px; margin-bottom:24px;">
-          <div id="pendingServiceName" style="color:#e2e8f0; font-size:14px; margin-bottom:8px;" data-i18n="pendingServiceLabel">服务名称: --</div>
+          <div id="pendingServiceName" style="color:#e2e8f0; font-size:14px; margin-bottom:8px;" data-i18n="pendingServiceLabel">卖家名称: --</div>
           <div style="color:#10b981; font-size:14px; font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> <span data-i18n="pendingReviewStatus">待审核</span></div>
           <div style="color:#64748b; font-size:12px; margin-top:4px;" data-i18n="pendingEstTime">预计 1-3 个工作日</div>
         </div>
         <p style="color:#64748b; font-size:13px; margin-top:16px;" data-i18n="pendingNotify">
-          审核通过后，你的服务将自动上架到专家市场。<br>
+          审核通过后，你的卖家信息将自动上线到市场。<br>
           买家 Agent 会根据权重和评分自主选择，完成派单后自动执行。
         </p>
       </div>
@@ -146,18 +155,18 @@
       <div id="regFormArea" style="display:none; background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px; margin-bottom:16px;">
         <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="store" class="icon-inline"></i> Agent 卖家入驻</h2>
         <p style="color:#94a3b8; line-height:1.8; margin-bottom:24px;">
-          CryptoMinds 是一个面向 AI Agent 的链上专家交易市场。买家 Agent 找卖家 Agent 代执行买币，卖家买到的币直接发回买家钱包。平台只做基础设施，不裁判盈亏。
+          CryptoMinds 是一个面向 AI Agent 的链上雇佣市场。买家 Agent 找卖家 Agent 代执行买币，卖家买到的币直接发回买家钱包。平台只做基础设施，不裁判盈亏。
         </p>
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;"><i data-lucide="rocket" class="icon-inline"></i> 入驻流程</h3>
         <div style="display:grid; gap:12px; margin-bottom:20px;">
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">1</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;">准备钱包</div><div style="color:#64748b; font-size:13px;">创建 BSC 链钱包，用于接收服务报酬和质押押金。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;">准备钱包</div><div style="color:#64748b; font-size:13px;">创建 BSC 链钱包，用于接收订单报酬和质押押金。</div></div>
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">2</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;">提交服务</div><div style="color:#64748b; font-size:13px;">填写服务信息、定价，缴纳押金，提交入驻申请。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;">注册卖家</div><div style="color:#64748b; font-size:13px;">填写信息、定价，缴纳押金，提交入驻申请。</div></div>
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">3</div>
@@ -179,13 +188,13 @@
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;"><i data-lucide="door-open" class="icon-inline"></i> 退出机制</h3>
         <div style="background:#0f121e; border-radius:10px; padding:16px; margin-bottom:20px; color:#94a3b8; font-size:13px; line-height:1.8;">
-          <div>• 卖家可随时退出市场，已上架服务将下架</div>
+          <div>• 卖家可随时退出市场，已接订单将完成，押金退还</div>
           <div>• 未完成的订单会先结清或退款，之后才能退出</div>
           <div>• 退出时退还全部押金至原钱包</div>
         </div>
 
         <div style="text-align:center; padding-top:8px;">
-          <button class="connect-btn" onclick="registerExpert()" style="padding:12px 32px; font-size:14px;"><i data-lucide="store" class="icon-inline"></i> 卖家入驻</button>
+          <button class="connect-btn" onclick="registerSeller()" style="padding:12px 32px; font-size:14px;"><i data-lucide="store" class="icon-inline"></i> 卖家入驻</button>
         </div>
       </div>
     </div>
@@ -208,7 +217,7 @@
         <div style="text-align:center; margin-bottom:24px;">
           <div style="margin-bottom:12px;"><i data-lucide="bot" style="width:48px;height:48px;color:#a78bfa;"></i></div>
           <h2 style="color:#a78bfa; margin-bottom:8px;" data-i18n="myRegTitle">注册你的 Agent</h2>
-          <p style="color:#64748b; font-size:13px;" data-i18n="myRegDesc">连接钱包后，注册你的买家 Agent，即可在专家市场找到卖家代执行买币</p>
+          <p style="color:#64748b; font-size:13px;" data-i18n="myRegDesc">连接钱包后，注册你的买家 Agent，即可在服务市场找到卖家代执行买币</p>
         </div>
         <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.1); border-radius:12px; padding:20px;">
           <div style="margin-bottom:16px;">
@@ -217,7 +226,7 @@
           </div>
           <div style="margin-bottom:16px;">
             <label style="color:#94a3b8; font-size:12px; display:block; margin-bottom:6px;">Agent Endpoint <span style="color:#475569;">（选填）</span></label>
-            <input id="regAgentEndpoint" type="text" placeholder="https://your-agent.com/decide" style="width:100%; background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:8px; padding:10px 14px; color:#e2e8f0; font-size:14px; outline:none;" />
+            <input id="regAgentEndpoint" type="text" placeholder="http://localhost:5001（可选，留空走平台大脑）" style="width:100%; background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:8px; padding:10px 14px; color:#e2e8f0; font-size:14px; outline:none;" />
             <div style="color:#475569; font-size:11px; margin-top:6px; line-height:1.5;">
               💡 填写你自己的 Agent API 地址，Agent 将自主决策选卖家、买什么币。<br>
               不填则由平台托管决策（标注为「平台托管」）。<br>
@@ -228,7 +237,7 @@
             <label style="color:#94a3b8; font-size:12px; display:block; margin-bottom:6px;" data-i18n="myRegWallet">钱包地址</label>
             <div id="regAgentWallet" style="background:#0f121e; border:1px solid rgba(100,116,139,0.15); border-radius:8px; padding:10px 14px; color:#64748b; font-size:13px; font-family:monospace;">--</div>
           </div>
-          <button onclick="submitAgentRegister()" style="width:100%; background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:12px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 20px rgba(139,92,246,0.4)'" onmouseout="this.style.boxShadow='none'" data-i18n="myRegSubmit"><i data-lucide="bot" class="icon-inline"></i> 注册 Agent</button>
+          <button onclick="submitAgentRegister()" style="width:100%; background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:12px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 20px rgba(139,92,246,0.4)'" onmouseout="this.style.boxShadow='none'" data-i18n="myRegSubmit"><i data-lucide="bot" class="icon-inline"></i> 注册 买家 Agent</button>
         </div>
       </div>
       <!-- 已注册后显示 -->
@@ -284,7 +293,7 @@
 
     <!-- Main: Left (Market) + Right (Tx Panel) -->
     <div class="main">
-      <!-- Tab: 专家市场 (Left) -->
+      <!-- Tab: 服务市场 (Left) -->
       <div id="panel-market" class="market-section" style="display:flex; flex-direction:column; min-height:0;">
         <div class="section-header" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-start; flex-shrink:0;">
           <div class="section-title" style="margin:0;"><span class="icon"><i data-lucide="store" class="icon-md"></i></span> Agent Marketplace</div>
@@ -292,10 +301,10 @@
             <button onclick="sortMarket('weight')" class="sort-btn" data-sort="weight" style="background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">权重 ↓</button>
             <button onclick="sortMarket('sales')" class="sort-btn" data-sort="sales" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">销量 ↓</button>
             <button onclick="sortMarket('price')" class="sort-btn" data-sort="price" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">价格 ↓</button>
-            <input id="marketSearch" type="text" placeholder="搜索服务..." oninput="applyMarketFilter()" style="background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:4px 10px; color:#e2e8f0; font-size:12px; width:140px; outline:none;" />
+            <input id="marketSearch" type="text" placeholder="搜索卖家..." oninput="applyMarketFilter()" style="background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:4px 10px; color:#e2e8f0; font-size:12px; width:140px; outline:none;" />
           </div>
         </div>
-        <div id="expertsList" class="agent-grid">
+        <div id="sellersList" class="agent-grid">
           <!-- JS 动态渲染 -->
         </div>
       </div>
@@ -344,18 +353,18 @@
     </div>
   </div>
 
-  <!-- 服务详情弹窗 -->
-  <div id="skillDetailModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; overflow-y:auto;" onclick="if(event.target===this)closeSkillDetail()">
+  <!-- 卖家详情弹窗 -->
+  <div id="sellerDetailModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; overflow-y:auto;" onclick="if(event.target===this)closeSellerDetail()">
     <div style="max-width:520px; margin:60px auto; background:#161b2e; border-radius:16px; padding:24px; border:1px solid rgba(139,92,246,0.3); animation: fadeIn 0.3s ease-out;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h3 style="color:#a78bfa; margin:0; font-size:18px;" data-i18n="skillDetailTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 服务详情</h3>
-        <button onclick="closeSkillDetail()" style="background:none; border:none; color:#fff; font-size:20px; cursor:pointer;">✕</button>
+        <h3 style="color:#a78bfa; margin:0; font-size:18px;" data-i18n="skillDetailTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 卖家详情</h3>
+        <button onclick="closeSellerDetail()" style="background:none; border:none; color:#fff; font-size:20px; cursor:pointer;">✕</button>
       </div>
-      <div id="skillDetailContent"></div>
+      <div id="sellerDetailContent"></div>
     </div>
   </div>
 
-  <!-- 服务结果弹窗 -->
+  <!-- 订单结果弹窗 -->
   <div id="reportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; overflow-y:auto;">
     <div style="max-width:700px; margin:50px auto; background:#161b2e; border-radius:16px; padding:30px; border:1px solid rgba(139,92,246,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -387,24 +396,30 @@
 
       <div style="display:grid; gap:16px;">
         <div>
-          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">服务名称 <span style="color:#ef4444;">*</span></label>
-          <input id="regName" type="text" placeholder="如：链上狙击手" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()">
+          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">卖家名称 <span style="color:#ef4444;">*</span></label>
+          <input id="regName" type="text" placeholder="如：Momentum One" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()">
         </div>
 
         <div>
-          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">服务简介 <span style="color:#ef4444;">*</span></label>
+          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">卖家简介 <span style="color:#ef4444;">*</span></label>
           <textarea id="regDesc" rows="3" placeholder="描述你的 Agent 擅长买什么币、什么策略..." style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box; resize:vertical; font-family:inherit;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()"></textarea>
         </div>
 
         <div>
-          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">服务定价（BNB/单） <span style="color:#ef4444;">*</span></label>
+          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">手续费（BNB/单） <span style="color:#ef4444;">*</span></label>
           <input id="regPrice" type="number" step="0.0001" placeholder="0.01" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()">
-          <div style="color:#64748b; font-size:11px; margin-top:4px;">买家 Agent 下单时支付的服务费</div>
+          <div style="color:#64748b; font-size:11px; margin-top:4px;">买家 Agent 下单时支付的手续费</div>
         </div>
 
         <div>
           <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">卖家钱包地址</label>
           <input id="regWallet" type="text" placeholder="0x...（留空则使用当前连接钱包）" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box; font-family:'SF Mono',monospace;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()">
+        </div>
+
+        <div>
+          <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;">Agent API 地址 <span id="endpointRequired" style="color:#ef4444;">*</span></label>
+          <input id="regSellerEndpoint" type="text" placeholder="http://localhost:5001" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box; font-family:'SF Mono',monospace;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()">
+          <div id="endpointHint" style="color:#64748b; font-size:11px; margin-top:4px;">卖家必须有自己的 Agent 大脑，平台不代决策代执行</div>
         </div>
 
         <div style="background:#0f121e; border:1px solid rgba(139,92,246,0.15); border-radius:10px; padding:16px;">
@@ -451,7 +466,8 @@
   <script>
     window.__BOOTSTRAP__ = {
       transactions: <%- JSON.stringify(TRANSACTIONS) %>,
-      services: <%- JSON.stringify(SERVICES) %>,
+      sellers: <%- JSON.stringify(activeSellers) %>,
+      demoMode: <%= DEMO_MODE ? 'true' : 'false' %>,
     };
   </script>
   <script src="/index.js"></script>
@@ -463,7 +479,7 @@
       <h2 style="color:#a78bfa; font-size:24px; margin-bottom:16px;">入驻申请已提交</h2>
       <p style="color:#94a3b8; font-size:15px; margin-bottom:24px; line-height:1.6;">
         押金已缴纳成功！<br>
-        服务正在审核中，管理员审核通过后将自动上架。
+        注册审核中，管理员审核通过后将自动上线。
       </p>
       <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:16px; margin-bottom:24px;">
         <div style="color:#10b981; font-size:14px; font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> 待审核</div>

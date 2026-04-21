@@ -1,4 +1,5 @@
 /**
+ * ⚠️ DEPRECATED — 旧 Skill 注入器，现由卖家 Agent endpoint 自行提供能力
  * 注册时自动注入 CryptoMinds 买服务能力到 Agent workspace
  * - 如果传了 workspacePath，直接写入该目录
  * - 否则按 OpenClaw 约定尝试 ~/.openclaw/workspace-{name}/
@@ -24,7 +25,7 @@ function injectCryptoMindsSkill(agentName, wallet, workspacePath) {
     }
   }
 
-  const apiUrl = process.env.MARKET_URL || 'http://localhost:3456';
+  const apiUrl = process.env.MARKET_URL || 'http://localhost:3457';
 
   const lines = [
     '### CryptoMinds — Agent 市场（注册时自动注入）',

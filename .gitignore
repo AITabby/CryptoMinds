@@ -7,15 +7,16 @@ wallets.json
 .env
 
 # Runtime data
-purchases.json
 orders.json
 deposits.json
-tx-log.json
-notifications.json
 push_subs.json
 services.json.backup*
-sellers.json
-agents.json
+tx-log.json
+purchases.json
+sellers.json.bak*
+
+# Agent runtime cache
+agent_events.json
 
 # Python
 __pycache__/
