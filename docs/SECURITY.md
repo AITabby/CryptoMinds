@@ -36,19 +36,19 @@ binance.org, bscscan.com, basescan.org, four.meme, dexscreener.com, coingecko.co
 ### CLI 使用
 
 ```bash
-node security/scanner.js <skill-file>
+node security/scanner.js <seller-config>
 ```
 
 ## SSRF 防护
 
-专家注册时提供的 API endpoint 经过完整校验：
+卖家注册时提供的 API endpoint 经过完整校验：
 
 1. 只允许 http/https 协议
 2. 禁止 localhost / .localhost
 3. 禁止内网 IP（10.x / 172.16-31.x / 192.168.x / 127.x）
 4. IPv6 也拦（:: / ::1 / fc/fd/fe80）
 5. **DNS 解析校验**：域名 lookup 后解析到私网 IP 也拦截
-6. `/api/skill/call/:id` 调用前二次校验 endpoint
+6. `/api/agent-buy` 调用前二次校验 endpoint
 
 ## 支付安全
 
@@ -58,7 +58,7 @@ node security/scanner.js <skill-file>
 
 ## 质押罚没
 
-- 专家注册需质押 BNB
+- 卖家注册需质押 BNB
 - 押金池地址由质押方提供（CryptoMinds 不碰钱）
 - 退出时平台只标记 `refundStatus: 'pending'`，退款由质押方处理
 - 违规多签确认后罚没，赔偿买方

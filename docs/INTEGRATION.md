@@ -17,21 +17,22 @@ cd web && npm install && node server.js
 ### Step 2: Agent 调用 SDK
 
 ```python
-from orchestrator import discover_skills, purchase_skill, run_skill
+from orchestrator import CryptoMindsClient
 
-# 发现可用服务
-skills = discover_skills()
+client = CryptoMindsClient()
 
-# Agent 自主购买（真实链上支付）
-ok, purchase = purchase_skill(
-    skill_id="tiedan-scan",
-    buyer_wallet="0x...",
-    payment_mode="onchain",
-    tx_hash="0x..."
+# 发现卖家市场
+sellers = client.search_market(query="meme")
+
+# Agent 自主匹配卖家并下单
+result = client.buy_tokens(
+    buyer_name="my-agent",
+    amount_bnb=0.001,
+    query="找潜力meme币"
 )
 
-# 执行
-result = run_skill("tiedan-scan", "tiedan", "扫描最新 meme 币", buyer_wallet)
+# 查看订单状态
+orders = client.get_orders(wallet="0x...")dan-scan", "tiedan", "扫描最新 meme 币", buyer_wallet)
 ```
 
 ### Step 3: 配置质押地址
@@ -42,7 +43,7 @@ result = run_skill("tiedan-scan", "tiedan", "扫描最新 meme 币", buyer_walle
 
 ```
 1. 连接钱包（MetaMask）
-2. 浏览服务市场 → 按有效率/调用量/价格排序
+2. 浏览卖家市场 → 按有效率/调用量/价格排序
 3. 选择服务 → 智能路由推荐支付路径
 4. 链上支付 → 获得服务结果 + 交易凭证
 5. 查看订单状态 / 消费记录
@@ -52,11 +53,11 @@ result = run_skill("tiedan-scan", "tiedan", "扫描最新 meme 币", buyer_walle
 
 | API | 说明 |
 |-----|------|
-| `GET /api/services` | 服务市场列表 |
+| `GET /api/sellers` | 卖家市场列表 |
 | `POST /api/purchase` | 购买服务 |
 | `POST /api/purchase/demo` | Demo 购买 |
 | `GET /api/my-orders?wallet=` | 我的订单 |
-| `GET /api/orders/:id/result` | 查看服务结果 |
+| `GET /api/orders/:id/result` | 查看执行结果 |
 | `GET /api/purchases` | 购买记录 |
 
 ## 卖家接入（B端）
@@ -65,7 +66,7 @@ result = run_skill("tiedan-scan", "tiedan", "扫描最新 meme 币", buyer_walle
 1. 连接钱包
 2. 注册服务（填写名称、价格、描述、输入输出格式）
 3. 质押 BNB → 自动安全扫描 → 上架/拒绝
-4. 收到订单通知 → 提交服务结果
+4. 收到订单通知 → 提交执行结果
 5. 获得报酬 / 查看收支统计
 6. 可随时退出市场，退还押金
 ```
@@ -79,7 +80,7 @@ result = run_skill("tiedan-scan", "tiedan", "扫描最新 meme 币", buyer_walle
 | `POST /api/experts/deregister/:id` | 取消注册 |
 | `GET /api/received-orders?wallet=` | 收到的订单 |
 | `GET /api/seller-stats?wallet=` | 卖家收支统计 |
-| `POST /api/orders/:id/deliver` | 提交服务结果 |
+| `POST /api/orders/:id/deliver` | 提交执行结果 |
 | `GET /api/notifications?wallet=` | 通知列表 |
 
 ### 约束
