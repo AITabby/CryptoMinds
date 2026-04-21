@@ -10,25 +10,27 @@ pragma solidity ^0.8.20;
  * 1. 买家创建订单，BNB 锁入合约
  * 2. 卖家提交服务结果
  * 3. 买家确认收货 → BNB 释放给卖家
- * 4. 超时自动确认 → BNB 释放给卖家
- * 5. 买家争议 → 管理员仲裁（退款或放款）
+ * 4. 卖家超时不交付 → BNB 退还给买家
+ * 5. 买家确认超时 → BNB 自动释放给卖家
+ * 6. 买家争议 → 管理员仲裁（退款或放款）
  * 
  * 不需要发币，全程 BNB。
  */
 contract ServiceEscrow {
     
     address public owner;           // 管理员（仲裁者）
-    uint256 public defaultTimeout;  // 默认超时（秒）
+    uint256 public defaultTimeout;  // 买家确认超时（秒）
+    uint256 public sellerTimeout;   // 卖家交付超时（秒）
     
     enum OrderStatus { 
         None,           // 不存在
-        Pending,        // 等待卖家接单
+        Pending,        // 等待卖家接单，BNB 已锁入合约
         Delivering,     // 卖家已接单，执行中
         Delivered,      // 卖家已提交结果
-        Confirmed,      // 买家确认收货，已放款
+        Confirmed,      // 买家确认收货，已放款给卖家
         Disputed,       // 买家争议，等仲裁
-        Refunded,       // 仲裁退款给买家
-        Expired         // 超时自动确认
+        Refunded,       // 退款给买家（卖家超时 or 仲裁退款）
+        Expired         // 买家确认超时，自动放款给卖家
     }
     
     struct Order {
@@ -38,8 +40,8 @@ contract ServiceEscrow {
         uint256 amount;         // 担保金额 (wei)
         uint256 createdAt;      // 创建时间
         uint256 deliveredAt;    // 卖家提交时间
-        uint256 timeoutAt;      // 确认截止时间（卖家交付后才开始计时）
-        uint256 timeoutSeconds; // 确认窗口时长（秒）
+        uint256 buyerTimeoutAt; // 买家确认超时时间
+        uint256 sellerTimeoutAt;// 卖家交付超时时间
         OrderStatus status;     // 当前状态
         string deliverResult;   // 卖家提交的结果（哈希或简述）
     }
@@ -61,7 +63,8 @@ contract ServiceEscrow {
     event OrderDisputed(bytes32 indexed orderId, address indexed buyer);
     event OrderRefunded(bytes32 indexed orderId, uint256 amount, string reason);
     event OrderExpired(bytes32 indexed orderId, uint256 amount);
-    event TimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
+    event SellerTimeoutRefund(bytes32 indexed orderId, uint256 amount);
+    event TimeoutUpdated(uint256 oldBuyerTimeout, uint256 newBuyerTimeout, uint256 oldSellerTimeout, uint256 newSellerTimeout);
     
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -78,22 +81,25 @@ contract ServiceEscrow {
         _;
     }
     
-    constructor(uint256 _defaultTimeout) {
+    constructor(uint256 _defaultTimeout, uint256 _sellerTimeout) {
         owner = msg.sender;
         defaultTimeout = _defaultTimeout > 0 ? _defaultTimeout : 24 hours;
+        sellerTimeout = _sellerTimeout > 0 ? _sellerTimeout : 30 minutes;
     }
     
     /**
      * 买家创建担保订单
      * @param seller 卖家钱包地址
      * @param serviceId 服务 ID
-     * @param timeoutSeconds 超时时间（秒），0 使用默认值
+     * @param buyerTimeoutSeconds 买家确认超时（秒），0 使用默认值
+     * @param sellerTimeoutSeconds 卖家交付超时（秒），0 使用默认值
      * @return orderId 订单 ID
      */
     function createOrder(
         address seller,
         string calldata serviceId,
-        uint256 timeoutSeconds
+        uint256 buyerTimeoutSeconds,
+        uint256 sellerTimeoutSeconds
     ) external payable returns (bytes32 orderId) {
         require(msg.value > 0, "Must deposit > 0");
         require(seller != address(0), "Invalid seller");
@@ -108,7 +114,8 @@ contract ServiceEscrow {
             allOrderIds.length
         ));
         
-        uint256 timeout = timeoutSeconds > 0 ? timeoutSeconds : defaultTimeout;
+        uint256 buyerTimeout = buyerTimeoutSeconds > 0 ? buyerTimeoutSeconds : defaultTimeout;
+        uint256 sTimeout = sellerTimeoutSeconds > 0 ? sellerTimeoutSeconds : sellerTimeout;
         
         Order memory order = Order({
             buyer: msg.sender,
@@ -117,8 +124,8 @@ contract ServiceEscrow {
             amount: msg.value,
             createdAt: block.timestamp,
             deliveredAt: 0,
-            timeoutAt: 0,
-            timeoutSeconds: timeout,
+            buyerTimeoutAt: block.timestamp + buyerTimeout,
+            sellerTimeoutAt: block.timestamp + sTimeout,
             status: OrderStatus.Pending,
             deliverResult: ""
         });
@@ -137,12 +144,17 @@ contract ServiceEscrow {
      */
     function deliver(bytes32 orderId, string calldata result) external onlySeller(orderId) {
         Order storage order = orders[orderId];
-        require(order.status == OrderStatus.Pending, "Order not pending");
+        require(
+            order.status == OrderStatus.Pending || order.status == OrderStatus.Delivering,
+            "Order not pending/delivering"
+        );
+        require(block.timestamp < order.sellerTimeoutAt, "Seller timeout exceeded");
         
         order.status = OrderStatus.Delivered;
         order.deliveredAt = block.timestamp;
-        order.timeoutAt = block.timestamp + order.timeoutSeconds;
         order.deliverResult = result;
+        // 买家确认超时从交付时刻重新计算
+        order.buyerTimeoutAt = block.timestamp + defaultTimeout;
         
         emit OrderDelivered(orderId, result);
     }
@@ -187,17 +199,17 @@ contract ServiceEscrow {
     }
     
     /**
-     * 超时自动确认 → BNB 释放给卖家
-     * 任何人都可以调用
+     * 买家确认超时 → BNB 自动释放给卖家
+     * 任何人都可以调用（交付后买家不确认）
      * @param orderId 订单 ID
      */
-    function claimTimeout(bytes32 orderId) external {
+    function claimBuyerTimeout(bytes32 orderId) external {
         Order storage order = orders[orderId];
         require(
             order.status == OrderStatus.Delivered,
             "Order not delivered"
         );
-        require(block.timestamp >= order.timeoutAt, "Not timed out yet");
+        require(block.timestamp >= order.buyerTimeoutAt, "Buyer not timed out yet");
         
         order.status = OrderStatus.Expired;
         uint256 amount = order.amount;
@@ -209,32 +221,29 @@ contract ServiceEscrow {
         
         emit OrderExpired(orderId, amount);
     }
-
+    
     /**
-     * 卖家超时未交付 —— 自动退款给买家
-     * 任何人都可以调用
+     * 卖家交付超时 → BNB 退还给买家
+     * 任何人都可以调用（卖家一直不交付）
      * @param orderId 订单 ID
      */
-    function claimNoDeliveryRefund(bytes32 orderId) external {
+    function claimSellerTimeout(bytes32 orderId) external {
         Order storage order = orders[orderId];
         require(
-            order.status == OrderStatus.Pending,
-            "Order not pending"
+            order.status == OrderStatus.Pending || order.status == OrderStatus.Delivering,
+            "Order not pending/delivering"
         );
-        require(
-            block.timestamp >= order.createdAt + order.timeoutSeconds,
-            "Delivery window not expired"
-        );
-
+        require(block.timestamp >= order.sellerTimeoutAt, "Seller not timed out yet");
+        
         order.status = OrderStatus.Refunded;
         uint256 amount = order.amount;
         order.amount = 0;
         totalRefunded += amount;
-
+        
         (bool ok, ) = payable(order.buyer).call{value: amount}("");
         require(ok, "Transfer to buyer failed");
-
-        emit OrderRefunded(orderId, amount, "Seller did not deliver in time");
+        
+        emit SellerTimeoutRefund(orderId, amount);
     }
     
     /**
@@ -292,12 +301,13 @@ contract ServiceEscrow {
         uint256 amount,
         uint256 createdAt,
         uint256 deliveredAt,
-        uint256 timeoutAt,
+        uint256 buyerTimeoutAt,
+        uint256 sellerTimeoutAt,
         OrderStatus status,
         string memory deliverResult
     ) {
         Order storage o = orders[orderId];
-        return (o.buyer, o.seller, o.serviceId, o.amount, o.createdAt, o.deliveredAt, o.timeoutAt, o.status, o.deliverResult);
+        return (o.buyer, o.seller, o.serviceId, o.amount, o.createdAt, o.deliveredAt, o.buyerTimeoutAt, o.sellerTimeoutAt, o.status, o.deliverResult);
     }
     
     /**
@@ -308,12 +318,13 @@ contract ServiceEscrow {
     }
     
     /**
-     * 更新默认超时时间
+     * 更新超时时间
      */
-    function setDefaultTimeout(uint256 newTimeout) external onlyOwner {
-        require(newTimeout > 0, "Timeout must > 0");
-        emit TimeoutUpdated(defaultTimeout, newTimeout);
-        defaultTimeout = newTimeout;
+    function setTimeouts(uint256 newBuyerTimeout, uint256 newSellerTimeout) external onlyOwner {
+        require(newBuyerTimeout > 0 && newSellerTimeout > 0, "Timeout must > 0");
+        emit TimeoutUpdated(defaultTimeout, newBuyerTimeout, sellerTimeout, newSellerTimeout);
+        defaultTimeout = newBuyerTimeout;
+        sellerTimeout = newSellerTimeout;
     }
     
     /**
