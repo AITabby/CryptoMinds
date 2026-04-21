@@ -2,16 +2,24 @@
 node_modules/
 web/node_modules/
 
-# Secrets — NEVER commit
+# Secrets
 wallets.json
+.env
 
 # Runtime data
 purchases.json
+orders.json
+deposits.json
 tx-log.json
+notifications.json
+push_subs.json
 services.json.backup*
+sellers.json
+agents.json
 
 # Python
 __pycache__/
+**/__pycache__/
 *.pyc
 
 # OS
@@ -19,6 +27,7 @@ __pycache__/
 
 # Logs
 *.log
-.DS_Store
-.DS_Store
+
+# Local backups
 web/server.js.bak.before-deliverymode
+web.bak.*/

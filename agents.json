@@ -8,7 +8,9 @@
     "skills": [
       "buy-service"
     ],
-    "active": true
+    "active": true,
+    "feeRate": 0.0,
+    "deposit": 0.0
   },
   {
     "id": "agent-1776703171508",
@@ -19,6 +21,8 @@
     "skills": [
       "buy-service"
     ],
-    "active": true
+    "active": true,
+    "feeRate": 0.0,
+    "deposit": 0.0
   }
 ]
