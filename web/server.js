@@ -10,20 +10,25 @@ const { injectCryptoMindsSkill } = require('./inject_skill');
 const webpush = require('web-push');
 const { createAgentBuyHandlers } = require('./lib/agent_buy');
 const { createSellersStore, createSellersMarketHandlers } = require('./lib/sellers_market');
+const { getEscrowAddress, getEscrowContract, getEscrowStats, checkSellerTimeouts, orderIdToBytes32, escrowABI, deployEscrow } = require('./lib/escrow');
 
 const upload = multer({ dest: '/tmp/cryptominds-uploads/', limits: { fileSize: 100 * 1024 } }); // 100KB max
 
 const app = express();
-const { getSellers, saveSellers } = createSellersStore(__dirname);
+const { getSellers, saveSellers } = createSellersStore(path.join(__dirname, '..'));
 const BSC_RPC = process.env.BSC_RPC || 'https://bsc-dataseed1.binance.org/';
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || '';
 const MINIMAX_BASE_URL = 'https://api.minimaxi.com/v1';
 const w3 = new Web3(BSC_RPC);
 
-// Web Push 配置
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BLzMOK5mKfFnE2xys9GxpEipw6P5hmvb1zOR4Hh5MY-taBxXXt7jIe8jON7-zhphRGrCpFH4_Sjt__8htdgq304';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'N9XArIyKx8ZZkJTS_gACVgibflcQQnyItwA_zxahAfU';
-webpush.setVapidDetails('mailto:cryptominds@four.meme', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+// Web Push 配置（必须从环境变量读取，不硬编码）
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails('mailto:cryptominds@four.meme', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+} else {
+  console.log('[webpush] VAPID keys not configured, push notifications disabled');
+}
 
 // 推送订阅存储
 const PUSH_SUBS_FILE = path.join(__dirname, '..', 'push_subs.json');
@@ -71,6 +76,7 @@ async function fetchBnbPrice() {
 
 const PORT = 3457;
 const DEMO_WALLET = '0xd2f899ce74320aef9d8f2359183232a554f4c0e1';
+const DEMO_MODE = process.env.DEMO_MODE === 'true'; // 黑客松评委体验模式
 // 押金池地址（获奖后替换为Four.meme地址或合约地址）
 const DEPOSIT_POOL_ADDRESS = process.env.DEPOSIT_POOL_ADDRESS || '0x287A44aAADDB78CA67EffCD94E83046353723862';
 const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
@@ -78,11 +84,6 @@ const SDK_DIR = path.join(__dirname, '..', 'agentpay_sdk');
 const X402_VERIFY_SCRIPT = path.join(SDK_DIR, 'x402_verify.py');
 const SMART_ROUTER_SCRIPT = path.join(SDK_DIR, 'smart_router.py');
 const MANAGED_X402_SCRIPT = path.join(__dirname, '..', 'scripts', 'managed_x402_payment.py');
-const ESCROW_DEPLOYMENT_FILE = path.join(__dirname, '..', 'escrow_deployment.json');
-const ESCROW_ABI_FILE = path.join(__dirname, '..', 'build', 'contracts_ServiceEscrow_sol_ServiceEscrow.abi');
-const STAKE_SELECTOR = '0x46f45b8d';
-
-const ESCROW_STATUS_NAMES = ['None', 'Pending', 'Delivering', 'Delivered', 'Confirmed', 'Disputed', 'Refunded', 'Expired'];
 const AUTO_BUY_KIND_RULES = [
   { kind: 'scan', keywords: ['scan', 'scanner', 'discover', 'find', 'hunt', 'alpha', 'meme', 'new coin', 'new token', 'pick', '搜', '扫描', '发现', '寻找', '新币', '新 token', '新币机会', '机会'] },
   { kind: 'risk', keywords: ['risk', 'security', 'safe', 'rug', 'audit', 'contract', '风控', '风险', '安全', '土狗', '审计', '合约'] },
@@ -232,7 +233,7 @@ function buildExecutionPreview(route, service) {
   const stepsByType = {
     direct: [
       `检查 ${route.chain.toUpperCase()} 链上 ${route.symbol} 余额`,
-      route.symbol === 'BNB' ? `通过 Escrow 担保合约锁定 ${priceLabel}，确认收货后放款` : `向服务提供者地址发起 ${priceLabel} 支付`,
+      route.symbol === 'BNB' ? `直接转账 ${priceLabel} 到卖家钱包` : `向卖家地址发起 ${priceLabel} 支付`,
       '提交链上交易并验证',
     ],
     swap: [
@@ -285,7 +286,7 @@ async function waitForPurchaseState(purchaseId, options = {}) {
 
   while (Date.now() - startedAt <= timeoutMs) {
     const purchase = getPurchaseById(purchaseId);
-    if (purchase && ['delivered', 'completed', 'rejected', 'demo-completed'].includes(purchase.status)) {
+    if (purchase && ['delivered', 'completed', 'rejected'].includes(purchase.status)) {
       return purchase;
     }
     await sleep(intervalMs);
@@ -481,7 +482,7 @@ async function createManagedX402Payment(service, buyerWallet, description) {
 
 async function resolveSelectedRoute(serviceId, walletAddress, selectedRoute) {
   if (!selectedRoute) return null;
-  const services = getServices();
+  const sellersData = getSellers(); const services = sellersData.sellers;
   const service = services.find(item => item.id === serviceId);
   if (!service) {
     throw new Error('服务不存在');
@@ -545,212 +546,86 @@ async function verifySplitHeaders(paymentHeaders, serviceId, expectedBuyerWallet
   };
 }
 
+// 验证 BNB 直接转账：买家 → 卖家钱包
 async function verifyPaymentTx(txHash, buyerWallet, service) {
-  return verifyEscrowPaymentTx(txHash, buyerWallet, service, null);
-}
-
-function normalizeEscrowStatus(rawStatus) {
-  if (typeof rawStatus === 'string' && Number.isNaN(Number(rawStatus))) {
-    return rawStatus;
-  }
-  return ESCROW_STATUS_NAMES[Number(rawStatus)] || 'Unknown';
-}
-
-function decodeSingleStringArg(txInput, selector) {
-  if (typeof txInput !== 'string' || !txInput.toLowerCase().startsWith(selector.toLowerCase())) {
-    return null;
-  }
-  try {
-    const decoded = w3.eth.abi.decodeParameters(['string'], `0x${txInput.slice(10)}`);
-    return decoded[0] || null;
-  } catch (err) {
-    return null;
-  }
-}
-
-async function fetchEscrowOrder(orderId) {
-  const contract = new w3.eth.Contract(ESCROW_ABI, ESCROW_CONFIG.address);
-  const order = await contract.methods.getOrder(orderId).call();
-  let timeoutSeconds = ESCROW_CONFIG.defaultTimeout;
-  try {
-    const raw = await contract.methods.orders(orderId).call();
-    timeoutSeconds = Number(raw[7] ?? raw.timeoutSeconds ?? ESCROW_CONFIG.defaultTimeout);
-  } catch (err) {}
-  return {
-    buyer: order[0],
-    seller: order[1],
-    serviceId: order[2],
-    amount: order[3],
-    amountBNB: w3.utils.fromWei(order[3], 'ether'),
-    createdAt: Number(order[4]),
-    deliveredAt: Number(order[5]),
-    timeoutAt: Number(order[6]),
-    timeoutSeconds,
-    status: normalizeEscrowStatus(order[7]),
-    deliverResult: order[8],
-  };
-}
-
-function getEscrowContract() {
-  return new w3.eth.Contract(ESCROW_ABI, ESCROW_CONFIG.address);
-}
-
-async function sendEscrowSignedTx(methodName, args, signer) {
-  const wallet = typeof signer === 'string'
-    ? findManagedWalletByAddress(signer)
-    : signer;
-  if (!wallet?.privateKey || !wallet?.address) {
-    throw new Error('未找到可用的托管钱包签名该 Escrow 交易');
-  }
-
-  const account = w3.eth.accounts.privateKeyToAccount(wallet.privateKey);
-  const contract = getEscrowContract();
-  const method = contract.methods[methodName](...args);
-  const gas = await method.estimateGas({ from: account.address });
-  const gasPrice = await w3.eth.getGasPrice();
-  const nonce = await w3.eth.getTransactionCount(account.address, 'pending');
-  const signed = await account.signTransaction({
-    from: account.address,
-    to: ESCROW_CONFIG.address,
-    data: method.encodeABI(),
-    gas: Number(gas) + 200000,
-    gasPrice,
-    nonce,
-    chainId: ESCROW_CONFIG.chainId,
-    value: '0x0',
-  });
-
-  return w3.eth.sendSignedTransaction(signed.rawTransaction);
-}
-
-async function createEscrowOrderForBuyer(service, buyerWallet, timeoutSeconds = ESCROW_CONFIG.defaultTimeout) {
-  const wallet = findManagedWalletByAddress(buyerWallet);
-  if (!wallet?.privateKey || !wallet?.address) {
-    throw new Error('买家钱包未托管，无法自动发起 Escrow 下单');
-  }
-
-  const account = w3.eth.accounts.privateKeyToAccount(wallet.privateKey);
-  const contract = getEscrowContract();
-  const value = w3.utils.toWei(String(service.price), 'ether');
-  const method = contract.methods.createOrder(service.wallet, service.id, timeoutSeconds);
-  const gas = await method.estimateGas({ from: account.address, value });
-  const gasPrice = await w3.eth.getGasPrice();
-  const nonce = await w3.eth.getTransactionCount(account.address, 'pending');
-  const signed = await account.signTransaction({
-    from: account.address,
-    to: ESCROW_CONFIG.address,
-    data: method.encodeABI(),
-    gas: Number(gas) + 200000,
-    gasPrice,
-    nonce,
-    chainId: ESCROW_CONFIG.chainId,
-    value,
-  });
-
-  const receipt = await w3.eth.sendSignedTransaction(signed.rawTransaction);
-  const orderId = receipt?.events?.OrderCreated?.returnValues?.orderId || '';
-  if (!orderId) {
-    throw new Error('Escrow 下单成功，但未解析到 orderId');
-  }
-
-  return {
-    txHash: receipt.transactionHash,
-    escrowOrderId: orderId,
-  };
-}
-
-async function confirmEscrowOrderAsBuyer(orderId, buyerWallet) {
-  const wallet = findManagedWalletByAddress(buyerWallet);
-  if (!wallet?.privateKey || !wallet?.address) {
-    throw new Error('买家钱包未托管，无法自动确认 Escrow 订单');
-  }
-  const receipt = await sendEscrowSignedTx('confirm', [orderId], wallet);
-  return { txHash: receipt.transactionHash };
-}
-
-async function verifyEscrowPaymentTx(txHash, buyerWallet, service, escrowOrderId) {
-  if (!isValidTxHash(txHash)) {
-    return { ok: false, error: 'txHash 格式无效' };
-  }
-
-  try {
-    const receipt = await w3.eth.getTransactionReceipt(txHash);
-    const tx = await w3.eth.getTransaction(txHash);
-
-    if (!receipt || !tx) return { ok: false, error: '链上未找到这笔交易' };
-    if (Number(receipt.status) !== 1) return { ok: false, error: '链上交易执行失败' };
-    if (!tx.to) return { ok: false, error: '交易缺少接收地址' };
-
-    const actualTo = tx.to.toLowerCase();
-    const actualFrom = tx.from.toLowerCase();
-    const expectedFrom = buyerWallet.toLowerCase();
-    const expectedValueWei = BigInt(w3.utils.toWei(String(service.price), 'ether'));
-    const actualValueWei = BigInt(tx.value.toString());
-    const expectedEscrowTo = ESCROW_CONFIG.address.toLowerCase();
-
-    if (actualTo !== expectedEscrowTo) {
-      return { ok: false, error: 'BNB 支付必须进入 Escrow 担保合约' };
-    }
-    if (actualFrom !== expectedFrom) {
-      return { ok: false, error: '付款地址不匹配 buyerWallet' };
-    }
-    if (actualValueWei < expectedValueWei) {
-      return { ok: false, error: '链上支付金额不足' };
-    }
-    if (!escrowOrderId) {
-      return { ok: false, error: '缺少 escrowOrderId，无法校验担保订单' };
-    }
-
-    const order = await fetchEscrowOrder(escrowOrderId);
-    if (!order || order.buyer === '0x0000000000000000000000000000000000000000') {
-      return { ok: false, error: 'Escrow 订单不存在' };
-    }
-    if (order.buyer.toLowerCase() !== expectedFrom) {
-      return { ok: false, error: 'Escrow 订单买家与 buyerWallet 不一致' };
-    }
-    if (order.seller.toLowerCase() !== service.wallet.toLowerCase()) {
-      return { ok: false, error: 'Escrow 订单卖家与服务提供者不一致' };
-    }
-    if (order.serviceId !== service.id) {
-      return { ok: false, error: 'Escrow 订单 serviceId 不匹配' };
-    }
-    if (BigInt(order.amount) < expectedValueWei) {
-      return { ok: false, error: 'Escrow 订单锁定金额不足' };
-    }
-    if (order.status !== 'Pending' && order.status !== 'Delivered') {
-      return { ok: false, error: `Escrow 订单状态异常: ${order.status}` };
-    }
-
+  if (!isValidTxHash(txHash)) return { ok: false, error: 'txHash 格式无效' };
+  
+  // P3: Demo 模式下跳过真实验证
+  if (DEMO_MODE) {
+    console.log('[DEMO_MODE] 跳过支付验证:', txHash);
     return {
       ok: true,
-      tx: {
-        hash: txHash,
-        from: tx.from,
-        to: tx.to,
-        value: actualValueWei.toString(), // BigInt转字符串
-        blockNumber: Number(tx.blockNumber),
-        gasUsed: Number(receipt.gasUsed),
-        escrowOrderId,
-      }
+      tx: { hash: txHash, from: buyerWallet, to: service.wallet, value: '0', blockNumber: 0, demo: true },
+    };
+  }
+  
+  try {
+    const tx = await w3.eth.getTransaction(txHash);
+    if (!tx) return { ok: false, error: '链上未找到这笔交易' };
+    const actualFrom = (tx.from || '').toLowerCase();
+    const actualTo = (tx.to || '').toLowerCase();
+    const expectedFrom = buyerWallet.toLowerCase();
+    const expectedTo = (service.wallet || '').toLowerCase();
+    const expectedValueWei = BigInt(w3.utils.toWei(String(service.price), 'ether'));
+    const actualValueWei = BigInt(tx.value.toString());
+    if (actualFrom !== expectedFrom) return { ok: false, error: '付款地址与 buyerWallet 不一致' };
+    if (actualTo !== expectedTo) return { ok: false, error: 'BNB 未发送到卖家钱包' };
+    if (actualValueWei < expectedValueWei) return { ok: false, error: '链上支付金额不足' };
+    return {
+      ok: true,
+      tx: { hash: txHash, from: tx.from, to: tx.to, value: tx.value.toString(), blockNumber: Number(tx.blockNumber) },
     };
   } catch (err) {
     return { ok: false, error: `校验 txHash 失败: ${err.message}` };
   }
 }
 
-// Agent 钱包（硬编码）
-const AGENTS = {
-  gangdan: { name: '钢蛋', role: '调度员', icon: '📡', addr: '0xd2f899CE74320AEf9d8f2359183232a554f4C0E1' },
-  tiedan: { name: '铁蛋', role: '侦察兵', icon: '🔍', addr: '0xce0DE97496c20Dd773d75F560d3e4494cF542d96' },
-  choudan: { name: '臭蛋', role: '风控员', icon: '🛡️', addr: '0x40992619077f0e42A1b7713C02B7324Fa1d8715c' },
-  pidan: { name: '皮蛋', role: '数据师', icon: '📊', addr: '0x0BAdB40BED90515Cb436282C1D5bE059d17566BC' },
-  ludan: { name: '卤蛋', role: '整理员', icon: '📝', addr: '0x4190877f1959E260B4613793e3D07e8A332bc44B' },
-};
+// BNB 直接转账：托管钱包签 BNB → 卖家钱包
+async function createDirectPayment(service, buyerWallet) {
+  const wallet = findManagedWalletByAddress(buyerWallet);
+  if (!wallet?.privateKey || !wallet?.address) {
+    throw new Error('买家钱包未托管，无法自动发起支付');
+  }
+  if (!service.wallet) throw new Error('卖家钱包地址无效');
+  const amount = w3.utils.toWei(String(service.price), 'ether');
+  const account = w3.eth.accounts.privateKeyToAccount(wallet.privateKey);
+  const gasPrice = await w3.eth.getGasPrice();
+  const nonce = await w3.eth.getTransactionCount(account.address, 'pending');
+  // 动态估算gas：先estimateGas，失败则fallback到30000
+  let gasLimit;
+  try {
+    gasLimit = await w3.eth.estimateGas({
+      from: account.address,
+      to: service.wallet,
+      value: amount,
+    });
+    gasLimit = Math.ceil(Number(gasLimit) * 1.2); // 加20%缓冲
+  } catch (e) {
+    console.log('[gas] estimateGas failed, fallback 30000:', e.message);
+    gasLimit = 30000;
+  }
+  const signed = await account.signTransaction({
+    from: account.address,
+    to: service.wallet,
+    value: amount,
+    gas: gasLimit,
+    gasPrice,
+    nonce,
+    chainId: 56,
+  });
+  const receipt = await w3.eth.sendSignedTransaction(signed.rawTransaction);
+  return {
+    txHash: receipt.transactionHash,
+    from: account.address,
+    to: service.wallet,
+    amount: service.price,
+  };
+}
 
-// 自由市场——专家自己入驻，自己定价，无分类
+// 自由市场——卖家自主入驻，自主定价
 
-// 专家服务列表（支持入驻）
-const SERVICES_FILE = path.join(__dirname, '..', 'services.json');
+// 卖家列表（支持入驻）
+// services.json 已废弃，统一使用 sellers.json
 const AGENTS_FILE = path.join(__dirname, '..', 'agents.json');
 const WALLETS_FILE = path.join(__dirname, '..', 'wallets.json');
 
@@ -763,6 +638,33 @@ function getWallets() {
   return {};
 }
 
+const MANAGED_AGENT_META = {
+  gangdan: { name: 'Buyer Agent', role: '买家代理', icon: '🤖' },
+  tiedan: { name: 'Momentum One', role: '趋势策略', icon: '📈' },
+  choudan: { name: 'Dip Hunter', role: '低吸策略', icon: '🎯' },
+  pidan: { name: 'Risk Sentinel', role: '风控策略', icon: '🛡️' },
+  ludan: { name: 'Flow Surfer', role: '流动性策略', icon: '🌊' },
+  four_meme: { name: 'Settlement Engine', role: '结算节点', icon: '⚙️' },
+};
+
+function getManagedAgents() {
+  const wallets = getWallets();
+  const agents = {};
+  for (const [key, wallet] of Object.entries(wallets)) {
+    if (!wallet?.address) continue;
+    const meta = MANAGED_AGENT_META[key] || {
+      name: key,
+      role: '托管钱包',
+      icon: '🤖',
+    };
+    agents[key] = {
+      ...meta,
+      addr: wallet.address,
+    };
+  }
+  return agents;
+}
+
 function findManagedWalletByAddress(address) {
   if (!address) return null;
   const normalized = address.toLowerCase();
@@ -772,16 +674,6 @@ function findManagedWalletByAddress(address) {
   return {
     address: found.address,
     privateKey: found.private_key.startsWith('0x') ? found.private_key : `0x${found.private_key}`,
-  };
-}
-
-function getEscrowExecutorWallet() {
-  const wallets = getWallets();
-  const deployer = wallets.four_meme;
-  if (!deployer?.address || !deployer?.private_key) return null;
-  return {
-    address: deployer.address,
-    privateKey: deployer.private_key.startsWith('0x') ? deployer.private_key : `0x${deployer.private_key}`,
   };
 }
 
@@ -803,28 +695,7 @@ function saveAgents(agents) {
   fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2));
 }
 
-function getServices() {
-  try {
-    if (fs.existsSync(SERVICES_FILE)) {
-      const loaded = JSON.parse(fs.readFileSync(SERVICES_FILE, 'utf8'));
-      // 确保所有服务都有 frameworks 字段
-      return loaded.map(s => ({ ...s, frameworks: Array.isArray(s.frameworks) && s.frameworks.length > 0 ? s.frameworks : ['generic'], security: s.security || { level: 'safe', score: 100, summary: '✅ 内置服务' } }));
-    }
-  } catch (e) {}
-  // 默认内置专家
-  const defaults = [
-    { id: 'tiedan-scan', expert: '铁蛋', wallet: '0xce0DE97496c20Dd773d75F560d3e4494cF542d96', name: '扫最新币', desc: '扫描 BSC 新上线代币，推荐有潜力的', price: 0.0005, deposit: 0.001, inputFormat: '代币合约地址（可选）', outputFormat: '新币列表 + 评分 + 涨幅', latency: '~3秒', totalCalls: 127, effectiveCalls: 113, effectiveRate: 0.89, active: true, avatar: '🔩', frameworks: ['openclaw','generic'], security: { level: 'safe', score: 100, summary: '✅ 内置服务' } },
-    { id: 'choudan-risk', expert: '臭蛋', wallet: '0x40992619077f0e42A1b7713C02B7324Fa1d8715c', name: '代币风控', desc: '检查合约安全性、rug pull 风险', price: 0.0003, deposit: 0.001, inputFormat: '代币合约地址', outputFormat: '安全评分 + 风险项列表', latency: '~5秒', totalCalls: 89, effectiveCalls: 82, effectiveRate: 0.92, active: true, avatar: '🥚', frameworks: ['openclaw','generic'], security: { level: 'safe', score: 100, summary: '✅ 内置服务' } },
-    { id: 'pidan-deep', expert: '皮蛋', wallet: '0x0BAdB40BED90515Cb436282C1D5bE059d17566BC', name: '深度分析', desc: '持仓分布、鲸鱼动向、链上数据', price: 0.0008, deposit: 0.001, inputFormat: '代币合约地址', outputFormat: '持仓分布 + 巨鲸动向 + 数据报告', latency: '~8秒', totalCalls: 67, effectiveCalls: 55, effectiveRate: 0.82, active: true, avatar: '🪺', frameworks: ['openclaw','langchain','generic'], security: { level: 'safe', score: 100, summary: '✅ 内置服务' } },
-    { id: 'ludan-report', expert: '卤蛋', wallet: '0x4190877f1959E260B4613793e3D07e8A332bc44B', name: '投资分析', desc: '生成投资分析、持有策略建议', price: 0.0001, deposit: 0.0005, inputFormat: '代币合约地址', outputFormat: '投资分析报告 + 策略建议', latency: '~10秒', totalCalls: 203, effectiveCalls: 170, effectiveRate: 0.84, active: true, avatar: '📝', frameworks: ['openclaw','generic'], security: { level: 'safe', score: 100, summary: '✅ 内置服务' } },
-  ];
-  saveServices(defaults);
-  return defaults;
-}
-
-function saveServices(services) {
-  fs.writeFileSync(SERVICES_FILE, JSON.stringify(services, null, 2));
-}
+// services.json 已废弃，数据统一在 sellers.json
 
 // 声誉数据
 const REPUTATION_FILE = path.join(__dirname, '..', 'agents', 'reputation_data.json');
@@ -1008,50 +879,7 @@ async function getWalletTokenBalance(walletAddress, tokenAddress) {
 // 生成服务执行结果（基于真实链上数据）
 async function generateReport(serviceType, buyerWallet, targetAddress = null) {
   const ts = new Date().toISOString();
-  
-  // 尝试调用真实 Python Agent runtime
-  const runtimeMap = {
-    'scanning': 'tiedan',
-    'risk': 'choudan',
-    'report': 'ludan',
-  };
-  const agentName = runtimeMap[serviceType];
-  
-  if (agentName) {
-    try {
-      const runtimeScript = path.join(__dirname, '..', 'agent_runtimes', `${agentName === 'tiedan' ? 'tiedan_scan' : agentName === 'choudan' ? 'choudan_risk' : 'ludan_report'}.py`);
-      const runtimeArgs = ['import', 'sys; sys.path.insert(0, "' + path.join(__dirname, '..') + '"); from agent_runtimes import RUNTIMES; import json; r = RUNTIMES["' + agentName + '"](' + (targetAddress ? 'task_description="分析", token_address="' + targetAddress + '"' : 'task_description="分析"') + '); print(json.dumps(r, ensure_ascii=False))'];
-      // 用 orchestrator.py 的 run_skill 代替，更接近真实流程
-      const orchestratorPath = path.join(__dirname, '..', 'orchestrator.py');
-      const env = { ...process.env, CRYPTOMINDS_OFFLINE: process.env.CRYPTOMINDS_OFFLINE || '0' };
-      const result = await new Promise((resolve, reject) => {
-        const py = spawn(PYTHON_BIN, ['-c', 
-          'import sys, json; sys.path.insert(0, "' + path.join(__dirname, '..') + '"); ' +
-          'from agent_runtimes import RUNTIMES; ' +
-          'r = RUNTIMES["' + agentName + '"](' + (targetAddress ? 'task_description="执行任务", token_address="' + targetAddress + '"' : 'task_description="执行任务"') + '); ' +
-          'print(json.dumps(r, ensure_ascii=False))'
-        ], { env, timeout: 20000 });
-        let stdout = '', stderr = '';
-        py.stdout.on('data', d => stdout += d);
-        py.stderr.on('data', d => stderr += d);
-        py.on('close', code => {
-          if (code === 0 && stdout.trim()) {
-            try { resolve(JSON.parse(stdout.trim())); } catch { resolve(null); }
-          } else { resolve(null); }
-        });
-        py.on('error', () => resolve(null));
-      });
-      
-      if (result) {
-        // 合并 Agent runtime 结果和标准格式
-        return { ...result, _source: 'agent_runtime', _agent: agentName, timestamp: ts };
-      }
-    } catch (e) {
-      console.error('Agent runtime 调用失败，降级到链上查询:', e.message);
-    }
-  }
-  
-  // 降级：链上查询
+
   switch(serviceType) {
     case 'scanning': {
       // 真实链上查询：获取最新交易对
@@ -1232,7 +1060,7 @@ async function executeServiceForPurchase(service, purchase) {
   const input = getPurchaseInput(purchase);
   const targetAddress = resolveTargetAddress(input);
 
-  // 内置服务（铁蛋扫链、臭蛋风控、卤蛋报告）— 兼容旧数据
+  // 兼容旧数据中的 serviceId 映射
   if (service.id.includes('scan') || service.id.includes('risk') || service.id.includes('report')) {
     const reportType = service.id.includes('scan') ? 'scanning'
       : service.id.includes('risk') ? 'risk'
@@ -1306,8 +1134,8 @@ async function markPurchaseDelivered(purchaseId, output, options = {}) {
   if (!purchase) throw new Error('订单不存在');
   if (purchase.status !== 'pending') return purchase;
 
-  const services = getServices();
-  const service = services.find(item => item.id === purchase.serviceId) || null;
+  const sellersData = getSellers(); const services = sellersData.sellers;
+  const service = services.find(item => item.id === purchase.sellerId) || null;
   const normalizedOutput = output?.version === 'hosted-result/v1'
     ? output
     : normalizeHostedDeliveryOutput(service, output, {
@@ -1330,104 +1158,65 @@ async function markPurchaseDelivered(purchaseId, output, options = {}) {
     type: 'order_result',
     targetWallet: purchase.buyerWallet,
     orderId: purchase.id,
-    serviceId: purchase.serviceId,
-    serviceName: purchase.serviceName,
-    sellerWallet: purchase.expertWallet,
-    sellerName: purchase.expert,
+    serviceId: purchase.sellerId,
+    serviceName: purchase.sellerName,
+    sellerWallet: purchase.sellerWallet,
+    sellerName: purchase.sellerName,
   });
 
   return purchase;
 }
 
+// 通知卖家 agent：有人付钱了，请用你的模型+策略买币并发回买家钱包
 async function attemptAutoDeliverPurchase(purchaseId) {
   const purchases = getPurchases();
   const purchase = purchases.find(item => item.id === purchaseId);
   if (!purchase || purchase.status !== 'pending') return;
 
-  const services = getServices();
-  const service = services.find(item => item.id === purchase.serviceId && item.active);
+  const sellersData = getSellers(); const services = sellersData.sellers;
+  const service = services.find(item => item.id === purchase.sellerId && item.active);
   if (!service) return;
 
+  // 通知卖家 agent endpoint
+  const sellerEndpoint = service.api?.endpoint || '';
+  if (!sellerEndpoint) {
+    console.log('[notify-seller] 无 endpoint，跳过通知:', service.id);
+    return;
+  }
+
   try {
-    const result = await executeServiceForPurchase(service, purchase);
-    let deliveryTxHash = '';
-    if (purchase.escrowOrderId) {
-      const managedSeller = findManagedWalletByAddress(purchase.expertWallet);
-      if (!managedSeller) {
-        throw new Error('卖家钱包未托管，需主人手动确认发货');
-      }
-      const receipt = await sendEscrowSignedTx('deliver', [purchase.escrowOrderId, JSON.stringify(result.output)], managedSeller);
-      deliveryTxHash = receipt.transactionHash;
-    }
-    await markPurchaseDelivered(purchase.id, result.output, {
-      autoDelivered: true,
-      deliveryTxHash,
-      report: result.report,
+    const notifyPayload = {
+      action: 'new_order',
+      orderId: purchase.id,
+      serviceId: service.id,
+      buyerWallet: purchase.buyerWallet,
+      buyerName: purchase.buyerName,
+      amount: purchase.price,
+      currency: 'BNB',
+      input: purchase.input || '',
+      txHash: purchase.txHash || '',
+    };
+    const resp = await fetch(sellerEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(notifyPayload),
+      signal: AbortSignal.timeout(10000),
     });
+    if (!resp.ok) throw new Error(`卖家 endpoint 返回 ${resp.status}`);
+    const data = await resp.json().catch(() => ({}));
+    console.log('[notify-seller] 通知成功:', purchase.id, data);
   } catch (error) {
+    console.error('[notify-seller] 通知失败:', error.message);
     addNotification({
       type: 'manual_delivery_required',
-      targetWallet: purchase.expertWallet,
+      targetWallet: purchase.sellerWallet,
       orderId: purchase.id,
-      serviceId: purchase.serviceId,
-      serviceName: purchase.serviceName,
+      serviceId: purchase.sellerId,
+      serviceName: purchase.sellerName,
       buyerWallet: purchase.buyerWallet,
       buyerName: purchase.buyerName,
       reason: error.message,
     });
-  }
-}
-
-let escrowReconcileRunning = false;
-async function reconcileEscrowOrders() {
-  if (escrowReconcileRunning) return;
-  escrowReconcileRunning = true;
-  try {
-    const executor = getEscrowExecutorWallet();
-    if (!executor) return;
-
-    const purchases = getPurchases();
-    for (const purchase of purchases) {
-      if (!purchase.escrowOrderId || !purchase.escrowAddress) continue;
-      try {
-        const order = await fetchEscrowOrder(purchase.escrowOrderId);
-        if (purchase.status === 'pending' && order.status === 'Pending') {
-          const deadline = order.createdAt + (order.timeoutSeconds || ESCROW_CONFIG.defaultTimeout);
-          if (deadline > 0 && Math.floor(Date.now() / 1000) >= deadline) {
-            const receipt = await sendEscrowSignedTx('claimNoDeliveryRefund', [purchase.escrowOrderId], executor);
-            purchase.status = 'rejected';
-            purchase.refundedAt = new Date().toISOString();
-            purchase.escrowStatus = 'Refunded';
-            purchase.refundTxHash = receipt.transactionHash;
-            addNotification({
-              type: 'order_refunded',
-              targetWallet: purchase.buyerWallet,
-              orderId: purchase.id,
-              serviceId: purchase.serviceId,
-              serviceName: purchase.serviceName,
-            });
-          }
-        } else if (purchase.status === 'delivered' && order.status === 'Delivered' && order.timeoutAt > 0 && Math.floor(Date.now() / 1000) >= order.timeoutAt) {
-          const receipt = await sendEscrowSignedTx('claimTimeout', [purchase.escrowOrderId], executor);
-          purchase.status = 'completed';
-          purchase.confirmedAt = new Date().toISOString();
-          purchase.escrowStatus = 'Expired';
-          purchase.timeoutReleaseTxHash = receipt.transactionHash;
-        } else if (order.status === 'Refunded') {
-          purchase.status = 'rejected';
-          purchase.escrowStatus = 'Refunded';
-        } else if (order.status === 'Confirmed' || order.status === 'Expired') {
-          if (purchase.status === 'delivered') {
-            purchase.status = 'completed';
-            purchase.confirmedAt = new Date().toISOString();
-          }
-          purchase.escrowStatus = order.status;
-        }
-      } catch (err) {}
-    }
-    savePurchases(purchases);
-  } finally {
-    escrowReconcileRunning = false;
   }
 }
 
@@ -1436,34 +1225,19 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.json({ limit: '256kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// CORS — 允许 SDK / 外部 Agent 跨域调用
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-402-Payment');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 // TX 记录
 const TX_LOG = path.join(__dirname, '..', 'tx-log.json');
 const AGENT_EVENTS_FILE = path.join(__dirname, '..', 'agent_events.json');
 
-function loadEscrowDeployment() {
-  try {
-    return JSON.parse(fs.readFileSync(ESCROW_DEPLOYMENT_FILE, 'utf8'));
-  } catch (err) {
-    return {};
-  }
-}
-
-function loadEscrowAbi() {
-  try {
-    return JSON.parse(fs.readFileSync(ESCROW_ABI_FILE, 'utf8'));
-  } catch (err) {
-    const deployment = loadEscrowDeployment();
-    return deployment.abi || [];
-  }
-}
-
-const ESCROW_DEPLOYMENT = loadEscrowDeployment();
-const ESCROW_CONFIG = {
-  address: process.env.ESCROW_ADDRESS || ESCROW_DEPLOYMENT.contractAddress || '0x47e1904364391f00147b9a77af9cf23cfd1b113c',
-  chainId: Number(process.env.ESCROW_CHAIN_ID || ESCROW_DEPLOYMENT.chainId || 56),
-  defaultTimeout: Number(process.env.ESCROW_DEFAULT_TIMEOUT || ESCROW_DEPLOYMENT.defaultTimeout || 86400),
-};
-const ESCROW_ABI = loadEscrowAbi();
 function getTxs() {
   try { return JSON.parse(fs.readFileSync(TX_LOG, 'utf8')); } catch(e) { return []; }
 }
@@ -1503,7 +1277,7 @@ function broadcastSSE(data) {
 let balanceCache = { data: {}, fetchedAt: 0 };
 
 async function fetchBalancesLive() {
-  const entries = Object.entries(AGENTS);
+  const entries = Object.entries(getManagedAgents());
   const results = await Promise.all(entries.map(async ([key, agent]) => {
     try {
       const bal = await w3.eth.getBalance(agent.addr);
@@ -1534,7 +1308,7 @@ async function getBalancesCached(forceRefresh = false) {
       return balanceCache.data;
     }
     const fallback = {};
-    for (const key of Object.keys(AGENTS)) fallback[key] = '0';
+    for (const key of Object.keys(getManagedAgents())) fallback[key] = '0';
     return fallback;
   }
 }
@@ -1546,10 +1320,11 @@ app.get('/', async (req, res) => {
   let txCount = 0;
   const txs = getTxs();
   txCount = txs.length;
-  for (const tx of txs) {
-    if (tx.from === '钢蛋') totalSpent += tx.amount;
-  }
-  res.render('index', { AGENTS, SERVICES: getServices().filter(s => s.active), PENDING_SERVICES: getServices().filter(s => s.status === 'pending'), TRANSACTIONS: txs, balances, totalSpent: totalSpent.toFixed(4), txCount });
+  totalSpent = txs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+  const sellersData = getSellers();
+  const activeSellers = sellersData.sellers.filter(s => s.active !== false);
+  const pendingSellers = sellersData.sellers.filter(s => s.serviceStatus === 'pending');
+  res.render('index', { AGENTS: getManagedAgents(), activeSellers, pendingSellers, TRANSACTIONS: txs, balances, totalSpent: totalSpent.toFixed(4), txCount, DEMO_MODE });
 });
 
 app.get('/api/balances', async (req, res) => {
@@ -1557,7 +1332,7 @@ app.get('/api/balances', async (req, res) => {
   // 后台异步刷新
   getBalancesCached(true);
   const result = {};
-  for (const [key, agent] of Object.entries(AGENTS)) {
+  for (const [key, agent] of Object.entries(getManagedAgents())) {
     result[key] = {
       ...agent,
       balance: balances[key] || '0',
@@ -1572,7 +1347,7 @@ app.get('/api/transactions', (req, res) => {
 });
 
 app.get('/api/market', async (req, res) => {
-  const services = getServices().filter(s => s.active && s.status === 'approved');
+  const services = getSellers().sellers.filter(s => s.active && s.status === 'approved');
   // BNB 价格用缓存，不阻塞响应
   const bnbPrice = bnbPriceUsd || 600;
   fetchBnbPrice(); // 后台刷新
@@ -1629,6 +1404,17 @@ app.get('/api/notifications', (req, res) => {
   res.json({ ok: true, total: mine.length, unread: mine.filter(n => !n.read).length, notifications: unread.slice(0, 50) });
 });
 
+// P3: Demo 模式状态（黑客松评委体验）
+app.get('/api/config', (req, res) => {
+  res.json({
+    ok: true,
+    demoMode: DEMO_MODE,
+    demoWallet: DEMO_WALLET,
+    port: PORT,
+    chain: 'BSC',
+  });
+});
+
 app.post('/api/notifications/:id/read', (req, res) => {
   const notifications = getNotifications();
   const ntf = notifications.find(n => n.id === req.params.id);
@@ -1664,48 +1450,10 @@ function isAdmin(wallet) {
   return ADMIN_WALLETS.includes(wallet.toLowerCase());
 }
 
-// 待审核列表
-app.get('/api/admin/pending', (req, res) => {
-  const wallet = req.query.wallet || '';
-  if (!isAdmin(wallet)) return res.json({ ok: false, error: '无权限' });
-  const services = getServices();
-  const pending = services.filter(s => s.status === 'pending');
-  res.json({ ok: true, pending });
-});
-
-// 审核：通过
-app.post('/api/admin/approve/:id', (req, res) => {
-  const { wallet } = req.body;
-  if (!isAdmin(wallet)) return res.json({ ok: false, error: '无权限' });
-  const services = getServices();
-  const svc = services.find(s => s.id === req.params.id);
-  if (!svc) return res.json({ ok: false, error: '服务不存在' });
-  if (svc.status !== 'pending') return res.json({ ok: false, error: '该服务不在待审核状态' });
-  svc.status = 'approved';
-  svc.approvedAt = new Date().toISOString();
-  saveServices(services);
-  res.json({ ok: true });
-});
-
-// 审核：拒绝
-app.post('/api/admin/reject/:id', (req, res) => {
-  const { wallet, reason } = req.body;
-  if (!isAdmin(wallet)) return res.json({ ok: false, error: '无权限' });
-  const services = getServices();
-  const svc = services.find(s => s.id === req.params.id);
-  if (!svc) return res.json({ ok: false, error: '服务不存在' });
-  if (svc.status !== 'pending') return res.json({ ok: false, error: '该服务不在待审核状态' });
-  svc.status = 'rejected';
-  svc.rejectReason = reason || '';
-  svc.rejectedAt = new Date().toISOString();
-  saveServices(services);
-  res.json({ ok: true });
-});
-
 // 提交服务结果（卖家调用）
-app.post('/api/orders/:orderId/result', (req, res) => {
+app.post('/api/orders/:orderId/result', async (req, res) => {
   const { orderId } = req.params;
-  const { output, sellerWallet } = req.body;
+  const { output, sellerWallet, deliveryTxHash } = req.body;
 
   if (!orderId || !output || !sellerWallet) {
     return res.json({ ok: false, error: '缺少 orderId, output 或 sellerWallet' });
@@ -1717,19 +1465,34 @@ app.post('/api/orders/:orderId/result', (req, res) => {
     return res.json({ ok: false, error: '订单不存在' });
   }
 
-  if (purchase.expertWallet?.toLowerCase() !== sellerWallet.toLowerCase()) {
+  if (purchase.sellerWallet?.toLowerCase() !== sellerWallet.toLowerCase()) {
     return res.json({ ok: false, error: '只有卖家能提交结果' });
   }
   if (purchase.status !== 'pending') {
     return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法提交结果` });
   }
 
-    Promise.resolve().then(async () => {
-    await markPurchaseDelivered(orderId, output, { autoDelivered: false, rawOutput: output });
-    res.json({ ok: true, escrowOrderId: purchase.escrowOrderId || '' });
-  }).catch(err => {
+  try {
+    // 如果订单走合约托管，调用合约 deliver()
+    if (purchase.escrowOrderId) {
+      const { getEscrowContract, orderIdToBytes32 } = require('./lib/escrow');
+      const contract = getEscrowContract();
+      if (contract) {
+        const b32 = orderIdToBytes32(purchase.escrowOrderId);
+        // 注意：合约 deliver() 需要 seller 签名，这里只记录，前端负责调合约
+        console.log(`[escrow] 订单 ${orderId} 有合约托管，escrowOrderId: ${purchase.escrowOrderId}`);
+      }
+    }
+
+    await markPurchaseDelivered(orderId, output, {
+      autoDelivered: false,
+      rawOutput: output,
+      deliveryTxHash: deliveryTxHash || '',
+    });
+    res.json({ ok: true, escrowOrderId: purchase.escrowOrderId || null });
+  } catch (err) {
     res.json({ ok: false, error: err.message });
-  });
+  }
 });
 
 // 查询订单结果（买家调用）
@@ -1748,24 +1511,8 @@ app.get('/api/orders/:orderId/result', (req, res) => {
   });
 });
 
-// 服务目录
-app.get('/api/services', async (req, res) => {
-  const services = getServices().filter(s => s.active && s.status === 'approved');
-  const bnbPrice = await fetchBnbPrice();
-  const withUsd = services.map(s => ({ ...s, price_usdc: +(s.price * bnbPrice).toFixed(2) }));
-  res.json(withUsd);
-});
 
-// 获取用户自己的服务（包括 pending 状态）
-app.get('/api/my-services/:wallet', (req, res) => {
-  const wallet = req.params.wallet.toLowerCase();
-  const services = getServices().filter(s => 
-    s.wallet && s.wallet.toLowerCase() === wallet && s.active
-  );
-  res.json(services);
-});
-
-// 专家入驻
+// 卖家入驻
 app.get('/api/config/deposit', (req, res) => {
   res.json({
     depositPoolAddress: DEPOSIT_POOL_ADDRESS,
@@ -1774,268 +1521,8 @@ app.get('/api/config/deposit', (req, res) => {
   });
 });
 
-// 服务文件安全扫描
-app.post('/api/skills/scan', upload.single('skillFile'), (req, res) => {
-  try {
-    if (!req.file) return res.json({ ok: false, error: '未上传文件' });
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    if (!['.py', '.js'].includes(ext)) {
-      fs.unlinkSync(req.file.path);
-      return res.json({ ok: false, error: '只支持 .py 或 .js 文件' });
-    }
-    const code = fs.readFileSync(req.file.path, 'utf8');
-    const { scan } = require('../security/scanner');
-    const scanResult = scan(code);
-    fs.unlinkSync(req.file.path); // 扫完删临时文件
-    res.json({ ok: true, scan: scanResult });
-  } catch(e) {
-    res.json({ ok: false, error: e.message });
-  }
-});
 
-app.post('/api/experts/register', upload.single('skillFile'), async (req, res) => {
-  const { expert, wallet, name, desc, price, deposit, depositTx, inputFormat, outputFormat, latency, deliveryMode, endpoint } = req.body;
-  const expertName = sanitizeText(expert, 40);
-  const skillName = sanitizeText(name, 80);
-  const description = sanitizeText(desc, 240);
-  let normalizedWallet = typeof wallet === 'string' ? wallet.trim() : '';
-  const parsedPrice = parsePositiveNumber(price);
-  const parsedDeposit = parseNonNegativeNumber(deposit, 0.001);
-  const depositTxHash = typeof depositTx === 'string' ? depositTx.trim() : '';
-  const deliveryModeValue = deliveryMode === 'self_hosted' ? 'self_hosted' : 'hosted';
-  const endpointUrl = deliveryModeValue === 'self_hosted' ? sanitizeText(endpoint, 240) : '';
 
-  const inputFmt = sanitizeText(inputFormat, 120);
-  const outputFmt = sanitizeText(outputFormat, 120);
-  const latencyEst = sanitizeText(latency, 30);
-  const initialStatus = req.body.status === 'pending_deposit' ? 'pending_deposit' : null;
-
-  if (!expertName || !normalizedWallet || !skillName || parsedPrice === null || parsedDeposit === null) {
-    console.log('Validation failed:', { expertName, normalizedWallet, skillName, parsedPrice, parsedDeposit, rawPrice: price, rawDeposit: deposit });
-    return res.json({ ok: false, error: `缺少必填字段: ${[!expertName&&'expert',!normalizedWallet&&'wallet',!skillName&&'name',parsedPrice===null&&'price',parsedDeposit===null&&'deposit'].filter(Boolean).join(',')}` });
-  }
-  if (!inputFmt || !outputFmt) {
-    return res.json({ ok: false, error: '请填写输入/输出格式' });
-  }
-  if (!isValidAddress(normalizedWallet)) {
-    return res.json({ ok: false, error: 'wallet 地址格式无效' });
-  }
-  // 一号一服务限制
-  const existingServices = getServices();
-  const hasActive = existingServices.find(s => s.wallet?.toLowerCase() === normalizedWallet.toLowerCase() && s.status !== 'deregistered');
-  if (hasActive) {
-    return res.json({ ok: false, error: '该钱包已发布服务，一个钱包只能发布一个服务' });
-  }
-  // 平台托管服务 ID
-  const id = `${expertName}-${skillName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
-
-  // 验证押金交易（非零地址时需要链上验证，pending_deposit 状态跳过验证）
-  if (!initialStatus && DEPOSIT_POOL_ADDRESS !== '0x0000000000000000000000000000000000000000') {
-    if (!isChainTxHash(depositTxHash)) {
-      return res.json({ ok: false, error: '缺少链上押金交易哈希，请先通过MetaMask缴纳押金' });
-    }
-    // 链上验证押金交易
-    try {
-      const tx = await w3.eth.getTransaction(depositTxHash);
-      if (!tx) return res.json({ ok: false, error: '押金交易未找到，请确认交易已上链' });
-      if (tx.from.toLowerCase() !== normalizedWallet.toLowerCase()) {
-        // 押金发送者和入驻钱包不一致，自动用押金发送者作为入驻钱包
-        console.log('Auto-correcting wallet:', { txFrom: tx.from, registerWallet: normalizedWallet });
-        normalizedWallet = tx.from.toLowerCase();
-      }
-      if (tx.to && tx.to.toLowerCase() !== DEPOSIT_POOL_ADDRESS.toLowerCase()) {
-        return res.json({ ok: false, error: '押金未发送到正确的押金池地址' });
-      }
-      if (!tx.input || !tx.input.toLowerCase().startsWith(STAKE_SELECTOR)) {
-        return res.json({ ok: false, error: '押金交易必须调用质押合约的 stake(skillId)' });
-      }
-      const stakedSkillId = decodeSingleStringArg(tx.input, STAKE_SELECTOR);
-      if (stakedSkillId && stakedSkillId !== id) {
-        return res.json({ ok: false, error: '押金交易绑定的 skillId 与当前服务不一致' });
-      }
-      const depositAmount = parseFloat(w3.utils.fromWei(tx.value, 'ether'));
-      if (depositAmount < parsedDeposit) {
-        return res.json({ ok: false, error: `押金金额不足，需要 ${parsedDeposit} BNB，实际 ${depositAmount} BNB` });
-      }
-    } catch (e) {
-      return res.json({ ok: false, error: `押金交易验证失败: ${e.message}` });
-    }
-  }
-
-  const services = getServices();
-  const duplicate = services.find(s => s.active && s.expert === expertName && s.name === skillName);
-  if (duplicate) {
-    // 允许替换 pending_deposit 状态的服务
-    if (duplicate.status === 'pending_deposit') {
-      // 更新现有服务
-      duplicate.wallet = normalizedWallet;
-      duplicate.desc = description || '';
-      duplicate.price = parsedPrice;
-      duplicate.deposit = parsedDeposit;
-      duplicate.inputFormat = inputFmt;
-      duplicate.outputFormat = outputFmt;
-      duplicate.latency = latencyEst || '';
-      duplicate.registeredAt = new Date().toISOString();
-      saveServices(services);
-      return res.json({ ok: true, service: duplicate, serviceId: duplicate.id });
-    }
-    return res.json({ ok: false, error: '该服务已存在，请更换名称' });
-  }
-
-  // 安全扫描 + 交付方式验证（必须通过才能上架）
-  let securityScan = { level: 'unsafe', score: 0, issues: [], summary: '❌ 未扫描' };
-  let skillFilePath = '';
-  let skillFileExt = '';
-
-  if (deliveryModeValue === 'hosted') {
-    // 托管模式：必须上传代码文件
-    if (!req.file) {
-      return res.json({ ok: false, error: '托管模式必须上传服务代码文件（.py 或 .js）' });
-    }
-    skillFileExt = path.extname(req.file.originalname).toLowerCase();
-    if (!['.py', '.js'].includes(skillFileExt)) {
-      try { fs.unlinkSync(req.file.path); } catch(e) {}
-      return res.json({ ok: false, error: '只支持 .py 或 .js 文件' });
-    }
-    // 安全扫描（必须通过）
-    try {
-      const code = fs.readFileSync(req.file.path, 'utf8');
-      const { scan } = require('../security/scanner');
-      securityScan = scan(code, skillFileExt === '.py' ? 'py' : 'js');
-      if (securityScan.level === 'critical') {
-        try { fs.unlinkSync(req.file.path); } catch(e2) {}
-        return res.json({ ok: false, error: '安全扫描未通过，服务不允许上架', scan: securityScan });
-      }
-    } catch(e) {
-      try { fs.unlinkSync(req.file.path); } catch(e2) {}
-      return res.json({ ok: false, error: '安全扫描失败: ' + e.message });
-    }
-  } else {
-    // 自托管模式：必须填 endpoint，并做可达性验证
-    if (!endpointUrl) {
-      return res.json({ ok: false, error: '自托管模式必须填写 API Endpoint' });
-    }
-    const endpointValidation = await validateServiceEndpoint(endpointUrl);
-    if (!endpointValidation.ok) {
-      return res.json({ ok: false, error: endpointValidation.error });
-    }
-    securityScan = { level: 'safe', score: 80, issues: [], summary: '✅ 自托管服务（API 安全由卖家负责）' };
-  }
-
-  // 保存上传的代码文件（托管模式）
-  if (deliveryModeValue === 'hosted' && req.file) {
-    const skillsDir = path.join(__dirname, '..', 'skills');
-    if (!fs.existsSync(skillsDir)) fs.mkdirSync(skillsDir, { recursive: true });
-    skillFilePath = path.join(skillsDir, `${id}${skillFileExt}`);
-    fs.copyFileSync(req.file.path, skillFilePath);
-    try { fs.unlinkSync(req.file.path); } catch(e) {} // 清理临时文件
-  }
-
-  const newService = {
-    id, expert: expertName, wallet: normalizedWallet, service: 'service', name: skillName,
-    desc: description || '', price: parsedPrice, deposit: parsedDeposit,
-    inputFormat: inputFmt, outputFormat: outputFmt, latency: latencyEst || '',
-    deliveryMode: deliveryModeValue,
-    executionMode: deliveryModeValue === 'hosted' ? 'hosted' : 'self_hosted',
-    resultType: inferServiceResultType({ id, name: skillName, outputFormat: outputFmt }),
-    api: {
-      endpoint: deliveryModeValue === 'self_hosted' ? endpointUrl : '',
-      method: 'POST',
-      skillFile: deliveryModeValue === 'hosted',
-      skillExt: deliveryModeValue === 'hosted' ? skillFileExt : '',
-    },
-    skillFilePath: deliveryModeValue === 'hosted' ? skillFilePath : '',
-    depositTx: depositTxHash || null,
-    security: securityScan,
-    totalCalls: 0, effectiveCalls: 0, effectiveRate: 0,
-    rating: 0, sales: 0, active: true,
-    status: initialStatus || 'pending',
-    avatar: '🤖',
-    registeredAt: new Date().toISOString()
-  };
-  services.push(newService);
-  saveServices(services);
-  if (!initialStatus) {
-    addTx({ time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}), from: expertName, to: '押金池', amount: parsedDeposit, reason: `入驻: ${skillName}`, tx: `reg-${id}` });
-  }
-  res.json({ ok: true, service: newService, serviceId: id });
-});
-
-// 更新服务押金状态（缴纳押金后调用）
-app.post('/api/services/:id/deposit', async (req, res) => {
-  const { id } = req.params;
-  const { txHash, wallet } = req.body;
-  
-  const services = getServices();
-  const svc = services.find(s => s.id === id);
-  if (!svc) return res.json({ ok: false, error: '服务不存在' });
-  if (svc.status !== 'pending_deposit') return res.json({ ok: false, error: '服务状态不正确' });
-  
-  // 验证押金交易
-  try {
-    const tx = await w3.eth.getTransaction(txHash);
-    if (!tx) return res.json({ ok: false, error: '交易未找到' });
-    if (tx.to && tx.to.toLowerCase() !== DEPOSIT_POOL_ADDRESS.toLowerCase()) {
-      return res.json({ ok: false, error: '押金未发送到正确地址' });
-    }
-    if (!tx.input || !tx.input.toLowerCase().startsWith(STAKE_SELECTOR)) {
-      return res.json({ ok: false, error: '押金交易必须调用质押合约的 stake(skillId)' });
-    }
-    const stakedSkillId = decodeSingleStringArg(tx.input, STAKE_SELECTOR);
-    if (!stakedSkillId || stakedSkillId !== svc.id) {
-      return res.json({ ok: false, error: '押金交易未绑定当前服务 skillId' });
-    }
-    const depositAmount = parseFloat(w3.utils.fromWei(tx.value, 'ether'));
-    if (depositAmount < 0.001) {
-      return res.json({ ok: false, error: '押金金额不足' });
-    }
-    
-    svc.status = 'pending'; // 更新为待审核
-    svc.depositTx = txHash;
-    svc.wallet = tx.from.toLowerCase(); // 用实际付款钱包
-    saveServices(services);
-    
-    addTx({ time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}), from: svc.expert, to: '押金池', amount: depositAmount, reason: `入驻: ${svc.name}`, tx: txHash });
-    
-    // 自动审核逻辑
-    let autoApproved = false;
-    if (svc.deliveryMode === 'hosted' && svc.security && svc.security.level !== 'unsafe') {
-      // 托管模式 + 安全扫描通过 → 自动审核通过
-      svc.status = 'approved';
-      svc.approvedAt = new Date().toISOString();
-      svc.autoApproved = true;
-      autoApproved = true;
-      saveServices(services);
-      console.log(`[自动审核] 托管模式服务已自动通过: ${svc.name}`);
-    } else if (svc.deliveryMode === 'self-hosted' && svc.endpoint) {
-      // 自托管模式 → 验证 API 可用性
-      try {
-        const healthRes = await fetch(svc.endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'health_check' }),
-          timeout: 5000
-        });
-        if (healthRes.ok) {
-          svc.status = 'approved';
-          svc.approvedAt = new Date().toISOString();
-          svc.autoApproved = true;
-          autoApproved = true;
-          saveServices(services);
-          console.log(`[自动审核] 自托管模式服务 API 验证通过: ${svc.name}`);
-        } else {
-          console.log(`[自动审核] 自托管模式服务 API 返回错误: ${svc.name}`);
-        }
-      } catch (e) {
-        console.log(`[自动审核] 自托管模式服务 API 验证失败: ${svc.name}, ${e.message}`);
-      }
-    }
-    
-    res.json({ ok: true, autoApproved });
-  } catch(e) {
-    res.json({ ok: false, error: '交易验证失败: ' + e.message });
-  }
-});
 
 // 确认购买（待确认订单 → 完成）
 app.post('/api/purchases/confirm/:purchaseId', (req, res) => {
@@ -2047,40 +1534,54 @@ app.post('/api/purchases/confirm/:purchaseId', (req, res) => {
   }
 
   Promise.resolve().then(async () => {
-    if (purchase.escrowOrderId) {
-      const order = await fetchEscrowOrder(purchase.escrowOrderId);
-      if (order.status !== 'Confirmed' && order.status !== 'Expired') {
-        return res.json({ ok: false, error: `Escrow 链上状态为 ${order.status}，请先完成链上确认或等待超时释放` });
-      }
-      purchase.escrowStatus = order.status;
-      purchase.escrowSettledAt = new Date().toISOString();
-      purchase.payment = {
-        ...(purchase.payment || {}),
-        mode: 'escrow',
-        verified: true,
-      };
-    }
-
-    purchase.status = purchase.payment?.verified ? 'completed' : 'demo-completed';
+    const rating = Number(req.body.rating || 5);
+    purchase.status = 'completed';
+    purchase.autoConfirmed = req.body.auto === true || req.body.rating !== undefined;
     purchase.confirmedAt = new Date().toISOString();
+    purchase.rating = rating;
+    if (req.body.comment) purchase.comment = req.body.comment;
     savePurchases(purchases);
 
-    const services = getServices();
-    const service = services.find(s => s.id === purchase.serviceId);
-    if (service) {
-      service.sales += 1;
-      saveServices(services);
+    // 更新卖家评分+权重
+    const data = getSellers();
+    const seller = data.sellers?.find(s => s.wallet?.toLowerCase() === purchase.sellerWallet?.toLowerCase());
+    if (seller) {
+      const totalRatings = seller.totalOrders || 0;
+      const oldAvg = seller.rating || 5;
+      seller.rating = Math.round(((oldAvg * totalRatings + rating) / (totalRatings + 1)) * 10) / 10;
+      seller.totalOrders = totalRatings + 1;
+      seller.weight = calculateWeight(seller);
+      if (rating <= 2) seller.badRatings = (seller.badRatings || 0) + 1;
+      saveSellers(data);
+
+      // 通知卖家Agent订单已确认
+      if (seller.endpoint) {
+        try {
+          await fetch(seller.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'order_confirmed',
+              orderId: purchase.id,
+              rating,
+              comment: req.body.comment || '',
+            }),
+          });
+        } catch (e) {
+          console.error('[confirm] 通知卖家Agent失败:', e.message);
+        }
+      }
     }
 
     addTx({
       time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
       from: purchase.buyerName || '未知',
       fromWallet: purchase.buyerWallet,
-      to: purchase.expert,
+      to: purchase.sellerName || '卖家',
       amount: purchase.price,
-      reason: `${purchase.serviceName} [确认购买]`,
+      reason: `${purchase.sellerName} [确认购买]`,
       tx: purchase.txHash || purchase.id,
-      verified: purchase.payment?.verified ? '✅ 已验证' : '🧪 模拟',
+      verified: '✅ 已验证',
       receipt: purchase.id
     });
 
@@ -2095,12 +1596,45 @@ app.post('/api/purchases/reject/:purchaseId', (req, res) => {
   const purchases = getPurchases();
   const purchase = purchases.find(p => p.id === req.params.purchaseId);
   if (!purchase) return res.json({ ok: false, error: '订单不存在' });
-  if (purchase.escrowOrderId) return res.json({ ok: false, error: 'Escrow 订单请走链上 dispute() 争议流程' });
   if (purchase.status !== 'delivered' && purchase.status !== 'pending_confirm') return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法拒绝` });
 
   purchase.status = 'rejected';
   purchase.rejectedAt = new Date().toISOString();
   savePurchases(purchases);
+
+  res.json({ ok: true, purchase });
+});
+
+// 卖家超时退款
+app.post('/api/orders/:orderId/refund', async (req, res) => {
+  const { reason, txHash } = req.body;
+  const purchases = getPurchases();
+  const purchase = purchases.find(p => p.id === req.params.orderId);
+  if (!purchase) return res.json({ ok: false, error: '订单不存在' });
+
+  purchase.status = 'seller_timeout';
+  purchase.refundReason = reason || 'seller_timeout';
+  purchase.refundTxHash = txHash;
+  purchase.refundedAt = new Date().toISOString();
+  // 注意：这里不自动扣减卖家余额，押金仍归平台；退款为平台代退处理
+  savePurchases(purchases);
+
+  // 记录转账流水
+  try {
+    addTx({
+      time: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+      from: 'Escrow',
+      fromWallet: 'Escrow',
+      to: purchase.buyerWallet,
+      amount: purchase.price,
+      reason: `卖家超时退款 ${reason || 'seller_timeout'}`,
+      tx: txHash,
+      verified: '✅ 已退款',
+      receipt: purchase.id,
+    });
+  } catch (e) {
+    console.error('[refund-tx] 记录转账失败:', e.message);
+  }
 
   res.json({ ok: true, purchase });
 });
@@ -2112,35 +1646,6 @@ app.get('/api/purchases/pending', (req, res) => {
   res.json({ ok: true, count: pending.length, purchases: pending });
 });
 
-// 专家退出（标记退出，退款由质押方处理）
-app.post('/api/experts/exit', (req, res) => {
-  const { expert, serviceId, withdrawTx } = req.body;
-  if (!expert) return res.json({ ok: false, error: '缺少专家名' });
-  const services = getServices();
-  const idx = services.findIndex(s => serviceId ? s.id === serviceId : s.expert === expert);
-  if (idx === -1) return res.json({ ok: false, error: '未找到该专家' });
-  const svc = services[idx];
-  if (!svc.active) return res.json({ ok: false, error: '已退出' });
-
-  // 检查是否有未完成的订单
-  const purchases = getPurchases();
-  const pending = purchases.filter(p => p.expert === expert && !['completed', 'demo-completed', 'rejected'].includes(p.status));
-  if (pending.length > 0) return res.json({ ok: false, error: `有 ${pending.length} 笔订单未完成，无法退出` });
-
-  svc.active = false;
-  svc.status = 'deregistered';
-  svc.exitedAt = new Date().toISOString();
-  if (withdrawTx) {
-    svc.withdrawTx = withdrawTx;
-    svc.refundStatus = 'completed';
-  } else {
-    svc.refundStatus = 'pending';
-  }
-  services[idx] = svc;
-  saveServices(services);
-
-  res.json({ ok: true, message: '已退出', service: svc });
-});
 
 // 质押方退款回调（Four.meme 或合约调用）
 // refund/callback 已移除（未使用）
@@ -2158,60 +1663,6 @@ function requireAdmin(req, res, next) {
 
 // admin/audit-log 已移除（未使用）
 
-// 管理员操作接口（需鉴权）
-app.get('/api/admin/pending', requireAdmin, (req, res) => {
-  const services = getServices();
-  const pending = services.filter(s => s.status === 'pending');
-  res.json({ ok: true, count: pending.length, services: pending });
-});
-
-app.post('/api/admin/approve/:serviceId', requireAdmin, (req, res) => {
-  const { serviceId } = req.params;
-  const services = getServices();
-  const idx = services.findIndex(s => s.id === serviceId);
-  if (idx === -1) return res.json({ ok: false, error: '服务不存在' });
-  const svc = services[idx];
-  if (svc.status !== 'pending') return res.json({ ok: false, error: `服务状态为 ${svc.status || 'active'}，无法审核` });
-  
-  svc.status = 'approved';
-  svc.active = true;
-  svc.approvedAt = new Date().toISOString();
-  services[idx] = svc;
-  saveServices(services);
-  res.json({ ok: true, message: `${svc.name} 已上架`, service: svc });
-});
-
-app.post('/api/admin/reject/:serviceId', requireAdmin, (req, res) => {
-  const { serviceId } = req.params;
-  const { reason } = req.body;
-  const services = getServices();
-  const idx = services.findIndex(s => s.id === serviceId);
-  if (idx === -1) return res.json({ ok: false, error: '服务不存在' });
-  const svc = services[idx];
-  if (svc.status !== 'pending') return res.json({ ok: false, error: `服务状态为 ${svc.status || 'active'}，无法拒绝` });
-  
-  svc.status = 'rejected';
-  svc.active = false;
-  svc.rejectedAt = new Date().toISOString();
-  svc.rejectionReason = reason || '审核未通过';
-  services[idx] = svc;
-  saveServices(services);
-  res.json({ ok: true, message: `${svc.name} 已拒绝`, service: svc });
-});
-
-// 专家列表（含质押状态）
-app.get('/api/experts', (req, res) => {
-  const services = getServices();
-  const experts = {};
-  services.forEach(s => {
-    if (!experts[s.expert]) {
-      experts[s.expert] = { name: s.expert, wallet: s.wallet, services: [], totalSales: 0, active: s.active };
-    }
-    experts[s.expert].services.push({ id: s.id, name: s.name, price: s.price });
-    experts[s.expert].totalSales += s.sales || 0;
-  });
-  res.json(Object.values(experts));
-});
 
 // ===== V2 API =====
 const sellersMarketHandlers = createSellersMarketHandlers({
@@ -2221,7 +1672,13 @@ const sellersMarketHandlers = createSellersMarketHandlers({
   savePurchases,
   purchasesFile: PURCHASES_FILE,
   addTx,
+  pythonBin: PYTHON_BIN,
+  execFileSync,
+  w3,
+  depositPoolAddress: DEPOSIT_POOL_ADDRESS,
+  demoMode: DEMO_MODE,
 });
+const { calculateWeight } = sellersMarketHandlers;
 
 app.get('/api/sellers', sellersMarketHandlers.listSellers);
 app.post('/api/sellers/register', sellersMarketHandlers.registerSeller);
@@ -2229,310 +1686,11 @@ app.post('/api/sellers/:wallet/deposit', sellersMarketHandlers.depositSeller);
 app.post('/api/orders/:id/execute', sellersMarketHandlers.executeOrder);
 app.post('/api/orders/create', sellersMarketHandlers.createOrder);
 app.post('/api/sellers/exit', sellersMarketHandlers.exitSeller);
+app.post('/api/sellers/:wallet/refund', sellersMarketHandlers.adminRefundSeller);
 
 
-// 购买服务
-app.post('/api/services/buy', async (req, res) => {
-  const { serviceId, buyerWallet, buyerName, txHash, selectedRoute, paymentMode, escrowOrderId } = req.body;
-  const normalizedServiceId = sanitizeText(serviceId, 120);
-  const normalizedBuyerWallet = typeof buyerWallet === 'string' ? buyerWallet.trim() : '';
-  const normalizedPaymentMode = typeof paymentMode === 'string' ? paymentMode.trim().toLowerCase() : '';
-  const normalizedInput = sanitizeText(
-    typeof req.body.input === 'string' ? req.body.input
-    : typeof req.body.task === 'string' ? req.body.task
-    : typeof req.body.targetAddress === 'string' ? req.body.targetAddress
-    : '',
-    240
-  );
-  // 优先用前端传的名字，否则从 agents.json 反查
-  let normalizedBuyerName = sanitizeText(buyerName, 60);
-  if (!normalizedBuyerName) {
-    const agents = getAgents();
-    const matchedAgent = agents.find(a => a.wallet && a.wallet.toLowerCase() === normalizedBuyerWallet.toLowerCase());
-    normalizedBuyerName = matchedAgent?.name || '未知Agent';
-  }
 
-  if (!normalizedServiceId || !normalizedBuyerWallet) {
-    return res.json({ ok: false, error: '缺少必填字段' });
-  }
-  if (!isSupportedWalletAddress(normalizedBuyerWallet)) {
-    return res.json({ ok: false, error: 'buyerWallet 地址格式无效' });
-  }
 
-  const services = getServices();
-  const service = services.find(s => s.id === normalizedServiceId);
-  if (!service) {
-    return res.json({ ok: false, error: '服务不存在' });
-  }
-  if (!service.active) {
-    return res.json({ ok: false, error: '服务已下架' });
-  }
-
-  const purchases = getPurchases();
-  if (txHash && purchases.some(p => p.txHash === txHash)) {
-    return res.json({ ok: false, error: '该 txHash 已使用，不能重复购买' });
-  }
-
-  const demoRequested = normalizedPaymentMode === 'demo';
-  if (!txHash && !demoRequested) {
-    return res.json({ ok: false, error: '缺少支付凭证，请提供 txHash 或显式使用 demo 模式' });
-  }
-
-  let payment = { mode: demoRequested ? 'demo' : 'pending', verified: false };
-  if (txHash) {
-    const verification = await verifyEscrowPaymentTx(txHash, normalizedBuyerWallet, service, escrowOrderId);
-    if (!verification.ok) {
-      return res.json({ ok: false, error: verification.error });
-    }
-    payment = {
-      mode: 'escrow',
-      verified: true,
-      ...verification.tx,
-    };
-  } else if (!demoRequested) {
-    return res.json({ ok: false, error: '支付验证失败' });
-  }
-
-  let route = null;
-  if (selectedRoute) {
-    try {
-      route = await resolveSelectedRoute(normalizedServiceId, normalizedBuyerWallet, selectedRoute);
-      payment.route = route;
-    } catch (error) {
-      // 路由校验失败不阻塞购买，降级继续
-      console.error('路由校验失败，降级继续:', error.message);
-    }
-  }
-
-  const reportType = service.id.includes('scan') ? 'scanning' : 
-                     service.id.includes('risk') ? 'risk' : 
-                     service.id.includes('report') ? 'report' : 'analysis';
-  const report = null; // 先不生成报告，避免阻塞
-  // 异步生成报告（不阻塞购买响应）
-  generateReport(reportType, normalizedBuyerWallet, service.wallet).then(r => {
-    if (r) { purchase.report = r; savePurchases(getPurchases()); }
-  }).catch(() => {});
-  const autoConfirm = req.body.autoConfirm === true;
-  const purchase = {
-    id: `purchase-${Date.now()}`,
-    serviceId: normalizedServiceId,
-    expert: service.expert,
-    expertWallet: service.wallet,
-    serviceName: service.name,
-    buyerWallet: normalizedBuyerWallet,
-    buyerName: normalizedBuyerName,
-    price: service.price,
-    status: autoConfirm ? (payment.verified ? 'completed' : 'demo-completed') : 'pending',
-    payment,
-    selectedRoute: route,
-    report,
-    txHash: txHash || '',
-    escrowOrderId: escrowOrderId || '',
-    escrowAddress: escrowOrderId ? ESCROW_CONFIG.address : '',
-    input: normalizedInput,
-    time: new Date().toISOString(),
-    autoConfirm
-  };
-  addPurchase(purchase);
-
-  // 通知卖家：有新订单
-  addNotification({
-    type: 'new_order',
-    targetWallet: service.wallet,
-    orderId: purchase.id,
-    serviceId: service.id,
-    serviceName: service.name,
-    buyerWallet: normalizedBuyerWallet,
-    buyerName: normalizedBuyerName,
-    input: purchase.input || '',
-  });
-
-  // 通知买家：订单已创建
-  addNotification({
-    type: 'order_confirmed',
-    targetWallet: normalizedBuyerWallet,
-    orderId: purchase.id,
-    serviceId: service.id,
-    serviceName: service.name,
-    sellerWallet: service.wallet,
-    sellerName: service.expert,
-  });
-
-  if (autoConfirm) {
-    // 自动确认模式：直接完成购买
-    service.sales += 1;
-    saveServices(services);
-    try {
-      const { installSkill } = require('../security/install');
-      const installResult = installSkill({
-        agentWallet: normalizedBuyerWallet,
-        skillId: service.id,
-        skillName: service.name,
-        seller: service.expert,
-        metadata: { price: service.price, frameworks: service.frameworks || [] }
-      });
-      purchase.installed = installResult.ok;
-    } catch (e) {
-      purchase.installed = false;
-    }
-    addTx({
-      time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
-      from: normalizedBuyerName,
-      fromWallet: normalizedBuyerWallet,
-      to: service.expert,
-      amount: service.price,
-      reason: route ? `${service.name} [${route.route_type}/${route.chain}/${route.symbol}]` : service.name,
-      tx: txHash || purchase.id,
-      route_type: route ? `${route.route_type}/${route.chain}/${route.symbol}` : 'direct',
-      verified: payment.verified ? '✅ 已验证' : '🧪 模拟',
-      receipt: purchase.id
-    });
-    res.json({ ok: true, purchase, serviceApi: service.api || null });
-  } else {
-    setTimeout(() => {
-      attemptAutoDeliverPurchase(purchase.id).catch(() => {});
-    }, 1000);
-    // Escrow / demo 模式：等待卖家先交付
-    res.json({ ok: true, purchase, needConfirm: false, message: '购买请求已提交，等待卖家交付结果' });
-  }
-});
-
-// ============================================
-// 服务代理调用（全自动，无需人工介入）
-// POST /api/skill/call/:serviceId
-// Body: { buyer: "0x钱包地址", ...请求参数 }
-// ============================================
-app.post('/api/skill/call/:serviceId', async (req, res) => {
-  const { serviceId } = req.params;
-  const { buyer, ...payload } = req.body;
-  const normalizedBuyer = typeof buyer === 'string' ? buyer.trim().toLowerCase() : '';
-
-  if (!normalizedBuyer) {
-    return res.json({ ok: false, error: '缺少 buyer 钱包地址' });
-  }
-
-  // 1. 查找 skill
-  const services = getServices();
-  const service = services.find(s => s.id === serviceId && s.active);
-  if (!service) {
-    return res.json({ ok: false, error: '服务不存在或已下架' });
-  }
-
-  // 2. 验证是否已购买
-  const purchases = getPurchases();
-  const hasPurchased = purchases.some(p =>
-    p.serviceId === serviceId &&
-    p.buyerWallet &&
-    p.buyerWallet.toLowerCase() === normalizedBuyer
-  );
-  if (!hasPurchased) {
-    return res.json({ ok: false, error: '未购买此服务，请先通过 /api/pay 购买' });
-  }
-
-  // 3. 执行服务 — 优先本地文件，其次 endpoint
-  const skillId = service.id;
-  const skillDir = path.join(__dirname, '..', 'uploaded_skills', skillId);
-  const pyFile = path.join(skillDir, 'skill.py');
-  const jsFile = path.join(skillDir, 'skill.js');
-
-  if (fs.existsSync(pyFile) || fs.existsSync(jsFile)) {
-    // 本地执行上传的服务文件
-    const execFile = require('child_process').execFile;
-    const fileToRun = fs.existsSync(pyFile) ? pyFile : jsFile;
-    const isPy = fileToRun.endsWith('.py');
-    const taskJson = JSON.stringify(payload.task || payload);
-
-    let execCmd, execArgs;
-    if (isPy) {
-      execCmd = 'python3';
-      execArgs = ['-c', `import json,sys;sys.path.insert(0,'${skillDir}');from skill import execute;print(json.dumps({"data":execute(${taskJson})}))`];
-    } else {
-      execCmd = 'node';
-      execArgs = ['-e', `const s=require('${jsFile}');Promise.resolve(s.execute(${taskJson})).then(r=>{console.log(JSON.stringify({data:r}));process.exit(0)}).catch(e=>{console.error(JSON.stringify({error:e.message}));process.exit(1)})`];
-    }
-
-    execFile(execCmd, execArgs, { timeout: 15000, cwd: skillDir }, (err, stdout, stderr) => {
-      const duration = Date.now() - Date.now();
-      addTx({
-        time: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-        from: normalizedBuyer.slice(0, 8) + '...',
-        to: service.expert,
-        amount: 0,
-        reason: `调用: ${service.name}`,
-        tx: `call-${Date.now()}`
-      });
-
-      if (err) {
-        return res.json({ ok: false, error: `执行失败: ${err.message}` });
-      }
-      try {
-        const out = JSON.parse(stdout.trim().split('\n').pop());
-        res.json({ ok: true, service: service.name, expert: service.expert, data: out.data });
-      } catch(e) {
-        res.json({ ok: true, service: service.name, expert: service.expert, data: stdout.trim() });
-      }
-    });
-  } else if (service.api && service.api.endpoint) {
-    // 降级：通过 endpoint 调用
-    try {
-      const method = (service.api.method || 'POST').toUpperCase();
-      const fetchOptions = { method, headers: { 'Content-Type': 'application/json' } };
-      if (method === 'POST' && Object.keys(payload).length > 0) {
-        fetchOptions.body = JSON.stringify(payload);
-      }
-      let url = service.api.endpoint;
-      if (method === 'GET' && Object.keys(payload).length > 0) {
-        const params = new URLSearchParams(payload).toString();
-        url += (url.includes('?') ? '&' : '?') + params;
-      }
-      const startTime = Date.now();
-      const response = await fetch(url, fetchOptions);
-      const duration = Date.now() - startTime;
-      const data = await response.json().catch(() => null);
-      addTx({
-        time: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-        from: normalizedBuyer.slice(0, 8) + '...',
-        to: service.expert,
-        amount: 0,
-        reason: `调用: ${service.name}`,
-        tx: `call-${Date.now()}`
-      });
-      res.json({ ok: true, service: service.name, expert: service.expert, duration_ms: duration, status: response.status, data });
-    } catch (error) {
-      res.json({ ok: false, error: `调用失败: ${error.message}` });
-    }
-  } else {
-    res.json({ ok: false, error: '该服务没有可用的执行方式' });
-  }
-});
-
-// 服务有效率反馈（agent 调用后标记有效/无效）
-app.post('/api/services/:id/feedback', (req, res) => {
-  const serviceId = req.params.id;
-  const { effective, buyerWallet } = req.body;
-  if (typeof effective !== 'boolean') {
-    return res.json({ ok: false, error: '缺少 effective 字段（true/false）' });
-  }
-  const services = getServices();
-  const svc = services.find(s => s.id === serviceId);
-  if (!svc) return res.json({ ok: false, error: '服务不存在' });
-
-  svc.totalCalls = (svc.totalCalls || 0) + 1;
-  svc.effectiveCalls = (svc.effectiveCalls || 0) + (effective ? 1 : 0);
-  svc.effectiveRate = svc.totalCalls > 0 ? parseFloat((svc.effectiveCalls / svc.totalCalls).toFixed(4)) : 0;
-  saveServices(services);
-
-  addTx({
-    time: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-    from: (buyerWallet || 'unknown').slice(0, 8) + '...',
-    to: svc.expert,
-    amount: 0,
-    reason: `${effective ? '✅ 有效' : '❌ 无效'}: ${svc.name}`,
-    tx: `fb-${Date.now()}`
-  });
-
-  res.json({ ok: true, totalCalls: svc.totalCalls, effectiveCalls: svc.effectiveCalls, effectiveRate: svc.effectiveRate });
-});
 
 // ============================================
 // x402 支付验证（AgentPay SDK）
@@ -2548,7 +1706,7 @@ app.post('/api/pay/x402', async (req, res) => {
   }
 
   try {
-    const servicesJson = JSON.stringify(getServices());
+    const servicesJson = JSON.stringify(getSellers().sellers);
     const result = await runPythonJson(X402_VERIFY_SCRIPT, [paymentHeader, normalizedServiceId, servicesJson]);
 
     if (!result.valid) {
@@ -2556,7 +1714,7 @@ app.post('/api/pay/x402', async (req, res) => {
     }
 
     // 验证成功，执行服务
-    const services = getServices();
+    const sellersData = getSellers(); const services = sellersData.sellers;
     const service = services.find(s => s.id === normalizedServiceId);
     if (!service) {
       return res.json({ ok: false, error: '服务不存在' });
@@ -2582,8 +1740,8 @@ app.post('/api/pay/x402', async (req, res) => {
     const purchase = {
       id: `purchase-x402-${Date.now()}`,
       serviceId: normalizedServiceId,
-      expert: service.expert,
-      expertWallet: service.wallet,
+      sellerName: service.expert,
+      sellerWallet: service.wallet,
       serviceName: service.name,
       buyerWallet: verifiedBuyerWallet,
       price: service.price,
@@ -2628,7 +1786,7 @@ app.post('/api/pay/x402', async (req, res) => {
     });
 
     service.sales += 1;
-    saveServices(services);
+    saveSellers(sellersData);
 
     addTx({
       time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
@@ -2661,7 +1819,7 @@ app.post('/api/pay/x402/split', async (req, res) => {
   }
 
   try {
-    const services = getServices();
+    const sellersData = getSellers(); const services = sellersData.sellers;
     const service = services.find(s => s.id === normalizedServiceId);
     if (!service) {
       return res.json({ ok: false, error: '服务不存在' });
@@ -2685,8 +1843,8 @@ app.post('/api/pay/x402/split', async (req, res) => {
     const purchase = {
       id: `purchase-x402-split-${Date.now()}`,
       serviceId: normalizedServiceId,
-      expert: service.expert,
-      expertWallet: service.wallet,
+      sellerName: service.expert,
+      sellerWallet: service.wallet,
       serviceName: service.name,
       buyerWallet: requestedBuyerWallet,
       price: service.price,
@@ -2732,7 +1890,7 @@ app.post('/api/pay/x402/split', async (req, res) => {
     });
 
     service.sales += 1;
-    saveServices(services);
+    saveSellers(sellersData);
 
     addTx({
       time: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }),
@@ -2768,7 +1926,7 @@ app.post('/api/smart-route', async (req, res) => {
   }
 
   try {
-    const services = getServices();
+    const sellersData = getSellers(); const services = sellersData.sellers;
     const service = services.find(s => s.id === normalizedServiceId);
     if (!service) {
       return res.json({ ok: false, error: '服务不存在' });
@@ -2840,7 +1998,18 @@ app.get('/api/received-orders', (req, res) => {
   const wallet = (req.query.wallet || '').trim().toLowerCase();
   if (!wallet) return res.json({ ok: false, error: '缺少 wallet' });
   const purchases = getPurchases();
-  const mine = purchases.filter(p => p.expertWallet?.toLowerCase() === wallet);
+  const mine = purchases.filter(p => (p.sellerWallet || p.expertWallet)?.toLowerCase() === wallet);
+  res.json({ ok: true, total: mine.length, orders: mine });
+});
+
+// 兼容旧测试/旧前端的卖家订单查询接口
+app.get('/api/orders', (req, res) => {
+  const wallet = (req.query.wallet || req.query.sellerWallet || '').trim().toLowerCase();
+  if (!wallet) {
+    return res.json({ ok: false, error: '缺少 wallet' });
+  }
+  const purchases = getPurchases();
+  const mine = purchases.filter(p => (p.sellerWallet || p.expertWallet)?.toLowerCase() === wallet);
   res.json({ ok: true, total: mine.length, orders: mine });
 });
 
@@ -2849,12 +2018,12 @@ app.get('/api/seller-stats', (req, res) => {
   const wallet = (req.query.wallet || '').trim().toLowerCase();
   if (!wallet) return res.json({ ok: false, error: '缺少 wallet' });
   const purchases = getPurchases();
-  const mine = purchases.filter(p => p.expertWallet?.toLowerCase() === wallet);
-  const services = getServices().filter(s => s.wallet?.toLowerCase() === wallet);
+  const mine = purchases.filter(p => (p.sellerWallet || p.expertWallet)?.toLowerCase() === wallet);
+  const services = getSellers().sellers.filter(s => s.wallet?.toLowerCase() === wallet);
   const depositTotal = services.reduce((sum, s) => sum + (s.deposit || 0), 0);
   const incomeTotal = mine.reduce((sum, p) => sum + (p.price || 0), 0);
-  const completedOrders = mine.filter(p => p.status === 'completed' || p.status === 'demo-completed').length;
-  const pendingOrders = mine.filter(p => !['completed', 'demo-completed', 'rejected'].includes(p.status)).length;
+  const completedOrders = mine.filter(p => p.status === 'completed').length;
+  const pendingOrders = mine.filter(p => !['completed', 'rejected'].includes(p.status)).length;
   res.json({ ok: true, income: incomeTotal, deposit: depositTotal, net: incomeTotal - depositTotal, completedOrders, pendingOrders, totalOrders: mine.length });
 });
 
@@ -2886,54 +2055,6 @@ app.get('/api/live-stream', (req, res) => {
   req.on('close', () => { sseClients.delete(res); });
 });
 
-// ===== Escrow 合约接口 =====
-// 获取合约配置（前端需要）
-app.get('/api/escrow/config', (req, res) => {
-  res.json({
-    address: ESCROW_CONFIG.address,
-    chainId: ESCROW_CONFIG.chainId,
-    defaultTimeout: ESCROW_CONFIG.defaultTimeout,
-    abi: ESCROW_ABI,
-  });
-});
-
-// 验证链上 Escrow 订单
-app.get('/api/escrow/order/:orderId', async (req, res) => {
-  try {
-    const order = await fetchEscrowOrder(req.params.orderId);
-    res.json({ ok: true, order });
-  } catch(e) {
-    res.json({ ok: false, error: e.message });
-  }
-});
-
-// Escrow 统计
-app.get('/api/escrow/stats', async (req, res) => {
-  try {
-    const { Web3 } = await import('web3');
-    const w3 = new Web3('https://bsc-dataseed1.binance.org');
-    const fullAbi = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'build', 'contracts_ServiceEscrow_sol_ServiceEscrow.abi'), 'utf8'));
-    const contract = new w3.eth.Contract(fullAbi, ESCROW_CONFIG.address);
-    const [totalEscrowed, totalReleased, totalRefunded, totalDisputed, orderCount] = await Promise.all([
-      contract.methods.totalEscrowed().call(),
-      contract.methods.totalReleased().call(),
-      contract.methods.totalRefunded().call(),
-      contract.methods.totalDisputed().call(),
-      contract.methods.getOrderCount().call(),
-    ]);
-    res.json({
-      ok: true,
-      totalEscrowed: w3.utils.fromWei(totalEscrowed, 'ether'),
-      totalReleased: w3.utils.fromWei(totalReleased, 'ether'),
-      totalRefunded: w3.utils.fromWei(totalRefunded, 'ether'),
-      totalDisputed: Number(totalDisputed),
-      orderCount: Number(orderCount),
-    });
-  } catch(e) {
-    res.json({ ok: false, error: e.message });
-  }
-});
-
 // 接收新交易（仅允许内部 Agent 调用）
 app.post('/api/tx', (req, res) => {
   const tx = req.body;
@@ -2945,12 +2066,13 @@ app.post('/api/tx', (req, res) => {
   // 允许所有已注册 Agent + 内置 Agent
   const allAgents = getAgents();
   const registeredNames = allAgents.map(a => a.name);
-  const builtinNames = ['gangdan','tiedan','choudan','pidan','ludan','four_meme','押金池','CryptoMinds'];
+  const managedAgents = getManagedAgents();
+  const builtinNames = ['押金池', 'CryptoMinds', ...Object.keys(managedAgents), ...Object.values(managedAgents).map(agent => agent.name)];
   const knownNames = new Set([...builtinNames, ...registeredNames]);
   if (!knownNames.has(tx.from) && !knownNames.has(tx.to)) {
     // 也允许钱包地址
     const knownAddrs = new Set([
-      ...builtinNames.map(n => (AGENTS[n] || {}).addr || '').filter(Boolean),
+      ...Object.values(managedAgents).map(agent => agent.addr || '').filter(Boolean),
       ...allAgents.map(a => a.wallet || '')
     ]);
     const fromLower = (tx.from || '').toLowerCase();
@@ -2968,101 +2090,7 @@ app.post('/api/tx', (req, res) => {
 // ============================================
 
 // 买家 Agent 注册
-// 退出市场
-app.post('/api/experts/deregister/:id', (req, res) => {
-  const { wallet } = req.body;
-  const services = getServices();
-  const svc = services.find(s => s.id === req.params.id);
-  if (!svc) return res.json({ ok: false, error: '服务不存在' });
-  if (!wallet || svc.wallet.toLowerCase() !== wallet.toLowerCase()) {
-    return res.json({ ok: false, error: '只能退出自己的服务' });
-  }
-  svc.active = false;
-  svc.status = 'deregistered';
-  svc.deregisteredAt = new Date().toISOString();
-  saveServices(services);
-  res.json({ ok: true });
-});
 
-// 分析服务名称和描述，推断输入输出格式
-app.post('/api/analyze-service-format', async (req, res) => {
-  const { name, desc } = req.body;
-  if (!name && !desc) {
-    return res.json({ ok: false, error: '请提供服务名称或描述' });
-  }
-
-  // 本地规则匹配（快速、无限制）
-  const FORMAT_RULES = [
-    { keywords: ['追踪', '监控', '跟踪', 'track'], input: '地址或查询参数', output: '追踪结果或列表' },
-    { keywords: ['分析', '评估', '检测', 'analyze'], input: '代币地址或合约地址', output: '分析报告或评分' },
-    { keywords: ['流动性', '池子', 'pool', 'liquidity'], input: '池子地址', output: '流动性数据或分析' },
-    { keywords: ['巨鲸', '大户', 'whale'], input: '钱包地址', output: '交易记录或持仓信息' },
-    { keywords: ['风控', '安全', '风险', 'risk'], input: '代币合约地址', output: '安全评分或风险报告' },
-    { keywords: ['新币', '新池子', 'new'], input: '查询参数或留空', output: '新币列表或池子列表' },
-    { keywords: ['交易', '买卖', 'trade'], input: '交易对或地址', output: '交易数据或建议' },
-    { keywords: ['持仓', '持仓分析', 'holding'], input: '钱包地址', output: '持仓列表或分析' },
-  ];
-
-  const text = ((name || '') + ' ' + (desc || '')).toLowerCase();
-  for (const rule of FORMAT_RULES) {
-    if (rule.keywords.some(k => text.includes(k.toLowerCase()))) {
-      return res.json({ ok: true, input: rule.input, output: rule.output, source: 'rule' });
-    }
-  }
-
-  // 规则匹配不到，调用 MiniMax 2.5
-  if (!MINIMAX_API_KEY) {
-    return res.json({ ok: false, error: 'API 未配置，请手动填写' });
-  }
-
-  try {
-    const prompt = `你是一个区块链服务分析助手。根据服务名称和描述，推断用户需要提供什么输入，会得到什么输出。
-
-服务名称：${name || '未提供'}
-服务描述：${desc || '未提供'}
-
-请用简洁的一句话回答：
-输入格式：用户需要提供什么？（如：钱包地址、代币合约地址、查询参数等）
-输出格式：用户会得到什么？（如：分析报告、列表数据、评分等）
-
-只回答这两行，不要其他内容。`;
-
-    const mmRes = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MINIMAX_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'MiniMax-Text-01',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 100,
-      }),
-    });
-
-    const mmData = await mmRes.json();
-    if (mmData.choices && mmData.choices[0]) {
-      const content = mmData.choices[0].message.content;
-      // 解析回答
-      const inputMatch = content.match(/输入格式[：:](.+)/);
-      const outputMatch = content.match(/输出格式[：:](.+)/);
-      if (inputMatch && outputMatch) {
-        return res.json({
-          ok: true,
-          input: inputMatch[1].trim(),
-          output: outputMatch[1].trim(),
-          source: 'ai',
-        });
-      }
-    }
-
-    return res.json({ ok: false, error: 'AI 分析失败，请手动填写' });
-  } catch (e) {
-    console.error('MiniMax 分析失败:', e.message);
-    return res.json({ ok: false, error: 'AI 分析失败，请手动填写' });
-  }
-});
 
 app.post('/api/agents/register', (req, res) => {
   const { name, wallet, framework } = req.body;
@@ -3079,10 +2107,13 @@ app.post('/api/agents/register', (req, res) => {
     return res.json({ ok: false, error: '该 Agent 名称或钱包已注册' });
   }
 
+  // endpoint: 买家Agent的API地址，有则自有大脑决策，无则走平台MiniMax
+  const endpoint = typeof req.body.endpoint === 'string' ? req.body.endpoint.trim() : '';
   const agent = {
     id: `agent-${Date.now()}`,
     name: agentName, wallet: normalizedWallet,
     framework: normalizedFramework,
+    endpoint, // 自有API模式：填了就有，没填=平台托管
     registeredAt: new Date().toISOString(),
     skills: ['buy-service'],
     active: true
@@ -3114,17 +2145,7 @@ app.get('/api/agents', (req, res) => {
 });
 
 // 获取 Agent 已安装的 Skill 列表
-app.get('/api/agents/:wallet/skills', (req, res) => {
-  const wallet = req.params.wallet;
-  if (!wallet) return res.json({ ok: false, error: '缺少钱包地址' });
-  try {
-    const { getInstalledSkills } = require('../security/install');
-    const skills = getInstalledSkills(wallet);
-    res.json({ ok: true, skills });
-  } catch (e) {
-    res.json({ ok: false, error: e.message });
-  }
-});
+// /api/agents/:wallet/skills — DEPRECATED (旧Skill概念已废弃)
 
 app.post('/api/agents/:wallet/discover-plan', (req, res) => {
   const requestedWallet = typeof req.params.wallet === 'string' ? req.params.wallet.trim().toLowerCase() : '';
@@ -3145,13 +2166,13 @@ app.post('/api/agents/:wallet/discover-plan', (req, res) => {
     return res.json({ ok: false, error: '该买家 Agent 未注册' });
   }
 
-  const services = getServices();
+  const sellersData = getSellers(); const services = sellersData.sellers;
   const recommendations = buildAgentRecommendations(task, services, maxCandidates)
     .filter(service => service.wallet?.toLowerCase() !== requestedWallet);
   const suggestedPlan = buildAutoBuyPlan(task, recommendations, maxPlan).map(service => ({
     serviceId: service.id,
     name: service.name,
-    expert: service.expert,
+    sellerName: service.expert,
     kind: getServiceKind(service),
     why: service._reasons || [],
   }));
@@ -3163,7 +2184,7 @@ app.post('/api/agents/:wallet/discover-plan', (req, res) => {
     candidates: recommendations.map(service => ({
       id: service.id,
       name: service.name,
-      expert: service.expert,
+      sellerName: service.expert,
       kind: service._kind,
       score: service._score,
       price: service.price,
@@ -3181,11 +2202,11 @@ app.post('/api/agents/:wallet/discover-plan', (req, res) => {
 app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
   const requestedWallet = typeof req.params.wallet === 'string' ? req.params.wallet.trim().toLowerCase() : '';
   const task = sanitizeText(req.body.task || req.body.prompt, 500);
-  const paymentPreference = sanitizeText(req.body.paymentPreference || req.body.paymentMode, 40).toLowerCase() || 'escrow_bnb';
+  const paymentPreference = sanitizeText(req.body.paymentPreference || req.body.paymentMode, 40).toLowerCase() || 'direct_bnb';
   const explicitTargetAddress = typeof req.body.targetAddress === 'string' ? req.body.targetAddress.trim() : '';
   const buyerNameInput = sanitizeText(req.body.buyerName, 60);
   const waitForResult = req.body.waitForResult !== false;
-  const autoConfirmEscrowResult = req.body.autoConfirmEscrowResult === true;
+  const autoConfirmResult = req.body.autoConfirmResult === true;
   const maxServices = Number(req.body.maxServices || 3);
   const autoExecute = req.body.autoExecute === true;
 
@@ -3202,7 +2223,7 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
     return res.json({ ok: false, error: '该买家 Agent 未注册' });
   }
 
-  const services = getServices();
+  const sellersData = getSellers(); const services = sellersData.sellers;
   const recommendedServices = buildAgentRecommendations(task, services, Math.max(maxServices * 2, 6))
     .filter(service => service.wallet?.toLowerCase() !== requestedWallet);
   if (recommendedServices.length === 0) {
@@ -3221,7 +2242,7 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
       recommendedServices: recommendedServices.map(service => ({
         id: service.id,
         name: service.name,
-        expert: service.expert,
+        sellerName: service.expert,
         kind: service._kind,
         score: service._score,
         reasons: service._reasons || [],
@@ -3232,7 +2253,7 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
       suggestedPlan: fallbackPlan.map(service => ({
         serviceId: service.id,
         name: service.name,
-        expert: service.expert,
+        sellerName: service.expert,
         kind: getServiceKind(service),
       })),
       message: '请由买家 Agent 根据候选列表自主决定 purchasePlan，再调用 auto-buy 执行购买',
@@ -3250,6 +2271,9 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
   let previousStep = null;
 
   try {
+    if (!plan || plan.length === 0) {
+      return res.json({ ok: false, error: 'plan 为空，无法执行购买', planItems, fallbackPlan });
+    }
     for (const item of plan) {
       const service = item.service;
       const stepInput = item.input || buildAutoStepInput(task, previousStep, explicitTargetAddress);
@@ -3259,15 +2283,17 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
       let paymentMeta = null;
       const stepPaymentPreference = item.paymentPreference || paymentPreference;
 
-      if (stepPaymentPreference === 'escrow' || stepPaymentPreference === 'escrow_bnb' || stepPaymentPreference === 'bnb_escrow' || stepPaymentPreference === 'bnb') {
-        paymentMeta = await createEscrowOrderForBuyer(service, requestedWallet, ESCROW_CONFIG.defaultTimeout);
-        purchaseResponse = await callLocalMarketApi('/api/services/buy', {
+      if (stepPaymentPreference === 'direct_bnb' || stepPaymentPreference === 'bnb') {
+        // 直接 BNB 转账：托管钱包签 BNB → 卖家钱包
+        console.log('[auto-buy] 开始创建直接支付, service:', service.id, 'buyer:', requestedWallet);
+        paymentMeta = await createDirectPayment(service, requestedWallet);
+        console.log('[auto-buy] 支付完成, txHash:', paymentMeta.txHash);
+        purchaseResponse = await callLocalMarketApi('/api/orders/create', {
           serviceId: service.id,
           buyerWallet: requestedWallet,
           buyerName: buyerNameInput || buyerAgent.name,
-          paymentMode: 'onchain',
+          paymentMode: 'direct_bnb',
           txHash: paymentMeta.txHash,
-          escrowOrderId: paymentMeta.escrowOrderId,
           input: stepInput,
         });
         if (!purchaseResponse.ok) {
@@ -3276,14 +2302,18 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
         purchase = purchaseResponse.purchase || null;
 
         if (purchase && waitForResult) {
-          purchase = await waitForPurchaseState(purchase.id, { timeoutMs: Number(req.body.waitTimeoutMs || 30000) });
-          if (purchase?.status === 'delivered' && autoConfirmEscrowResult) {
-            await confirmEscrowOrderAsBuyer(purchase.escrowOrderId, requestedWallet);
-            const confirmResp = await callLocalMarketApi(`/api/purchases/confirm/${purchase.id}`, {});
+          purchase = await waitForPurchaseState(purchase.id, { timeoutMs: Number(req.body.waitTimeoutMs || 60000) });
+          // 卖家交付后自动确认评分
+          if (purchase?.status === 'delivered' && !purchase.autoConfirmed) {
+            const confirmResp = await callLocalMarketApi(`/api/purchases/confirm/${purchase.id}`, {
+              rating: 5,
+              comment: '自动确认',
+            });
             if (!confirmResp.ok) {
-              throw new Error(confirmResp.error || `自动确认 ${service.name} 失败`);
+              console.error('自动确认失败:', confirmResp.error);
+            } else {
+              purchase = getPurchaseById(purchase.id) || purchase;
             }
-            purchase = getPurchaseById(purchase.id) || purchase;
           }
         }
       } else if (stepPaymentPreference === 'x402') {
@@ -3317,7 +2347,8 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
           throw new Error(purchaseResponse.error || `x402 自动购买 ${service.name} 失败`);
         }
         purchase = purchaseResponse.purchase || null;
-        invocation = await callLocalMarketApi(`/api/skill/call/${service.id}`, {
+        // 通知卖家Agent执行（平台不代执行）
+        invocation = await callLocalMarketApi(`/api/orders/${purchase.id}/execute`, {
           buyer: requestedWallet,
           task: stepInput,
           targetAddress: explicitTargetAddress,
@@ -3329,7 +2360,7 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
       const stepResult = {
         serviceId: service.id,
         serviceName: service.name,
-        expert: service.expert,
+        sellerName: service.expert,
         paymentPreference: stepPaymentPreference,
         input: stepInput,
         purchase,
@@ -3352,7 +2383,7 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
       plannedServices: plan.map(item => ({
         id: item.service.id,
         name: item.service.name,
-        expert: item.service.expert,
+        sellerName: item.service.expert,
         kind: getServiceKind(item.service),
       })),
       steps,
@@ -3364,7 +2395,7 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
       error: error.message,
       task,
       paymentPreference,
-      plannedServices: plan.map(item => ({ id: item.service.id, name: item.service.name, expert: item.service.expert })),
+      plannedServices: plan.map(item => ({ id: item.service.id, name: item.service.name, sellerName: item.service.expert })),
       steps,
     });
   }
@@ -3386,7 +2417,7 @@ app.get('/api/sync-chain', async (req, res) => {
     const walletLower = wallet.toLowerCase();
     const nameMap = {};
     const allAddrs = new Set();
-    for (const [k, v] of Object.entries(AGENTS)) {
+    for (const [k, v] of Object.entries(getManagedAgents())) {
       nameMap[v.addr.toLowerCase()] = v.name;
       allAddrs.add(v.addr.toLowerCase());
     }
@@ -3421,7 +2452,7 @@ app.get('/api/sync-chain', async (req, res) => {
           if (amount <= 0) continue;
           if (knownHashes.has(tx.hash.toLowerCase())) continue;
           
-          const services = getServices().filter(s => s.active);
+          const services = getSellers().sellers.filter(s => s.active);
           const matchedService = services.find(s => 
             s.wallet && s.wallet.toLowerCase() === toL && 
             Math.abs(Number(s.price) - amount) < 0.00001
@@ -3467,6 +2498,7 @@ const { pickSellerHandler, agentBuyHandler } = createAgentBuyHandlers({
   execFileSync,
   getSellers,
   saveSellers,
+  getAgents,
   addPurchase,
   addTx,
 });
@@ -3477,12 +2509,78 @@ app.post('/api/agent-buy', agentBuyHandler);
 // 评价订单 API
 app.post('/api/rate-order', sellersMarketHandlers.rateOrder);
 
+// 管理员权限检查（避免前端硬编码钱包地址）
+app.get('/api/admin-check', (req, res) => {
+  const adminWallets = (process.env.ADMIN_WALLETS || '').split(',').filter(Boolean);
+  const buyerWallet = req.query.wallet || '';
+  const isAdmin = adminWallets.some(w => w.toLowerCase() === buyerWallet.toLowerCase());
+  res.json({ isAdmin });
+});
+
+// ══════════════════════════════════════════════════════
+// Escrow 担保合约 API
+// ══════════════════════════════════════════════════════
+
+// 获取合约信息（地址+ABI+统计）
+app.get('/api/escrow/info', (req, res) => {
+  const addr = getEscrowAddress();
+  if (!addr) return res.json({ ok: false, error: '合约未部署' });
+  res.json({
+    ok: true,
+    address: addr,
+    abi: escrowABI,
+  });
+});
+
+// 获取合约统计数据
+app.get('/api/escrow/stats', async (req, res) => {
+  const stats = await getEscrowStats();
+  if (!stats) return res.json({ ok: false, error: '合约未部署' });
+  res.json({ ok: true, ...stats });
+});
+
+// 查询链上订单状态
+app.get('/api/escrow/order/:orderId', async (req, res) => {
+  const { getOrderFromChain } = require('./lib/escrow');
+  const order = await getOrderFromChain(req.params.orderId);
+  if (!order) return res.json({ ok: false, error: '订单未找到' });
+  res.json({ ok: true, order });
+});
+
+// 部署合约（管理员）
+app.post('/api/escrow/deploy', async (req, res) => {
+  const adminWallets = (process.env.ADMIN_WALLETS || '').split(',').filter(Boolean);
+  const caller = req.body.caller || '';
+  if (!adminWallets.some(w => w.toLowerCase() === caller.toLowerCase())) {
+    return res.json({ ok: false, error: '无管理员权限' });
+  }
+  const deployerKey = process.env.DEPLOYER_PRIVATE_KEY;
+  if (!deployerKey) return res.json({ ok: false, error: '未配置 DEPLOYER_PRIVATE_KEY' });
+  try {
+    const addr = await deployEscrow(deployerKey);
+    res.json({ ok: true, address: addr });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`CryptoMinds Marketplace running on http://localhost:${PORT}`);
-  reconcileEscrowOrders().catch(() => {});
-  setInterval(() => {
-    reconcileEscrowOrders().catch(() => {});
-  }, 60_000);
+  const escrowAddr = getEscrowAddress();
+  if (escrowAddr) {
+    console.log(`[escrow] 合约地址: ${escrowAddr}`);
+  } else {
+    console.log('[escrow] 合约未部署，Escrow 功能不可用');
+  }
+
+  // 卖家超时检查 — 每2分钟扫描一次
+  setInterval(async () => {
+    try {
+      await checkSellerTimeouts(getSellers, saveSellers);
+    } catch (e) {
+      console.error('[escrow-timeout] 检查失败:', e.message);
+    }
+  }, 2 * 60_000);
 
   // 自动评价：已完成但未评价的订单，24小时后自动好评
   setInterval(async () => {
@@ -3492,15 +2590,36 @@ app.listen(PORT, () => {
       const ONE_DAY = 24 * 60 * 60 * 1000;
       let changed = false;
       for (const order of data.orders) {
+        // 自动确认：delivered 24小时未确认 → 自动确认
+        if (order.status === 'delivered' && order.deliveredAt && !order.confirmedAt) {
+          const deliveredTime = new Date(order.deliveredAt).getTime();
+          if (now - deliveredTime > ONE_DAY) {
+            order.status = 'completed';
+            order.confirmedAt = new Date().toISOString();
+            order.autoConfirmed = true;
+            changed = true;
+            // 通知卖家Agent
+            const seller = data.sellers.find(s => s.wallet.toLowerCase() === order.sellerWallet?.toLowerCase());
+            if (seller?.endpoint) {
+              try {
+                await fetch(seller.endpoint, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ event: 'order_confirmed', orderId: order.id, rating: 0, autoConfirmed: true }),
+                });
+              } catch(e) { console.log('[auto-confirm] 通知卖家失败:', e.message); }
+            }
+          }
+        }
+        // 自动评价：completed/delivered 24小时未评价 → 自动评价
         if ((order.status === 'completed' || order.status === 'delivered') && !order.rated && order.completedAt) {
           const completedTime = new Date(order.completedAt).getTime();
           if (now - completedTime > ONE_DAY) {
-            // 调买家 Agent endpoint 自主评价
-            let rating = 5; // 默认好评
-            const buyerInfo = data.sellers.find(s => s.wallet.toLowerCase() === order.buyerWallet?.toLowerCase());
-            if (buyerInfo?.endpoint) {
+            let rating = 5;
+            const buyerAgent = getAgents().find(a => a.active && a.wallet.toLowerCase() === order.buyerWallet?.toLowerCase());
+            if (buyerAgent?.endpoint) {
               try {
-                const resp = await fetch(buyerInfo.endpoint, {
+                const resp = await fetch(buyerAgent.endpoint, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ action: 'rateOrder', orderId: order.id, sellerName: order.sellerName, amount: order.amount, tokenAmount: order.tokenAmount }),
@@ -3515,12 +2634,12 @@ app.listen(PORT, () => {
             order.rated = true;
             order.rating = rating;
             order.autoRated = true;
-            // 更新卖家评分
             const seller = data.sellers.find(s => s.wallet.toLowerCase() === order.sellerWallet?.toLowerCase());
             if (seller) {
               const total = seller.totalOrders || 0;
               const old = seller.rating || 5;
               seller.rating = Math.round(((old * total + rating) / (total + 1)) * 10) / 10;
+              seller.weight = calculateWeight(seller);
               if (rating <= 2) seller.badRatings = (seller.badRatings || 0) + 1;
             }
             changed = true;
@@ -3544,4 +2663,13 @@ app.listen(PORT, () => {
       console.log('[auto-rate] 错误:', e.message);
     }
   }, 5 * 60_000); // 每5分钟检查
+});
+
+// ── 进程异常保护 ──────────────────────────────────────────
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught Exception:', err.message);
+  // 不退出，让服务继续运行（黑客松Demo不能崩）
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[WARN] Unhandled Rejection:', reason);
 });
