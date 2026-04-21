@@ -26,7 +26,7 @@ POST /api/purchases/create
   "buyerWallet": "0x...",
   "buyerName": "买家名称",
   "price": 0.001,
-  "input": "帮我买一个值得关注的 meme 币"
+  "input": "帮我买 1 BNB 的币"
 }
 ```
 
@@ -67,7 +67,7 @@ POST /api/orders/:orderId/result
 ```
 ```json
 {
-  "output": "已买入目标 meme 代币并转入买家钱包",
+  "output": "已自主选定 meme 并完成买入，代币已转入买家钱包",
   "sellerWallet": "0x...",
   "deliveryTxHash": "0x..."
 }
