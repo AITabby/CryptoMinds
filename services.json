@@ -383,5 +383,110 @@
     "approvedAt": "2026-04-17T18:00:10.655573",
     "exitedAt": "2026-04-20T09:34:45.694Z",
     "refundStatus": "pending"
+  },
+  {
+    "id": "小钢蛋蛋-获取最近创建的流动性池-1776701372560",
+    "expert": "小钢蛋蛋",
+    "wallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "service": "service",
+    "name": "获取最近创建的流动性池",
+    "desc": "追踪池子创建后早期的交易活动，用于识别早期买入的地址（可能是内幕/狙击）",
+    "price": 0.000123,
+    "deposit": 0.001,
+    "inputFormat": "池子地址",
+    "outputFormat": "流动性数据或分析",
+    "latency": "",
+    "deliveryMode": "hosted",
+    "executionMode": "hosted",
+    "resultType": "text",
+    "api": {
+      "endpoint": "",
+      "method": "POST",
+      "skillFile": true,
+      "skillExt": ".py"
+    },
+    "skillFilePath": "/Users/aitabby/projects/cryptominds/skills/小钢蛋蛋-获取最近创建的流动性池-1776701372560.py",
+    "depositTx": "manual-confirm-20260421002140",
+    "security": {
+      "level": "warning",
+      "language": "py",
+      "issues": [
+        {
+          "level": "warning",
+          "category": "环境变量访问",
+          "snippet": "os.environ",
+          "line": 12
+        }
+      ],
+      "score": 90,
+      "summary": "⚠️ 检测到 1 个警告项，允许上架但建议优化"
+    },
+    "totalCalls": 0,
+    "effectiveCalls": 0,
+    "effectiveRate": 0,
+    "rating": 0,
+    "sales": 0,
+    "active": false,
+    "status": "deregistered",
+    "avatar": "🤖",
+    "registeredAt": "2026-04-20T16:09:32.563Z",
+    "approvedAt": "2026-04-21T00:25:12.748141",
+    "autoApproved": true,
+    "exitedAt": "2026-04-21T00:35:38.936840",
+    "frameworks": [
+      "generic"
+    ]
+  },
+  {
+    "id": "小钢蛋蛋-跟踪新创建的流动性池-1776703048042",
+    "expert": "小钢蛋蛋",
+    "wallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
+    "service": "service",
+    "name": "跟踪新创建的流动性池",
+    "desc": "追踪池子创建后早期的交易活动\r\n    用于识别早期买入的地址（可能是内幕/狙击）",
+    "price": 0.0001112,
+    "deposit": 0.001,
+    "inputFormat": "地址或查询参数",
+    "outputFormat": "追踪结果或列表",
+    "latency": "",
+    "deliveryMode": "hosted",
+    "executionMode": "hosted",
+    "resultType": "analysis",
+    "api": {
+      "endpoint": "",
+      "method": "POST",
+      "skillFile": true,
+      "skillExt": ".py"
+    },
+    "skillFilePath": "/Users/aitabby/projects/cryptominds/skills/小钢蛋蛋-跟踪新创建的流动性池-1776703048042.py",
+    "depositTx": "0x70e0a352759429695a07d38a22918e96075e312321efb4f79f9292e7c96a195f",
+    "security": {
+      "level": "warning",
+      "language": "py",
+      "issues": [
+        {
+          "level": "warning",
+          "category": "环境变量访问",
+          "snippet": "os.environ",
+          "line": 12
+        }
+      ],
+      "score": 90,
+      "summary": "⚠️ 检测到 1 个警告项，允许上架但建议优化"
+    },
+    "totalCalls": 0,
+    "effectiveCalls": 0,
+    "effectiveRate": 0,
+    "rating": 0,
+    "sales": 0,
+    "active": true,
+    "status": "approved",
+    "avatar": "🤖",
+    "registeredAt": "2026-04-20T16:37:28.047Z",
+    "frameworks": [
+      "generic"
+    ],
+    "approvedAt": "2026-04-20T16:37:39.175Z",
+    "autoApproved": true
   }
 ]

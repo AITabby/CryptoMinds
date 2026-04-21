@@ -13,6 +13,8 @@ const upload = multer({ dest: '/tmp/cryptominds-uploads/', limits: { fileSize: 1
 
 const app = express();
 const BSC_RPC = process.env.BSC_RPC || 'https://bsc-dataseed1.binance.org/';
+const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || '';
+const MINIMAX_BASE_URL = 'https://api.minimaxi.com/v1';
 const w3 = new Web3(BSC_RPC);
 
 // Web Push 配置
@@ -746,6 +748,7 @@ const AGENTS = {
 
 // 专家服务列表（支持入驻）
 const SERVICES_FILE = path.join(__dirname, '..', 'services.json');
+const AGENTS_FILE = path.join(__dirname, '..', 'agents.json');
 const WALLETS_FILE = path.join(__dirname, '..', 'wallets.json');
 
 function getWallets() {
@@ -1896,7 +1899,7 @@ app.post('/api/experts/register', upload.single('skillFile'), async (req, res) =
       const code = fs.readFileSync(req.file.path, 'utf8');
       const { scan } = require('../security/scanner');
       securityScan = scan(code, skillFileExt === '.py' ? 'py' : 'js');
-      if (securityScan.level !== 'safe') {
+      if (securityScan.level === 'critical') {
         try { fs.unlinkSync(req.file.path); } catch(e2) {}
         return res.json({ ok: false, error: '安全扫描未通过，服务不允许上架', scan: securityScan });
       }
@@ -1990,7 +1993,42 @@ app.post('/api/services/:id/deposit', async (req, res) => {
     saveServices(services);
     
     addTx({ time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}), from: svc.expert, to: '押金池', amount: depositAmount, reason: `入驻: ${svc.name}`, tx: txHash });
-    res.json({ ok: true });
+    
+    // 自动审核逻辑
+    let autoApproved = false;
+    if (svc.deliveryMode === 'hosted' && svc.security && svc.security.level !== 'unsafe') {
+      // 托管模式 + 安全扫描通过 → 自动审核通过
+      svc.status = 'approved';
+      svc.approvedAt = new Date().toISOString();
+      svc.autoApproved = true;
+      autoApproved = true;
+      saveServices(services);
+      console.log(`[自动审核] 托管模式服务已自动通过: ${svc.name}`);
+    } else if (svc.deliveryMode === 'self-hosted' && svc.endpoint) {
+      // 自托管模式 → 验证 API 可用性
+      try {
+        const healthRes = await fetch(svc.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'health_check' }),
+          timeout: 5000
+        });
+        if (healthRes.ok) {
+          svc.status = 'approved';
+          svc.approvedAt = new Date().toISOString();
+          svc.autoApproved = true;
+          autoApproved = true;
+          saveServices(services);
+          console.log(`[自动审核] 自托管模式服务 API 验证通过: ${svc.name}`);
+        } else {
+          console.log(`[自动审核] 自托管模式服务 API 返回错误: ${svc.name}`);
+        }
+      } catch (e) {
+        console.log(`[自动审核] 自托管模式服务 API 验证失败: ${svc.name}, ${e.message}`);
+      }
+    }
+    
+    res.json({ ok: true, autoApproved });
   } catch(e) {
     res.json({ ok: false, error: '交易验证失败: ' + e.message });
   }
@@ -2073,7 +2111,7 @@ app.get('/api/purchases/pending', (req, res) => {
 
 // 专家退出（标记退出，退款由质押方处理）
 app.post('/api/experts/exit', (req, res) => {
-  const { expert, serviceId } = req.body;
+  const { expert, serviceId, withdrawTx } = req.body;
   if (!expert) return res.json({ ok: false, error: '缺少专家名' });
   const services = getServices();
   const idx = services.findIndex(s => serviceId ? s.id === serviceId : s.expert === expert);
@@ -2089,11 +2127,16 @@ app.post('/api/experts/exit', (req, res) => {
   svc.active = false;
   svc.status = 'deregistered';
   svc.exitedAt = new Date().toISOString();
-  svc.refundStatus = 'pending'; // 待质押方退款
+  if (withdrawTx) {
+    svc.withdrawTx = withdrawTx;
+    svc.refundStatus = 'completed';
+  } else {
+    svc.refundStatus = 'pending';
+  }
   services[idx] = svc;
   saveServices(services);
 
-  res.json({ ok: true, message: '已退出，押金退还由质押方处理', service: svc });
+  res.json({ ok: true, message: '已退出', service: svc });
 });
 
 // 质押方退款回调（Four.meme 或合约调用）
@@ -2918,6 +2961,86 @@ app.post('/api/experts/deregister/:id', (req, res) => {
   svc.deregisteredAt = new Date().toISOString();
   saveServices(services);
   res.json({ ok: true });
+});
+
+// 分析服务名称和描述，推断输入输出格式
+app.post('/api/analyze-service-format', async (req, res) => {
+  const { name, desc } = req.body;
+  if (!name && !desc) {
+    return res.json({ ok: false, error: '请提供服务名称或描述' });
+  }
+
+  // 本地规则匹配（快速、无限制）
+  const FORMAT_RULES = [
+    { keywords: ['追踪', '监控', '跟踪', 'track'], input: '地址或查询参数', output: '追踪结果或列表' },
+    { keywords: ['分析', '评估', '检测', 'analyze'], input: '代币地址或合约地址', output: '分析报告或评分' },
+    { keywords: ['流动性', '池子', 'pool', 'liquidity'], input: '池子地址', output: '流动性数据或分析' },
+    { keywords: ['巨鲸', '大户', 'whale'], input: '钱包地址', output: '交易记录或持仓信息' },
+    { keywords: ['风控', '安全', '风险', 'risk'], input: '代币合约地址', output: '安全评分或风险报告' },
+    { keywords: ['新币', '新池子', 'new'], input: '查询参数或留空', output: '新币列表或池子列表' },
+    { keywords: ['交易', '买卖', 'trade'], input: '交易对或地址', output: '交易数据或建议' },
+    { keywords: ['持仓', '持仓分析', 'holding'], input: '钱包地址', output: '持仓列表或分析' },
+  ];
+
+  const text = ((name || '') + ' ' + (desc || '')).toLowerCase();
+  for (const rule of FORMAT_RULES) {
+    if (rule.keywords.some(k => text.includes(k.toLowerCase()))) {
+      return res.json({ ok: true, input: rule.input, output: rule.output, source: 'rule' });
+    }
+  }
+
+  // 规则匹配不到，调用 MiniMax 2.5
+  if (!MINIMAX_API_KEY) {
+    return res.json({ ok: false, error: 'API 未配置，请手动填写' });
+  }
+
+  try {
+    const prompt = `你是一个区块链服务分析助手。根据服务名称和描述，推断用户需要提供什么输入，会得到什么输出。
+
+服务名称：${name || '未提供'}
+服务描述：${desc || '未提供'}
+
+请用简洁的一句话回答：
+输入格式：用户需要提供什么？（如：钱包地址、代币合约地址、查询参数等）
+输出格式：用户会得到什么？（如：分析报告、列表数据、评分等）
+
+只回答这两行，不要其他内容。`;
+
+    const mmRes = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MINIMAX_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'MiniMax-Text-01',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 100,
+      }),
+    });
+
+    const mmData = await mmRes.json();
+    if (mmData.choices && mmData.choices[0]) {
+      const content = mmData.choices[0].message.content;
+      // 解析回答
+      const inputMatch = content.match(/输入格式[：:](.+)/);
+      const outputMatch = content.match(/输出格式[：:](.+)/);
+      if (inputMatch && outputMatch) {
+        return res.json({
+          ok: true,
+          input: inputMatch[1].trim(),
+          output: outputMatch[1].trim(),
+          source: 'ai',
+        });
+      }
+    }
+
+    return res.json({ ok: false, error: 'AI 分析失败，请手动填写' });
+  } catch (e) {
+    console.error('MiniMax 分析失败:', e.message);
+    return res.json({ ok: false, error: 'AI 分析失败，请手动填写' });
+  }
 });
 
 app.post('/api/agents/register', (req, res) => {

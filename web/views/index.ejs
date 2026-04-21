@@ -428,10 +428,6 @@
               <div class="addr" id="myAddr">--</div>
             </div>
           </div>
-          <div style="cursor:pointer;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;margin-left:auto;" onclick="toggleMyOrders()">
-            <i data-lucide="clipboard-list" class="icon-inline" style="font-size:16px;"></i>
-            <span style="color:#a78bfa;font-size:13px;font-weight:600;" data-i18n="myOrders">我的订单</span>
-          </div>
           <div style="cursor:pointer;position:relative;padding:8px 14px;background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;display:flex;align-items:center;gap:6px;" onclick="toggleNotificationPanel()">
             <i data-lucide="bell" class="icon-inline" style="font-size:16px;"></i>
             <span id="myUnread" style="color:#a78bfa;font-size:13px;font-weight:600;">0</span>
@@ -598,12 +594,12 @@
 
         <div>
           <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;" data-i18n="regModalSkillName">服务名称</label>
-          <input id="regName" type="text" data-i18n-placeholder="regModalSkillPlaceholder" placeholder="如：BSC 链上新币扫描" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'" oninput="validateRegisterForm()">
+          <input id="regName" type="text" data-i18n-placeholder="regModalSkillPlaceholder" placeholder="如：BSC 链上新币扫描" style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'; autoAnalyzeFormat()" oninput="validateRegisterForm()">
         </div>
 
         <div>
           <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:6px;" data-i18n="regModalSkillDesc">服务描述</label>
-          <textarea id="regDesc" rows="3" data-i18n-placeholder="regModalDescPlaceholder" placeholder="描述你的服务 能做什么，输入输出是什么..." style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box; resize:vertical; font-family:inherit;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'"></textarea>
+          <textarea id="regDesc" rows="3" data-i18n-placeholder="regModalDescPlaceholder" placeholder="描述你的服务 能做什么，输入输出是什么..." style="width:100%; background:#0f121e; border:1px solid rgba(100,116,139,0.25); border-radius:8px; padding:10px 12px; color:#e2e8f0; font-size:14px; outline:none; box-sizing:border-box; resize:vertical; font-family:inherit;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(100,116,139,0.25)'; autoAnalyzeFormat()"></textarea>
         </div>
 
         <div style="background:#0f121e; border:1px solid rgba(139,92,246,0.1); border-radius:10px; padding:16px;">
@@ -974,17 +970,25 @@
     // ===== Live Feed =====
     const AGENT_ICONS = { 'ChainSentry': '🔍', 'RiskGuard': '🛡️', 'NFTScout': '🎯', 'GasSaver': '⛽', 'AlphaBot': '🤖', 'ChainSeer': '🔮', 'Sentinel': '🔐', '小钢蛋蛋': '🤖', '钢蛋': '🧠' };
     const AGENT_COLORS = { 'ChainSentry': '#34d399', 'RiskGuard': '#fbbf24', 'NFTScout': '#f472b6', 'GasSaver': '#60a5fa', 'AlphaBot': '#a78bfa', 'ChainSeer': '#818cf8', 'Sentinel': '#34d399', '小钢蛋蛋': '#a78bfa', '钢蛋': '#a78bfa' };
-    let myAgentNames = new Set(); // 从 agents.json 加载
+    let myAgentNames = new Set(); // 从 agents.json 加载当前钱包的 agent
 
     async function loadMyAgents() {
       try {
+        const wallet = currentAccount || getActiveWallet();
+        if (!wallet) {
+          myAgentNames = new Set();
+          const nameEl = document.getElementById('myAgentName'); if (nameEl) nameEl.textContent = '未连接钱包';
+          return;
+        }
         const res = await fetch('/api/agents');
         const agents = await res.json();
-        myAgentNames = new Set(agents.map(a => a.name).filter(Boolean));
+        // 只加载当前钱包的 agent
+        const myAgents = agents.filter(a => (a.wallet || '').toLowerCase() === wallet.toLowerCase());
+        myAgentNames = new Set(myAgents.map(a => a.name).filter(Boolean));
         const nameEl = document.getElementById('myAgentName'); if (nameEl) nameEl.textContent = [...myAgentNames].join(', ') || '未注册';
       } catch(e) {
-        myAgentNames = new Set(['小钢蛋蛋']); // fallback
-        const nameEl2 = document.getElementById('myAgentName'); if (nameEl2) nameEl2.textContent = '小钢蛋蛋';
+        myAgentNames = new Set();
+        const nameEl2 = document.getElementById('myAgentName'); if (nameEl2) nameEl2.textContent = '加载失败';
       }
     }
 
@@ -1248,6 +1252,11 @@
         feed.scrollTop = 0;
       }
 
+      // 刷新消费记录（如果是我的 agent 的交易）
+      if (isMyAgent(item) && currentAccount) {
+        loadBuyerStats();
+      }
+
       // Update timestamp
       const now = new Date();
       document.getElementById('liveLastUpdate').textContent = '更新于 ' + now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1399,8 +1408,11 @@
           if (metricsDiv2) metricsDiv2.style.display = 'grid';
           lucide.createIcons();
         } else {
+          // 没有已上架的服务，隐藏卖家面板
           formArea.style.display = 'block';
           regPanel.style.display = 'none';
+          document.getElementById('sellerDashboard').style.display = 'none';
+          // 不隐藏指标卡片，由 showTab 控制
         }
       } catch(e) {}
     }
@@ -1484,8 +1496,13 @@
         const data = await res.json();
         if (!data.ok) { area.style.background = 'rgba(248,113,113,0.1)'; area.style.border = '1px solid rgba(248,113,113,0.3)'; area.style.color = '#f87171'; area.textContent = '❌ 扫描失败: ' + (data.error || '未知错误'); return; }
         const scan = data.scan;
-        if (scan.level === 'safe') {
-          area.style.background = 'rgba(52,211,153,0.1)'; area.style.border = '1px solid rgba(52,211,153,0.3)'; area.style.color = '#34d399'; area.textContent = '✅ 安全扫描通过 (评分 ' + scan.score + '/100)';
+        if (scan.level === 'safe' || scan.level === 'warning') {
+          area.style.background = 'rgba(52,211,153,0.1)'; area.style.border = '1px solid rgba(52,211,153,0.3)'; area.style.color = '#34d399';
+          if (scan.level === 'warning') {
+            area.innerHTML = '⚠️ 安全扫描通过 (评分 ' + scan.score + '/100)<br><small style="color:#fbbf24">' + scan.summary + '</small>';
+          } else {
+            area.textContent = '✅ 安全扫描通过 (评分 ' + scan.score + '/100)';
+          }
         } else {
           area.style.background = 'rgba(248,113,113,0.1)'; area.style.border = '1px solid rgba(248,113,113,0.3)'; area.style.color = '#f87171'; area.innerHTML = '❌ 安全扫描未通过 (评分 ' + scan.score + '/100)<br>' + scan.issues.map(i => '• ' + i.category + ': ' + i.snippet).join('<br>');
         }
@@ -1493,6 +1510,47 @@
         area.style.background = 'rgba(248,113,113,0.1)'; area.style.border = '1px solid rgba(248,113,113,0.3)'; area.style.color = '#f87171'; area.textContent = '❌ 扫描请求失败: ' + e.message;
       }
       validateRegisterForm();
+    }
+
+    // 自动分析服务名称和描述，推断输入输出格式
+    let analyzeTimeout = null;
+    async function autoAnalyzeFormat() {
+      // 防抖：500ms 后执行
+      if (analyzeTimeout) clearTimeout(analyzeTimeout);
+      analyzeTimeout = setTimeout(async () => {
+        const name = document.getElementById('regName').value.trim();
+        const desc = document.getElementById('regDesc').value.trim();
+        
+        // 如果输入输出已经填了，不覆盖
+        const inputFormat = document.getElementById('regInputFormat').value.trim();
+        const outputFormat = document.getElementById('regOutputFormat').value.trim();
+        if (inputFormat && outputFormat) return;
+        
+        // 名称和描述都为空，不分析
+        if (!name && !desc) return;
+        
+        try {
+          const res = await fetch('/api/analyze-service-format', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, desc })
+          });
+          const data = await res.json();
+          
+          if (data.ok) {
+            // 只填充空的字段
+            if (!inputFormat && data.input) {
+              document.getElementById('regInputFormat').value = data.input;
+            }
+            if (!outputFormat && data.output) {
+              document.getElementById('regOutputFormat').value = data.output;
+            }
+            validateRegisterForm();
+          }
+        } catch (e) {
+          // 静默失败，用户可以手动填写
+        }
+      }, 500);
     }
 
     function validateRegisterForm() {
@@ -2533,10 +2591,57 @@
       modal.id = 'notifModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) { notifPanelOpen = false; modal.remove(); } };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> 通知中心</div><div style="display:flex;gap:8px;align-items:center;"><button onclick="markAllRead()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">全部已读</button><button onclick="notifPanelOpen=false;document.getElementById('notifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div></div><div id="notifList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:560px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><div style="color:#a78bfa;font-weight:600;font-size:16px;"><i data-lucide="bell" class="icon-inline"></i> 我的订单</div><button onclick="notifPanelOpen=false;document.getElementById('notifModal').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button></div><div id="ordersList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;">加载中...</div></div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
-      loadNotifications();
+      loadMyOrdersInNotif();
+    }
+
+    async function loadMyOrdersInNotif() {
+      if (!currentAccount) return;
+      const list = document.getElementById('ordersList');
+      if (!list) return;
+      list.innerHTML = '加载中...';
+      try {
+        const res = await fetch(`/api/my-orders?wallet=${currentAccount}`);
+        const data = await res.json();
+        if (!data.ok) { list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败</div>'; return; }
+
+        if (data.orders.length === 0) {
+          list.innerHTML = '<div style="color:#475569;text-align:center;padding:20px;">暂无订单</div>';
+          return;
+        }
+
+        list.innerHTML = data.orders.map(o => {
+          const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+          let statusText = '', statusColor = '';
+          if (o.status === 'pending') { statusText = '<i data-lucide="clock" class="icon-inline"></i> 待卖家交付'; statusColor = '#fbbf24'; }
+          else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 待确认收货'; statusColor = '#34d399'; }
+          else if (o.status === 'confirmed' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 已确认'; statusColor = '#60a5fa'; }
+          else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
+          else { statusText = o.status; statusColor = '#94a3b8'; }
+
+          const hasResult = o.result || o.report;
+          const needConfirm = o.status === 'delivered';
+          return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="color:#e2e8f0;font-weight:600;">${o.serviceName || '服务'}</div>
+                <div style="color:#64748b;font-size:11px;margin-top:4px;">卖家: ${o.expert || '未知'} | ${time}</div>
+                <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
+              </div>
+              <div style="text-align:right;padding-right:4px;">
+                <div style="color:${statusColor};font-size:12px;font-weight:600;">${statusText}</div>
+                ${needConfirm ? `<button onclick="confirmPurchase('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#34d399,#10b981);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">确认收货</button>` : ''}
+                ${hasResult ? `<button onclick="viewOrderResult('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">查看结果</button>` : ''}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+        lucide.createIcons();
+      } catch(e) {
+        list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败</div>';
+      }
     }
 
     let myOrdersOpen = false;
@@ -2587,6 +2692,7 @@
           else { statusText = o.status; statusColor = '#94a3b8'; }
 
           const hasResult = o.result || o.report;
+          const needConfirm = o.status === 'delivered';
           return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
@@ -2596,6 +2702,7 @@
               </div>
               <div style="text-align:right;padding-right:4px;">
                 <div style="color:${statusColor};font-size:12px;font-weight:600;">${statusText}</div>
+                ${needConfirm ? `<button onclick="confirmPurchase('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#34d399,#10b981);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">确认收货</button>` : ''}
                 ${hasResult ? `<button onclick="viewOrderResult('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">查看结果</button>` : ''}
               </div>
             </div>
@@ -2608,23 +2715,54 @@
 
     function viewOrderResult(orderId) {
       fetch(`/api/orders/${orderId}/result`).then(r => r.json()).then(data => {
-        if (!data.ok || !data.result) { alert('结果暂不可用'); return; }
+        if (!data.ok || !data.result) { 
+          const list = document.getElementById('ordersList') || document.getElementById('notifList');
+          if (list) list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">结果暂不可用</div>';
+          return; 
+        }
         const result = data.result;
-        const resultBody = result && result.version === 'hosted-result/v1'
-          ? `${result.title || '服务结果'}\n\n摘要：${result.summary || '-'}\n\n${typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2)}`
-          : (typeof result === 'string' ? result : JSON.stringify(result, null, 2));
-        const modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;justify-content:center;align-items:center;';
-        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-        modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:32px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div style="color:#a78bfa;font-size:16px;font-weight:600;"><i data-lucide="package" class="icon-inline"></i> 服务结果</div>
-            <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
+        
+        // 格式化结果为人类可读格式
+        let resultBody = '';
+        if (result && result.version === 'hosted-result/v1') {
+          resultBody = `<div style="margin-bottom:16px;">
+            <div style="color:#a78bfa;font-size:14px;font-weight:600;margin-bottom:8px;">${result.title || '服务结果'}</div>
+            <div style="color:#94a3b8;font-size:12px;margin-bottom:12px;">${result.summary || ''}</div>
+          </div>`;
+          
+          // 如果有 pools 数据，格式化显示
+          if (result.data && result.data.pools) {
+            resultBody += `<div style="color:#e2e8f0;font-size:13px;">
+              <div style="color:#34d399;margin-bottom:12px;">发现 ${result.data.count || result.data.pools.length} 个流动性池：</div>`;
+            result.data.pools.forEach((pool, i) => {
+              resultBody += `<div style="background:rgba(139,92,246,0.1);border-radius:8px;padding:12px;margin-bottom:8px;">
+                <div style="color:#a78bfa;font-weight:600;margin-bottom:6px;">池子 ${i+1}</div>
+                <div style="color:#94a3b8;font-size:12px;">地址: <a href="https://bscscan.com/address/${pool.address}" target="_blank" style="color:#8b5cf6;">${pool.address.slice(0,10)}...${pool.address.slice(-8)}</a></div>
+                <div style="color:#94a3b8;font-size:12px;">交易对: ${pool.token0?.symbol || '?'}/${pool.token1?.symbol || '?'}</div>
+                <div style="color:#94a3b8;font-size:12px;">初始流动性: ${pool.initialLiquidity || '未知'}</div>
+                <div style="color:#94a3b8;font-size:12px;">创建者: <a href="https://bscscan.com/address/${pool.creator}" target="_blank" style="color:#8b5cf6;">${pool.creator.slice(0,10)}...</a></div>
+                <div style="color:#64748b;font-size:11px;margin-top:4px;">区块: ${pool.blockNumber} | ${new Date(pool.createdAt).toLocaleString('zh-CN')}</div>
+              </div>`;
+            });
+            resultBody += '</div>';
+          } else if (result.data) {
+            // 其他数据类型，格式化 JSON
+            resultBody += `<pre style="color:#e2e8f0;font-size:12px;white-space:pre-wrap;word-break:break-all;">${JSON.stringify(result.data, null, 2)}</pre>`;
+          }
+        } else {
+          // 旧格式，直接显示
+          resultBody = `<pre style="color:#e2e8f0;font-size:12px;white-space:pre-wrap;">${typeof result === 'string' ? result : JSON.stringify(result, null, 2)}</pre>`;
+        }
+        
+        // 在当前弹窗内显示结果
+        const list = document.getElementById('ordersList');
+        if (list) {
+          list.innerHTML = `<div style="margin-bottom:16px;">
+            <button onclick="loadMyOrdersInNotif()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;"><i data-lucide="arrow-left" class="icon-inline"></i> 返回订单列表</button>
           </div>
-          <div style="color:#e2e8f0;font-size:13px;white-space:pre-wrap;line-height:1.6;">${resultBody}</div>
-        </div>`;
-        document.body.appendChild(modal);
-      lucide.createIcons();
+          <div style="font-size:13px;line-height:1.6;">${resultBody}</div>`;
+          lucide.createIcons();
+        }
       });
     }
 
@@ -3163,20 +3301,6 @@
       } catch(e) { showError('网络错误：' + e.message); }
     }
 
-    async function viewOrderResult(orderId) {
-      try {
-        const res = await fetch(`/api/orders/${orderId}/result`);
-        const data = await res.json();
-        if (data.ok && data.result) {
-          alert(`服务结果：${JSON.stringify(data.result)}`);
-        } else {
-          alert('结果暂未提交，请稍后再试');
-        }
-      } catch(e) {
-        alert('查询失败');
-      }
-    }
-
     async function executePayment(serviceId, route) {
       if (isPaymentInProgress) {
         showNotice('<i data-lucide="loader" class="icon-inline spin"></i> 上一笔支付正在处理中，请等待完成...');
@@ -3291,18 +3415,91 @@
       lucide.createIcons();
     }
 
-    function doExitExpert() {
+    async function doExitExpert() {
       const expert = document.getElementById('exitExpertName')?.value?.trim();
       if (!expert) return;
       document.getElementById('exitExpertModal')?.remove();
-      fetch('/api/experts/exit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expert })
-      }).then(r => r.json()).then(data => {
-        if (data.ok) { showNotice('<i data-lucide="door-open" class="icon-inline"></i> ' + data.message); reloadMarket(); }
-        else { showError('退出失败：' + (data.error || '未知错误')); }
-      }).catch(e => showError('网络请求失败：' + e.message));
+      
+      if (!currentAccount) {
+        showError('请先连接钱包');
+        return;
+      }
+      
+      try {
+        await ensureChain('bsc');
+      } catch(e) {
+        showError('切换到 BSC 链失败');
+        return;
+      }
+      
+      // 获取服务信息
+      const servicesRes = await fetch('/api/services');
+      const services = await servicesRes.json();
+      const svc = services.find(s => s.expert === expert && s.wallet?.toLowerCase() === currentAccount.toLowerCase());
+      
+      if (!svc) {
+        showError('未找到您的服务');
+        return;
+      }
+      
+      if (!svc.depositTx || svc.depositTx.startsWith('manual-')) {
+        // 没有链上押金记录，直接退出
+        const res = await fetch('/api/experts/exit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expert, serviceId: svc.id })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showNotice('<i data-lucide="door-open" class="icon-inline"></i> 已退出');
+          reloadMarket();
+        } else {
+          showError('退出失败：' + (data.error || '未知错误'));
+        }
+        return;
+      }
+      
+      // 调用合约 withdraw 函数
+      try {
+        const withdrawSelector = '0x3ccfd60b'; // withdraw(string)
+        const skillId = svc.id;
+        const skillIdHex = Array.from(new TextEncoder().encode(skillId)).map(b => b.toString(16).padStart(2,'0')).join('');
+        const skillIdPadded = skillIdHex.padEnd(Math.ceil(skillIdHex.length/64)*64, '0');
+        const strOffset = '0000000000000000000000000000000000000000000000000000000000000020';
+        const strLen = (new TextEncoder().encode(skillId).length).toString(16).padStart(64,'0');
+        const calldata = withdrawSelector + strOffset + strLen + skillIdPadded;
+        
+        const txHash = await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: currentAccount,
+            to: depositConfig.depositPoolAddress,
+            data: calldata,
+          }]
+        });
+        
+        showNotice('<i data-lucide="loader" class="icon-inline"></i> 等待交易确认...');
+        
+        // 等待交易确认
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // 调用后端更新状态
+        const res = await fetch('/api/experts/exit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expert, serviceId: svc.id, withdrawTx: txHash })
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          showNotice(`<i data-lucide="check-circle" class="icon-inline"></i> 已退出，押金已退还<br><a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;font-size:12px;">查看交易</a>`);
+          reloadMarket();
+        } else {
+          showError('退出失败：' + (data.error || '未知错误'));
+        }
+      } catch(e) {
+        showError('退出失败：' + (e.message || '交易被取消'));
+      }
     }
     // 标准服务类型枚举
     const SERVICE_TYPES = {
@@ -3500,21 +3697,39 @@ async function confirmDepositModal() {
           if (svc) {
             document.getElementById('pendingServiceName').textContent = '服务名称: ' + svc.name;
           }
+          
+          // 显示审核结果
+          if (depositData.autoApproved) {
+            status.style.color = '#34d399';
+            status.innerHTML = `<i data-lucide="check-circle" class="icon-inline"></i> 自动审核通过！服务已上架<br><a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;font-size:12px;">查看交易</a><br><br><button onclick="goToPendingPage()" style="background:linear-gradient(135deg,#34d399,#10b981);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">查看服务</button>`;
+          } else {
+            status.style.color = '#fbbf24';
+            status.innerHTML = `<i data-lucide="clock" class="icon-inline"></i> 押金已缴纳，等待人工审核<br><a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;font-size:12px;">查看交易</a><br><br><button onclick="goToPendingPage()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">完成</button>`;
+          }
+          // 3秒后自动跳转
+          setTimeout(goToPendingPage, 3000);
         } else {
+          // 押金确认失败，显示错误
           console.error('Deposit API error:', depositData.error);
+          status.style.color = '#f87171';
+          status.innerHTML = `<i data-lucide="x-circle" class="icon-inline"></i> 押金确认失败: ${depositData.error}<br><a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;font-size:12px;">查看交易</a>`;
+          btn.disabled = false;
+          btn.textContent = '重新确认';
         }
       } catch(e) {
         console.error('Deposit API call failed:', e);
+        status.style.color = '#f87171';
+        status.innerHTML = `<i data-lucide="x-circle" class="icon-inline"></i> 押金确认失败: ${e.message}<br><a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;font-size:12px;">查看交易</a>`;
+        btn.disabled = false;
+        btn.textContent = '重新确认';
       }
     } else {
       console.log('No pendingServiceId');
+      status.style.color = '#f87171';
+      status.textContent = '服务ID丢失，请重新提交入驻申请';
+      btn.disabled = false;
+      btn.textContent = '缴纳押金';
     }
-    
-    status.style.color = '#34d399';
-    status.innerHTML = `<a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;"><i data-lucide="check-circle" class="icon-inline"></i> 押金已缴纳！查看交易</a><br><br><button onclick="goToPendingPage()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">完成</button>`;
-    
-    // 3秒后自动跳转
-    setTimeout(goToPendingPage, 3000);
     
   } catch(e) {
     status.style.color = '#f87171';
@@ -3663,6 +3878,12 @@ async function confirmDepositModal() {
 
     // Demo 模式：自动连接钱包并加载数据
     async function autoLoadWalletData() {
+      // 如果 currentAccount 还没设置，不执行（等钱包重连）
+      if (!currentAccount) {
+        console.log('[autoLoadWalletData] currentAccount is null, skipping');
+        return;
+      }
+      
       const wallet = getActiveWallet();
       // 只有真正连接了 MetaMask 才更新按钮显示
       if (currentAccount) {
@@ -3807,7 +4028,12 @@ async function confirmDepositModal() {
 
         const res = await fetch('/api/purchases/confirm/' + purchaseId, { method: 'POST' });
         const data = await res.json();
-        if (data.ok) { showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 购买已确认'); loadPendingPurchases(); reloadMarket(); }
+        if (data.ok) { 
+          showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 购买已确认'); 
+          loadPendingPurchases(); 
+          loadMyOrders(); // 刷新买家订单列表
+          reloadMarket(); 
+        }
         else { showError(data.error); }
       } catch(e) { showError('确认失败: ' + e.message); }
     }
@@ -4446,8 +4672,13 @@ async function confirmDepositModal() {
           currentAccount = accounts[0].toLowerCase();
           console.log('[autoReconnect] Setting currentAccount to:', currentAccount);
           await autoLoadWalletData();
+          // 检查入驻状态
+          await checkMyRegistration();
           // 始终加载余额（不管在哪个tab）
           loadBuyerStats();
+          // 刷新 agent 大脑
+          await loadMyAgents();
+          await loadLiveFeed();
           // 如果当前在 myagent tab，刷新买家指标显示
           if (activeTab === 'myagent') {
             showBuyerMetrics();

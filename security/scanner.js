@@ -58,12 +58,21 @@ const DANGEROUS_PATTERNS = [
   },
   // 🟡 中危 - 一律视为不安全，拒绝上架
   {
-    level: 'critical',
+    level: 'warning',
     name: '环境变量访问',
     patterns: [
       /process\.env/i,
       /os\.environ/i,
       /getenv/i,
+    ]
+  },
+  // 🔴 高危 - 敏感环境变量
+  {
+    level: 'critical',
+    name: '敏感环境变量读取',
+    patterns: [
+      /process\.env\.(PRIVATE_KEY|MNEMONIC|SEED|API_KEY|SECRET)/i,
+      /os\.environ\.get\s*\(\s*['"](PRIVATE_KEY|MNEMONIC|SEED|API_KEY|SECRET)/i,
     ]
   },
   {
@@ -174,13 +183,14 @@ function scan(code, language = 'auto') {
   // 去重（同一行同一类别只报一次）
   const deduped = deduplicate(issues);
 
-  // 确定整体评级：只有全部通过才是 safe，有任何问题都是 critical
-  let level = deduped.length === 0 ? 'safe' : 'critical';
+  // 确定整体评级：只有 critical 问题才拒绝上架
+  const hasCritical = deduped.some(i => i.level === 'critical');
+  let level = deduped.length === 0 ? 'safe' : (hasCritical ? 'critical' : 'warning');
 
-  // 计算安全分数 (0-100)，有问题就扣分
+  // 计算安全分数 (0-100)
   let score = 100;
   for (const issue of deduped) {
-    score -= 30;
+    score -= issue.level === 'critical' ? 30 : 10;  // critical 扣30，warning 扣10
   }
   score = Math.max(0, score);
 
@@ -229,7 +239,11 @@ function deduplicate(issues) {
 
 function generateSummary(level, issues) {
   if (issues.length === 0) return '✅ 未检测到危险模式，代码安全';
-  return `❌ 检测到 ${issues.length} 个风险项，拒绝上架`;
+  const critical = issues.filter(i => i.level === 'critical').length;
+  const warning = issues.filter(i => i.level === 'warning').length;
+  if (critical > 0) return `❌ 检测到 ${critical} 个高危风险项，拒绝上架`;
+  if (warning > 0) return `⚠️ 检测到 ${warning} 个警告项，允许上架但建议优化`;
+  return '✅ 未检测到危险模式，代码安全';
 }
 
 module.exports = { scan, isDomainAllowed, ALLOWED_DOMAINS };

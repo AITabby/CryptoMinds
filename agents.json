@@ -9,5 +9,16 @@
       "buy-service"
     ],
     "active": true
+  },
+  {
+    "id": "agent-1776703171508",
+    "name": "小臭蛋蛋",
+    "wallet": "0x40992619077f0e42a1b7713c02b7324fa1d8715c",
+    "framework": "unknown",
+    "registeredAt": "2026-04-20T16:39:31.508Z",
+    "skills": [
+      "buy-service"
+    ],
+    "active": true
   }
 ]
