@@ -108,7 +108,7 @@
         cards[2].querySelector('.label').innerHTML = '<i data-lucide="coins" class="icon-inline"></i> 总消费';
         const v2 = cards[2].querySelector('.value'); v2.id = 'buyerTotalSpent'; v2.textContent = '--'; v2.style.color = '#64748b';
         const t2 = cards[2].querySelector('.trend'); t2.id = 'buyerTotalSpentTrend'; t2.textContent = '--'; t2.className = 'trend'; t2.style.color = '#64748b';
-        cards[3].querySelector('.label').innerHTML = '<i data-lucide="package" class="icon-inline"></i> 已购服务';
+        cards[3].querySelector('.label').innerHTML = '<i data-lucide="package" class="icon-inline"></i> 已购订单';
         const v3 = cards[3].querySelector('.value'); v3.id = 'buyerServices'; v3.textContent = '--'; v3.style.color = '#64748b';
         const t3 = cards[3].querySelector('.trend'); t3.id = 'buyerServicesTrend'; t3.textContent = '--'; t3.className = 'trend'; t3.style.color = '#64748b';
         lucide.createIcons();
@@ -190,7 +190,7 @@
       if (!el) return;
       if (_brainAnimTimer) { clearTimeout(_brainAnimTimer); _brainAnimTimer = null; }
       if (!orders.length) {
-        el.innerHTML = '<div style="color:#475569; text-align:center; padding:40px 0;"><i data-lucide="brain" style="width:32px;height:32px;color:#475569;display:block;margin:0 auto 12px;"></i>Agent 决策链路<br><span style="font-size:11px;margin-top:6px;display:block;">点击「买币指令」开始<br>Agent 将实时展示搜索专家、选择下单、代执行买币全过程</span></div>';
+        el.innerHTML = '<div style="color:#475569; text-align:center; padding:40px 0;"><i data-lucide="brain" style="width:32px;height:32px;color:#475569;display:block;margin:0 auto 12px;"></i>Agent 决策链路<br><span style="font-size:11px;margin-top:6px;display:block;">点击「买币指令」开始<br>Agent 将实时展示搜索卖家、选择下单、代执行买币全过程</span></div>';
         lucide.createIcons();
         return;
       }
@@ -222,7 +222,7 @@
         }).join('');
 
         const steps = [
-          { icon: '🔍', color: '#a78bfa', label: '搜索卖家', detail: `扫描专家市场 ${15} 个卖家，按权重/评分/额度筛选...`, tags: `<span style="background:rgba(139,92,246,0.1);color:#a78bfa;padding:2px 6px;border-radius:4px;font-size:10px;">${expert} ★</span>` },
+          { icon: '🔍', color: '#a78bfa', label: '搜索卖家', detail: `扫描服务市场 ${15} 个卖家，按权重/评分/额度筛选...`, tags: `<span style="background:rgba(139,92,246,0.1);color:#a78bfa;padding:2px 6px;border-radius:4px;font-size:10px;">${expert} ★</span>` },
           { icon: '🎯', color: '#34d399', label: '选择最优', detail: `选中 <b style="color:#34d399;">${expert}</b> — 评分最高、押金充足` },
           { icon: '💰', color: '#fbbf24', label: '付款', detail: `${price} BNB → ${expert} ${isDone ? '<span style="color:#34d399;">✅ 链上确认</span>' : '<span style="color:#fbbf24;">⏳ 待确认</span>'}`, extra: txHash ? `TX: ${txLink}` : '' },
           { icon: '🤖', color: '#8b5cf6', label: '卖家代执行', detail: `${expert} 收到指令，为你买入代币...` },
@@ -278,7 +278,7 @@
         html += `<div style="margin-bottom:4px;color:#64748b;font-size:10px;">${time}</div>`;
         html += `<div style="padding:6px 0; border-bottom:1px solid rgba(139,92,246,0.06);">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="color:#a78bfa;font-size:12px;">🔍 搜索卖家</span></div>
-          <div style="color:#94a3b8;font-size:11px;">扫描专家市场，按权重/评分/额度筛选...</div>
+          <div style="color:#94a3b8;font-size:11px;">扫描服务市场，按权重/评分/额度筛选...</div>
           <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;"><span style="background:rgba(139,92,246,0.1);color:#a78bfa;padding:2px 6px;border-radius:4px;font-size:10px;">${expert} ★</span></div>
         </div>`;
         html += `<div style="padding:6px 0; border-bottom:1px solid rgba(139,92,246,0.06);">
@@ -320,14 +320,18 @@
       const btn = document.getElementById('buyTokenBtn');
       if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block;">⏳</span> 执行中...'; }
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000); // 60秒超时
         const res = await fetch('/api/agent-buy', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
             buyerWallet: currentAccount,
             amount: amount
-          })
+          }),
+          signal: controller.signal
         });
+        clearTimeout(timeout);
         const data = await res.json();
         if (data.ok) {
           await loadBuyerStats();
@@ -338,7 +342,11 @@
           alert('买币失败: ' + (data.error || '未知错误'));
         }
       } catch(e) {
-        alert('请求失败: ' + e.message);
+        if (e.name === 'AbortError') {
+          alert('请求超时（60秒），卖家Agent可能未响应，请检查卖家状态');
+        } else {
+          alert('请求失败: ' + e.message);
+        }
       }
       _buyingActive = false;
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = '<i data-lucide="zap" class="icon-inline" style="width:12px;height:12px;"></i> 买币指令'; lucide.createIcons(); }
@@ -492,8 +500,8 @@
 
 
     // ===== Live Feed =====
-    const AGENT_ICONS = { 'ChainSentry': '🔍', 'RiskGuard': '🛡️', 'NFTScout': '🎯', 'GasSaver': '⛽', 'AlphaBot': '🤖', 'ChainSeer': '🔮', 'Sentinel': '🔐', '小钢蛋蛋': '🤖', '钢蛋': '🧠' };
-    const AGENT_COLORS = { 'ChainSentry': '#34d399', 'RiskGuard': '#fbbf24', 'NFTScout': '#f472b6', 'GasSaver': '#60a5fa', 'AlphaBot': '#a78bfa', 'ChainSeer': '#818cf8', 'Sentinel': '#34d399', '小钢蛋蛋': '#a78bfa', '钢蛋': '#a78bfa' };
+    const AGENT_ICONS = { 'ChainSentry': '🔍', 'RiskGuard': '🛡️', 'NFTScout': '🎯', 'GasSaver': '⛽', 'AlphaBot': '🤖', 'ChainSeer': '🔮', 'Sentinel': '🔐', 'Buyer Agent': '🤖', 'Scout Agent': '🧭', 'Momentum One': '📈', 'Dip Hunter': '🎯', 'Risk Sentinel': '🛡️', 'Flow Surfer': '🌊' };
+    const AGENT_COLORS = { 'ChainSentry': '#34d399', 'RiskGuard': '#fbbf24', 'NFTScout': '#f472b6', 'GasSaver': '#60a5fa', 'AlphaBot': '#a78bfa', 'ChainSeer': '#818cf8', 'Sentinel': '#34d399', 'Buyer Agent': '#a78bfa', 'Scout Agent': '#38bdf8', 'Momentum One': '#34d399', 'Dip Hunter': '#f59e0b', 'Risk Sentinel': '#60a5fa', 'Flow Surfer': '#22c55e' };
     let myAgentNames = new Set(); // 从 agents.json 加载当前钱包的 agent
 
     async function loadMyAgents() {
@@ -553,18 +561,18 @@
         agent = tx.to;
         icon = AGENT_ICONS[agent] || '🤖';
         color = AGENT_COLORS[agent] || '#a78bfa';
-        reason = tx.reason ? tx.reason.replace('购买服务:', '收到订单:') : '收到订单';
+        reason = tx.reason ? tx.reason.replace('雇佣卖家:', '收到订单:') : '收到订单';
         direction = '📥';
       } else {
         // C端视角或外部
         agent = tx.from || '未知';
         icon = AGENT_ICONS[agent] || '🤖';
         color = AGENT_COLORS[agent] || '#a78bfa';
-        reason = tx.reason || '服务支付';
+        reason = tx.reason || '订单支付';
         direction = '';
       }
       
-      const isRealTx = tx.tx && !tx.tx.startsWith('purchase-') && tx.verified !== '🧪 模拟';
+      const isRealTx = typeof tx.tx === 'string' && tx.tx.startsWith('0x');
       const shortTx = tx.tx ? (tx.tx.length > 16 ? tx.tx.slice(0, 8) + '...' + tx.tx.slice(-6) : tx.tx) : '';
       const bscUrl = isRealTx ? `https://bscscan.com/tx/${tx.tx}` : null;
 
@@ -664,14 +672,14 @@
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const txs = items.filter(i => i._type === 'tx');
         const todayTxs = txs.filter(t => new Date(t.timestamp) >= today);
-        const NON_AGENTS = ['押金池', '未知服务', 'test', 'undefined', 'null'];
+        const NON_AGENTS = ['押金池', '未知', 'test', 'undefined', 'null'];
         const uniqueAgents = new Set();
         items.forEach(t => {
           [t.from, t.to, t.agent].forEach(name => {
             if (name && !NON_AGENTS.includes(name)) uniqueAgents.add(name);
           });
         });
-        const verifiedCount = txs.filter(t => t.tx && !t.tx.startsWith('purchase-') && t.verified !== '🧪 模拟').length;
+        const verifiedCount = txs.filter(t => typeof t.tx === 'string' && t.tx.startsWith('0x')).length;
         const todayVolume = todayTxs.reduce((s, t) => s + (t.amount || 0), 0);
 
         // Stats (optional elements, may not exist on this page)
@@ -805,9 +813,14 @@
     let txsEventSource = null;
 
     function renderTxsRow(tx) {
-      const isRealTx = tx.tx && !tx.tx.startsWith('purchase-') && tx.verified !== '🧪 模拟';
+      const isRealTx = typeof tx.tx === 'string' && tx.tx.startsWith('0x');
       const bscUrl = isRealTx ? 'https://bscscan.com/tx/' + tx.tx : null;
-      const isIn = myAgentNames.has(tx.to);
+      // 用钱包地址判断方向：toWallet === 当前钱包 → 收入(+), 否则 → 支出(-)
+      const wallet = (currentAccount || '').toLowerCase();
+      const toW = (tx.toWallet || '').toLowerCase();
+      const fromW = (tx.fromWallet || '').toLowerCase();
+      const isIn = wallet && toW && toW === wallet;
+      const isOut = wallet && fromW && fromW === wallet;
       const icon = isIn ? 'download' : 'upload';
       const iconColor = isIn ? '#10b981' : '#a78bfa';
       const sign = isIn ? '+' : '-';
@@ -931,10 +944,10 @@
           const weightEl = document.getElementById('sellerWeightContent');
           if (weightEl && mySeller) {
             const allSellers = sellers;
-            const maxWeight = Math.max(...allSellers.map(s => (s.deposit||0) * Math.max(s.totalOrders||1,1) * (s.rating||1)));
-            const myWeight = (mySeller.deposit||0) * Math.max(mySeller.totalOrders||1,1) * (mySeller.rating||1);
+            const maxWeight = Math.max(...allSellers.map(s => s.weight || 1));
+            const myWeight = mySeller.weight || 1;
             const weightPercent = maxWeight > 0 ? (myWeight / maxWeight * 100).toFixed(0) : 0;
-            const rank = allSellers.sort((a,b) => (b.deposit||0)*Math.max(b.totalOrders||1,1)*(b.rating||1) - (a.deposit||0)*Math.max(a.totalOrders||1,1)*(a.rating||1)).findIndex(s => s.wallet === mySeller.wallet) + 1;
+            const rank = allSellers.sort((a,b) => (b.weight||1) - (a.weight||1)).findIndex(s => s.wallet === mySeller.wallet) + 1;
             weightEl.innerHTML = `
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
                 <div style="flex:1;">
@@ -972,7 +985,7 @@
           if (metricsDiv2) metricsDiv2.style.display = 'grid';
           lucide.createIcons();
         } else {
-          // 没有已上架的服务，隐藏卖家面板
+          // 没有已上线的卖家信息，隐藏卖家面板
           formArea.style.display = 'block';
           regPanel.style.display = 'none';
           document.getElementById('sellerDashboard').style.display = 'none';
@@ -984,7 +997,7 @@
     async function doDeregister(id) {
       document.getElementById('deregisterModal')?.remove();
       try {
-        const res = await fetch(`/api/experts/deregister/${id}`, {
+        const res = await fetch(`/api/sellers/exit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ wallet: currentAccount })
@@ -1025,38 +1038,11 @@
     async function scanSkillFile(file) {
       const area = document.getElementById('scanResultArea');
       area.style.display = 'block';
-      area.style.background = 'rgba(251,191,36,0.1)';
-      area.style.border = '1px solid rgba(251,191,36,0.3)';
-      area.style.color = '#fbbf24';
-      area.textContent = '🔍 正在安全扫描...';
-      try {
-        const fd = new FormData();
-        fd.append('skillFile', file);
-        const res = await fetch('/api/skills/scan', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!data.ok) { area.style.background = 'rgba(248,113,113,0.1)'; area.style.border = '1px solid rgba(248,113,113,0.3)'; area.style.color = '#f87171'; area.textContent = '❌ 扫描失败: ' + (data.error || '未知错误'); return; }
-        const scan = data.scan;
-        if (scan.level === 'safe' || scan.level === 'warning') {
-          area.style.background = 'rgba(52,211,153,0.1)'; area.style.border = '1px solid rgba(52,211,153,0.3)'; area.style.color = '#34d399';
-          if (scan.level === 'warning') {
-            area.innerHTML = '⚠️ 安全扫描通过 (评分 ' + scan.score + '/100)<br><small style="color:#fbbf24">' + scan.summary + '</small>';
-          } else {
-            area.textContent = '✅ 安全扫描通过 (评分 ' + scan.score + '/100)';
-          }
-        } else {
-          area.style.background = 'rgba(248,113,113,0.1)'; area.style.border = '1px solid rgba(248,113,113,0.3)'; area.style.color = '#f87171'; area.innerHTML = '❌ 安全扫描未通过 (评分 ' + scan.score + '/100)<br>' + scan.issues.map(i => '• ' + i.category + ': ' + i.snippet).join('<br>');
-        }
-      } catch(e) {
-        area.style.background = 'rgba(248,113,113,0.1)'; area.style.border = '1px solid rgba(248,113,113,0.3)'; area.style.color = '#f87171'; area.textContent = '❌ 扫描请求失败: ' + e.message;
-      }
-      validateRegisterForm();
+      area.style.color = '#94a3b8';
+      area.textContent = '⚠️ 安全扫描功能已下线，卖家由押金+评分机制约束';
     }
 
-    // 自动分析服务名称和描述，推断输入输出格式
-    let analyzeTimeout = null;
-    async function autoAnalyzeFormat() {
-      // V2: simplified, no auto-analyze
-    }
+    // 自动分析功能已废弃（新模型不需要推断输入输出格式）
 
     function validateRegisterForm() {
       const name = document.getElementById('regName').value.trim();
@@ -1064,8 +1050,9 @@
       const priceVal = document.getElementById('regPrice').value.trim();
       const priceNum = parseFloat(priceVal);
       const wallet = document.getElementById('regWallet').value.trim() || currentAccount;
+      const endpoint = document.getElementById('regSellerEndpoint')?.value?.trim() || '';
 
-      const valid = name && desc && priceVal && !isNaN(priceNum) && priceNum > 0 && wallet;
+      const valid = name && desc && priceVal && !isNaN(priceNum) && priceNum > 0 && wallet && (isDemoMode || endpoint);
       const depositBtn = document.getElementById('depositBtn');
       
       if (valid) {
@@ -1080,9 +1067,9 @@
         depositBtn.style.background = 'linear-gradient(135deg,#475569,#334155)';
         depositBtn.style.color = '#94a3b8';
         if (!name) {
-          depositBtn.textContent = '请填写服务名称';
+          depositBtn.textContent = '请填写卖家名称';
         } else if (!desc) {
-          depositBtn.textContent = '请填写服务描述';
+          depositBtn.textContent = '请填写卖家描述';
         } else if (!priceVal || isNaN(priceNum) || priceNum <= 0) {
           depositBtn.textContent = '请填写有效的费率';
         } else if (!wallet) {
@@ -1220,82 +1207,120 @@
       const bnbAmount = route.amount || service.price;
       const weiValue = '0x' + BigInt(Math.round(bnbAmount * 1e18)).toString(16);
 
-      // ===== Escrow 担保支付 =====
-      renderProgressSteps('Escrow 担保支付', `资金将锁定在担保合约中，确认收货后释放给 ${service.expert}`, [
-        { label: `切换到 ${route.chain.toUpperCase()} 链`, state: 'done' },
-        { label: `向担保合约存入 ${bnbAmount} BNB`, state: 'active' },
-        { label: '等待链上确认', state: 'pending' },
-        { label: '提交订单', state: 'pending' },
-      ]);
+      // ===== Escrow 担保支付：BNB 锁入合约，卖家交付后释放 =====
+      const escrowInfo = await fetch('/api/escrow/info').then(r => r.json()).catch(() => null);
+      const useEscrow = escrowInfo?.ok && escrowInfo.address;
 
-      // 获取合约配置
-      const escrowRes = await fetch('/api/escrow/config');
-      const escrowCfg = await escrowRes.json();
-      const ESCROW_ADDR = escrowCfg.address;
+      if (useEscrow) {
+        // ── 走合约托管 ──
+        renderProgressSteps('Escrow 担保支付', `BNB 将锁入担保合约，卖家交付后自动释放`, [
+          { label: `切换到 ${route.chain.toUpperCase()} 链`, state: 'done' },
+          { label: `向担保合约锁定 ${bnbAmount} BNB`, state: 'active' },
+          { label: '等待链上确认', state: 'pending' },
+          { label: '提交订单', state: 'pending' },
+        ]);
 
-      // createOrder(address seller, string serviceId, uint256 timeoutSeconds) payable returns (bytes32)
-      // selector: 0x + keccak256('createOrder(address,string,uint256)') 前4字节
-      const createOrderSelector = '0x84d3afe6'; // createOrder(address,string,uint256)
-      const sellerParam = service.wallet.toLowerCase().replace('0x', '').padStart(64, '0');
-      const timeoutParam = BigInt(86400).toString(16).padStart(64, '0');
-      // dynamic string encoding: offset + length + data + padding
-      const serviceIdHex = service.id;
-      const svcBytes = new TextEncoder().encode(serviceIdHex);
-      const svcHex = Array.from(svcBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-      const svcPadded = svcHex.padEnd(Math.ceil(svcHex.length / 64) * 64, '0');
-      const svcLen = svcBytes.length.toString(16).padStart(64, '0');
-      const svcOffset = (192).toString(16).padStart(64, '0'); // 3 * 64 = 192
-      const data = createOrderSelector + sellerParam + svcOffset + timeoutParam + svcLen + svcPadded;
-
-      const txHash = await window.ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [{
-          from: wallet,
-          to: ESCROW_ADDR,
-          value: weiValue,
-          data: data,
-        }]
-      });
-
-      renderProgressSteps('等待链上确认', '担保交易已广播，正在等待区块确认...', [
-        { label: `向担保合约存入 ${bnbAmount} BNB`, state: 'done' },
-        { label: '等待链上确认', state: 'active' },
-        { label: '提交订单', state: 'pending' },
-      ], `<p style="color:#8b5cf6;">TxHash: ${txHash}</p><p style="color:#34d399; font-size:11px;">🔒 资金已锁定在担保合约 ${ESCROW_ADDR.slice(0,10)}...</p>`);
-
-      const receipt = await waitForTransactionReceipt(txHash);
-
-      // 从链上 receipt 解析 escrowOrderId
-      // OrderCreated(bytes32 orderId, address buyer, address seller, string serviceId, uint256 amount)
-      const orderCreatedTopic = '0x' + 'OrderCreated(bytes32,address,address,string,uint256)'.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(16); // placeholder
-      let escrowOrderId = '';
-      if (receipt && receipt.logs) {
-        for (const log of receipt.logs) {
-          if (log.address.toLowerCase() === ESCROW_ADDR.toLowerCase() && log.topics && log.topics.length >= 2) {
-            escrowOrderId = log.topics[1]; // orderId is the first indexed param
-            break;
-          }
+        let escrowContract;
+        try {
+          escrowContract = await loadEscrowContract(escrowInfo.address, escrowInfo.abi);
+        } catch(e) {
+          throw new Error('无法加载担保合约: ' + e.message);
         }
+        
+        // createOrder(seller, serviceId, buyerTimeoutSeconds, sellerTimeoutSeconds)
+        // buyerTimeout=24h, sellerTimeout=30min
+        const createTx = await escrowContract.methods.createOrder(
+          service.wallet,
+          service.id || service.name || '',
+          86400,  // 24h buyer timeout
+          1800    // 30min seller timeout
+        ).send({
+          from: wallet,
+          value: weiValue,
+        });
+
+        const escrowOrderId = createTx.events?.OrderCreated?.returnValues?.orderId || null;
+        const txHash = createTx.transactionHash;
+
+        renderProgressSteps('等待链上确认', '担保合约已锁定 BNB，等待区块确认...', [
+          { label: `向担保合约锁定 ${bnbAmount} BNB`, state: 'done' },
+          { label: '等待链上确认', state: 'active' },
+          { label: '提交订单', state: 'pending' },
+        ], `<p style="color:#8b5cf6;">TxHash: ${txHash}</p><p style="color:#34d399; font-size:11px;">🔒 BNB 已锁入担保合约，卖家交付后释放</p>`);
+
+        renderProgressSteps('提交订单', '链上确认成功，正在提交订单...', [
+          { label: '等待链上确认', state: 'done' },
+          { label: '提交订单', state: 'active' },
+        ]);
+
+        const response = await fetch('/api/orders/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceId: service.id,
+            buyerWallet: wallet,
+            paymentMode: 'escrow_bnb',
+            txHash: txHash,
+            escrowOrderId: escrowOrderId,
+            selectedRoute: { route_type: route.route_type, chain: route.chain, symbol: route.symbol }
+          })
+        });
+        return await response.json();
+
+      } else {
+        // ── 无合约时降级为直付（兼容） ──
+        renderProgressSteps('BNB 直接转账', `BNB 将直接发送给 ${service.expert} 的钱包`, [
+          { label: `切换到 ${route.chain.toUpperCase()} 链`, state: 'done' },
+          { label: `向卖家转账 ${bnbAmount} BNB`, state: 'active' },
+          { label: '等待链上确认', state: 'pending' },
+          { label: '提交订单', state: 'pending' },
+        ]);
+
+        const txHash = await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: wallet,
+            to: service.wallet,
+            value: weiValue,
+          }]
+        });
+
+        renderProgressSteps('等待链上确认', '交易已广播，正在等待区块确认...', [
+          { label: `向卖家转账 ${bnbAmount} BNB`, state: 'done' },
+          { label: '等待链上确认', state: 'active' },
+          { label: '提交订单', state: 'pending' },
+        ], `<p style="color:#8b5cf6;">TxHash: ${txHash}</p><p style="color:#f59e0b; font-size:11px;">⚠️ BNB 直付卖家，无担保保护</p>`);
+
+        await waitForTransactionReceipt(txHash);
+
+        renderProgressSteps('提交订单', '链上确认成功，正在提交订单...', [
+          { label: '等待链上确认', state: 'done' },
+          { label: '提交订单', state: 'active' },
+        ]);
+
+        const response = await fetch('/api/orders/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceId: service.id,
+            buyerWallet: wallet,
+            paymentMode: 'direct_bnb',
+            txHash: txHash,
+            selectedRoute: { route_type: route.route_type, chain: route.chain, symbol: route.symbol }
+          })
+        });
+        return await response.json();
       }
+    }
 
-      renderProgressSteps('提交订单', '链上确认成功，正在提交订单...', [
-        { label: '等待链上确认', state: 'done' },
-        { label: '提交订单', state: 'active' },
-      ]);
-
-      const response = await fetch('/api/services/buy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          serviceId: service.id,
-          buyerWallet: wallet,
-          paymentMode: 'onchain',
-          txHash: txHash,
-          escrowOrderId: escrowOrderId,
-          selectedRoute: { route_type: route.route_type, chain: route.chain, symbol: route.symbol }
-        })
-      });
-      return await response.json();
+    // 加载 Escrow 合约实例（Web3.js via window.ethereum）
+    let _escrowContract = null;
+    async function loadEscrowContract(address, abi) {
+      if (_escrowContract && _escrowContract.options?.address === address) return _escrowContract;
+      // 使用 ethers.js 或 web3.js 从 MetaMask provider 创建
+      const web3Provider = new Web3(window.ethereum);
+      _escrowContract = new web3Provider.eth.Contract(abi, address);
+      return _escrowContract;
     }
 
     async function executeRealSwapPayment(service, route, wallet) {
@@ -1731,8 +1756,8 @@
 	    function showSuccessModal(title, data) {
 	      let html = `<div style="margin-bottom:12px;">`;
       html += `<p><span class="status-dot confirmed"></span><strong>${title}</strong></p>`;
-      if (data.service) html += `<p>服务：${data.service}</p>`;
-      if (data.expert) html += `<p>专家：${data.expert}</p>`;
+      if (data.sellerService) html += `<p>卖家执行：${data.sellerService}</p>`;
+      if (data.expert) html += `<p>卖家：${data.expert}</p>`;
       if (data.amount) html += `<p>金额：<span style="color:#34d399; font-family:monospace;">${data.amount}</span></p>`;
       if (data.route) html += `<p>路由：${data.route}</p>`;
       if (data.paymentMode) html += `<p>支付方式：${data.paymentMode}</p>`;
@@ -1747,18 +1772,18 @@
 	      }
       if (data.txHint) html += `<p style="color:#64748b; font-size:12px; margin-top:8px;">${data.txHint}</p>`;
 
-      // 如果购买的服务有API配置，显示调用信息
-      if (data.serviceApi && data.serviceApi.endpoint) {
+      // 如果卖家有API配置，显示调用信息
+      if (data.sellerServiceApi && data.sellerServiceApi.endpoint) {
         html += `<div style="margin-top:16px; background:#0f121e; border:1px solid rgba(139,92,246,0.15); border-radius:10px; padding:14px;">`;
-        html += `<div style="color:#a78bfa; font-size:13px; font-weight:600; margin-bottom:10px;"><i data-lucide="zap" class="icon-inline"></i> 服务调用信息</div>`;
+        html += `<div style="color:#a78bfa; font-size:13px; font-weight:600; margin-bottom:10px;"><i data-lucide="zap" class="icon-inline"></i> 卖家调用信息</div>`;
         html += `<div style="color:#94a3b8; font-size:12px; margin-bottom:6px;">Endpoint:</div>`;
         html += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">`;
-        html += `<code style="flex:1; background:#161b2e; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:8px 10px; color:#34d399; font-size:12px; word-break:break-all;">${data.serviceApi.endpoint}</code>`;
-        html += `<button onclick="copyToClipboard('${data.serviceApi.endpoint}', this)" style="background:rgba(100,116,139,0.2); color:#94a3b8; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:11px; white-space:nowrap;"><i data-lucide="copy" class="icon-inline"></i> 复制</button>`;
+        html += `<code style="flex:1; background:#161b2e; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:8px 10px; color:#34d399; font-size:12px; word-break:break-all;">${data.sellerServiceApi.endpoint}</code>`;
+        html += `<button onclick="copyToClipboard('${data.sellerServiceApi.endpoint}', this)" style="background:rgba(100,116,139,0.2); color:#94a3b8; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:11px; white-space:nowrap;"><i data-lucide="copy" class="icon-inline"></i> 复制</button>`;
         html += `</div>`;
-        if (data.serviceApi.example) {
+        if (data.sellerServiceApi.example) {
           html += `<div style="color:#94a3b8; font-size:12px; margin-bottom:6px;">调用示例:</div>`;
-          html += `<pre style="background:#161b2e; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:10px; color:#a78bfa; font-size:11px; overflow-x:auto; white-space:pre-wrap; margin:0;">${data.serviceApi.example}</pre>`;
+          html += `<pre style="background:#161b2e; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:10px; color:#a78bfa; font-size:11px; overflow-x:auto; white-space:pre-wrap; margin:0;">${data.sellerServiceApi.example}</pre>`;
         }
         html += `</div>`;
       }
@@ -1846,15 +1871,22 @@
           loadNotifications();
           setInterval(loadNotifications, 10000); // 10秒轮询
 
-          // 检查管理员权限
-          const ADMIN_WALLETS = ['0xd2f899ce74320aef9d8f2359183232a554f4c0e1'];
-          if (ADMIN_WALLETS.includes(currentAccount.toLowerCase())) {
-            document.getElementById('adminTab').style.display = 'inline';
-          }
+          // 管理员权限 — 从后端获取，避免前端硬编码
+          try {
+            const adminRes = await fetch(`/api/admin-check?wallet=${currentAccount}`);
+            const adminData = await adminRes.json();
+            if (adminData.isAdmin) {
+              document.getElementById('adminTab').style.display = 'inline';
+            }
+          } catch(e) { /* 非管理员，忽略 */ }
         } catch(e) {
           if (activeTab === 'myagent') document.getElementById('buyerBalance').textContent = '加载失败';
         }
 
+        // 钱包连上后重新渲染交易feed（方向+/-需要currentAccount）
+        loadTxsFeed();
+        // 钱包连上后重新检查卖家注册状态
+        checkMyRegistration();
         // 消费记录由 loadBuyerStats 统一渲染（showTab('myagent') 会调用）
         // 自动切到我的 Agent
         showTab('myagent');
@@ -1868,6 +1900,32 @@
           showError('连接失败：' + (e.message || '未知错误'));
         }
       }
+    }
+
+    // ── 钱包事件监听：切换账号/断连自动刷新 ──
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', (accounts) => {
+        if (accounts.length === 0) {
+          // 钱包断连
+          currentAccount = null;
+          document.getElementById('connectBtn').innerHTML = '<i data-lucide="wallet" class="icon-inline" style="color:#fff"></i> 连接钱包';
+          document.getElementById('connectBtn').classList.remove('connected');
+          showTab('marketplace');
+          console.log('[wallet] 断开连接');
+        } else {
+          // 切换账号
+          currentAccount = accounts[0].toLowerCase();
+          document.getElementById('connectBtn').innerHTML = '<i data-lucide="check-circle" class="icon-inline" style="color:#fff"></i> ' + currentAccount.slice(0, 6) + '...' + currentAccount.slice(-4);
+          loadTxsFeed(); // 切账号后重渲染方向
+          checkMyRegistration(); // 切账号后重新检查卖家状态
+          showTab('myagent');
+          console.log('[wallet] 切换账号:', currentAccount);
+        }
+      });
+      window.ethereum.on('chainChanged', () => {
+        // 切链刷新页面
+        window.location.reload();
+      });
     }
 
     // 直接展示购买凭证
@@ -1885,11 +1943,11 @@
       // 购买信息
       html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">';
       html += `<div>
-        <div style="color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px;">服务名称</div>
+        <div style="color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px;">卖家名称</div>
         <div style="color:#e2e8f0; font-weight:500;">${p.serviceName || '-'}</div>
       </div>`;
       html += `<div>
-        <div style="color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px;">服务专家</div>
+        <div style="color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px;">卖家 Agent</div>
         <div style="color:#e2e8f0;">${p.expert || '-'}</div>
       </div>`;
       html += `<div>
@@ -1936,7 +1994,7 @@
         p.payment?.mode === 'demo' ? '演示'
         : p.payment?.mode === 'x402' ? 'x402 协议'
         : p.payment?.mode === 'x402-split' ? 'x402 协议 / Split'
-        : p.payment?.mode === 'escrow' ? 'BNB Escrow'
+        : p.payment?.mode === 'direct_bnb' ? 'BNB 直转'
         : p.payment?.mode || '-';
       html += `<div style="margin-top:14px; text-align:right;">
         <span style="background:rgba(139,92,246,0.1); color:#a78bfa; padding:4px 10px; border-radius:6px; font-size:11px;">${modeLabel}</span>
@@ -1952,13 +2010,13 @@
       document.getElementById('reportModal').style.display = 'none';
     }
 
-    // 服务详情弹窗
+    // 订单详情弹窗
     function showSkillDetail(serviceId) {
       const services = Array.from(marketServices.values());
       const s = services.find(x => x.id === serviceId);
       if (!s) return;
       const secBadge = s.security ? (s.security.level === 'safe' ? '<span style="color:#10b981;"><i data-lucide="shield-check" class="icon-inline"></i> 安全检测通过</span>' : s.security.level === 'warning' ? '<span style="color:#f59e0b;"><i data-lucide="alert-triangle" class="icon-inline"></i> 待人工审核</span>' : '<span style="color:#ef4444;"><i data-lucide="shield-x" class="icon-inline"></i> 拒绝上架</span>') : '';
-      document.getElementById('skillDetailContent').innerHTML = `
+      document.getElementById('sellerDetailContent').innerHTML = `
         <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
           <div style="width:48px; height:48px; border-radius:12px; background:linear-gradient(135deg,#8b5cf6,#6366f1); display:flex; align-items:center; justify-content:center; font-size:24px;"><i data-lucide="bot" class="icon-lg"></i></div>
           <div>
@@ -1972,7 +2030,7 @@
         </div>
         <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">${secBadge}</div>
         <div style="background:#0f121e; border-radius:8px; padding:12px; margin-bottom:12px;">
-          <div style="font-size:12px; color:#94a3b8; margin-bottom:6px;">服务简介</div>
+          <div style="font-size:12px; color:#94a3b8; margin-bottom:6px;">卖家简介</div>
           <div style="font-size:13px; color:#e2e8f0; line-height:1.6;">${s.desc || s.name || '暂无描述'}</div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:16px;">
@@ -1990,14 +2048,14 @@
           </div>
         </div>
         <div style="background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.2); border-radius:8px; padding:12px; text-align:center;">
-          <div style="font-size:12px; color:#a78bfa;"><i data-lucide="bot" class="icon-inline"></i> 此服务仅限 Agent 调用，人类无法直接购买</div>
+          <div style="font-size:12px; color:#a78bfa;"><i data-lucide="bot" class="icon-inline"></i> 此卖家仅限 Agent 雇佣，人类无法直接购买</div>
         </div>
       `;
-      document.getElementById('skillDetailModal').style.display = 'block';
+      document.getElementById('sellerDetailModal').style.display = 'block';
     }
       lucide.createIcons();
-    function closeSkillDetail() {
-      document.getElementById('skillDetailModal').style.display = 'none';
+    function closeSellerDetail() {
+      document.getElementById('sellerDetailModal').style.display = 'none';
     }
 
     // 智能路由相关（Agent 自动调用，人类无操作入口）
@@ -2054,23 +2112,28 @@
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let statusText = '', statusColor = '';
           if (o.status === 'pending') { statusText = '<i data-lucide="clock" class="icon-inline"></i> 待卖家交付'; statusColor = '#fbbf24'; }
+          else if (o.status === 'executing') { statusText = '<i data-lucide="loader" class="icon-inline" style="animation:spin 1s linear infinite"></i> 卖家执行中'; statusColor = '#8b5cf6'; }
           else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 待确认收货'; statusColor = '#34d399'; }
-          else if (o.status === 'confirmed' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 已确认'; statusColor = '#60a5fa'; }
+          else if (o.status === 'seller_timeout') { statusText = '<i data-lucide="alert-triangle" class="icon-inline"></i> 卖家超时'; statusColor = '#ef4444'; }
+          else if (o.status === 'refunded') { statusText = '<i data-lucide="rotate-ccw" class="icon-inline"></i> 已退款'; statusColor = '#60a5fa'; }
+          else if (o.status === 'confirmed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 已确认'; statusColor = '#60a5fa'; }
           else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
           else { statusText = o.status; statusColor = '#94a3b8'; }
 
           const hasResult = o.result || o.report;
           const needConfirm = o.status === 'delivered';
+          const canRefund = o.status === 'seller_timeout' && o.escrowOrderId;
           return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
-                <div style="color:#e2e8f0;font-weight:600;">${o.serviceName || '服务'}</div>
+                <div style="color:#e2e8f0;font-weight:600;">${o.sellerName || '订单'}</div>
                 <div style="color:#64748b;font-size:11px;margin-top:4px;">卖家: ${o.expert || '未知'} | ${time}</div>
                 <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
               </div>
               <div style="text-align:right;padding-right:4px;">
                 <div style="color:${statusColor};font-size:12px;font-weight:600;">${statusText}</div>
                 ${needConfirm ? `<button onclick="confirmPurchase('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#34d399,#10b981);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">确认收货</button>` : ''}
+                ${canRefund ? `<button onclick="claimSellerTimeout('${o.id}', '${o.escrowOrderId}')" style="margin-top:6px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">申请退款</button>` : ''}
                 ${hasResult ? `<button onclick="viewOrderResult('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">查看结果</button>` : ''}
               </div>
             </div>
@@ -2124,23 +2187,28 @@
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let statusText = '', statusColor = '';
           if (o.status === 'pending') { statusText = '<i data-lucide="clock" class="icon-inline"></i> 待卖家交付'; statusColor = '#fbbf24'; }
+          else if (o.status === 'executing') { statusText = '<i data-lucide="loader" class="icon-inline" style="animation:spin 1s linear infinite"></i> 卖家执行中'; statusColor = '#8b5cf6'; }
           else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 待确认收货'; statusColor = '#34d399'; }
-          else if (o.status === 'confirmed' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 已确认'; statusColor = '#60a5fa'; }
+          else if (o.status === 'seller_timeout') { statusText = '<i data-lucide="alert-triangle" class="icon-inline"></i> 卖家超时'; statusColor = '#ef4444'; }
+          else if (o.status === 'refunded') { statusText = '<i data-lucide="rotate-ccw" class="icon-inline"></i> 已退款'; statusColor = '#60a5fa'; }
+          else if (o.status === 'confirmed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 已确认'; statusColor = '#60a5fa'; }
           else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
           else { statusText = o.status; statusColor = '#94a3b8'; }
 
           const hasResult = o.result || o.report;
           const needConfirm = o.status === 'delivered';
+          const canRefund = o.status === 'seller_timeout' && o.escrowOrderId;
           return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
-                <div style="color:#e2e8f0;font-weight:600;">${o.serviceName || '服务'}</div>
+                <div style="color:#e2e8f0;font-weight:600;">${o.sellerName || '订单'}</div>
                 <div style="color:#64748b;font-size:11px;margin-top:4px;">卖家: ${o.expert || '未知'} | ${time}</div>
                 <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
               </div>
               <div style="text-align:right;padding-right:4px;">
                 <div style="color:${statusColor};font-size:12px;font-weight:600;">${statusText}</div>
                 ${needConfirm ? `<button onclick="confirmPurchase('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#34d399,#10b981);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">确认收货</button>` : ''}
+                ${canRefund ? `<button onclick="claimSellerTimeout('${o.id}', '${o.escrowOrderId}')" style="margin-top:6px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">申请退款</button>` : ''}
                 ${hasResult ? `<button onclick="viewOrderResult('${o.id}')" style="margin-top:6px;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;">查看结果</button>` : ''}
               </div>
             </div>
@@ -2164,7 +2232,7 @@
         let resultBody = '';
         if (result && result.version === 'hosted-result/v1') {
           resultBody = `<div style="margin-bottom:16px;">
-            <div style="color:#a78bfa;font-size:14px;font-weight:600;margin-bottom:8px;">${result.title || '服务结果'}</div>
+            <div style="color:#a78bfa;font-size:14px;font-weight:600;margin-bottom:8px;">${result.title || '执行结果'}</div>
             <div style="color:#94a3b8;font-size:12px;margin-bottom:12px;">${result.summary || ''}</div>
           </div>`;
           
@@ -2258,7 +2326,7 @@
           return;
         }
         if (data.pending.length === 0) {
-          document.getElementById('pendingList').innerHTML = '<div style="color:#475569;text-align:center;padding:20px;"><i data-lucide="check-circle" class="icon-inline"></i> 暂无待审核服务</div>';
+          document.getElementById('pendingList').innerHTML = '<div style="color:#475569;text-align:center;padding:20px;"><i data-lucide="check-circle" class="icon-inline"></i> 暂无待审核卖家</div>';
           return;
         }
         document.getElementById('pendingList').innerHTML = data.pending.map(s => {
@@ -2387,15 +2455,16 @@
         list.innerHTML = data.orders.map(o => {
           const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
           let statusText = '', statusColor = '';
-          if (o.status === 'pending' || o.status === 'demo-completed') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 待交付'; statusColor = '#fbbf24'; }
+          if (o.status === 'pending') { statusText = '<i data-lucide="refresh-cw" class="icon-inline"></i> 待交付'; statusColor = '#fbbf24'; }
+          else if (o.status === 'executing') { statusText = '<i data-lucide="loader" class="icon-inline" style="animation:spin 1s linear infinite"></i> 执行中'; statusColor = '#8b5cf6'; }
           else if (o.status === 'delivered') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 待买家确认'; statusColor = '#34d399'; }
           else if (o.status === 'completed') { statusText = '<i data-lucide="check-circle" class="icon-inline"></i> 已完成'; statusColor = '#34d399'; }
           else { statusText = o.status; statusColor = '#94a3b8'; }
-          const needDeliver = (o.status === 'pending' || o.status === 'demo-completed' || o.status === 'confirmed') && !o.result;
+          const needDeliver = (o.status === 'pending' || o.status === 'confirmed') && !o.result;
           return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
-                <div style="color:#e2e8f0;font-weight:600;">${o.serviceName || '服务'}</div>
+                <div style="color:#e2e8f0;font-weight:600;">${o.expert || o.sellerName || '订单'}</div>
                 <div style="color:#64748b;font-size:11px;margin-top:4px;">买家: ${o.buyerName || o.buyerWallet?.slice(0,10)+'...'} | ${time}</div>
                 <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
                 ${o.input ? `<div style="color:#64748b;font-size:11px;margin-top:2px;">输入: ${typeof o.input === 'string' ? o.input.slice(0,80) : JSON.stringify(o.input).slice(0,80)}</div>` : ''}
@@ -2415,51 +2484,55 @@
       const modal = document.createElement('div');
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100000;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:500px;max-width:90vw;"><div style="color:#a78bfa;font-weight:600;font-size:16px;margin-bottom:16px;"><i data-lucide="package" class="icon-inline"></i> 提交服务结果</div><textarea id="deliverOutput" rows="8" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;resize:vertical;" placeholder="输入服务执行结果..."></textarea><div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;"><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:8px;padding:8px 20px;cursor:pointer;">取消</button><button onclick="submitDeliverResult('${orderId}')" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-weight:600;">提交</button></div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:500px;max-width:90vw;"><div style="color:#a78bfa;font-weight:600;font-size:16px;margin-bottom:16px;"><i data-lucide="package" class="icon-inline"></i> 提交交付结果</div><div style="color:#94a3b8;font-size:12px;margin-bottom:8px;">订单执行结果（如买入的代币信息、数量等）</div><textarea id="deliverOutput" rows="6" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;resize:vertical;" placeholder="例如：已买入 1000 USDT 并转入买家钱包..."></textarea><div style="color:#94a3b8;font-size:12px;margin:12px 0 8px 0;">转账交易哈希（可选，用于链上验证）</div><input id="deliverTxHash" type="text" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;" placeholder="0x..."/><div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;"><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:8px;padding:8px 20px;cursor:pointer;">取消</button><button onclick="submitDeliverResult('${orderId}')" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-weight:600;">提交交付</button></div></div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
     }
 
     async function submitDeliverResult(orderId) {
       const output = document.getElementById('deliverOutput')?.value?.trim();
+      const txHash = document.getElementById('deliverTxHash')?.value?.trim() || '';
       if (!output) { showError('请输入结果'); return; }
+      
       try {
+        // 先查订单是否有 escrowOrderId（走合约托管）
+        const purchasesRes = await fetch('/api/purchases');
+        const purchasesData = await purchasesRes.json();
+        const purchase = (purchasesData.purchases || purchasesData).find(p => p.id === orderId);
+        
+        if (purchase?.escrowOrderId) {
+          // ── 走合约交付 → 更新链上状态 ──
+          const escrowInfo = await fetch('/api/escrow/info').then(r => r.json());
+          if (!escrowInfo.ok) throw new Error('合约不可用');
+          
+          const escrowContract = await loadEscrowContract(escrowInfo.address, escrowInfo.abi);
+          const wallet = getActiveWallet();
+          
+          showNotice('<i data-lucide="loader" class="icon-inline spin"></i> 正在提交交付，请在 MetaMask 确认...');
+          
+          // 调合约 deliver(orderId, result)
+          const deliverTx = await escrowContract.methods.deliver(purchase.escrowOrderId, output).send({
+            from: wallet,
+          });
+          console.log('[escrow] deliver tx:', deliverTx.transactionHash);
+        }
+        
+        // 后端提交结果
         const res = await fetch(`/api/orders/${orderId}/result`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ output, sellerWallet: currentAccount })
+          body: JSON.stringify({ output, sellerWallet: currentAccount, deliveryTxHash: txHash })
         });
         const data = await res.json();
         if (data.ok) {
-          // 如果有 Escrow 订单，链上调用 deliver()
-          if (data.escrowOrderId && window.ethereum) {
-            try {
-              const escrowRes = await fetch('/api/escrow/config');
-              const escrowCfg = await escrowRes.json();
-              // deliver(bytes32 orderId, string result)
-              const deliverSelector = '0xe89e856a'; // deliver(bytes32,string)
-              const orderIdParam = data.escrowOrderId.replace('0x','').padStart(64,'0');
-              // string 参数: offset + length + data + padding
-              const outputHex = Array.from(new TextEncoder().encode(output)).map(b => b.toString(16).padStart(2,'0')).join('');
-              const outputPadded = outputHex.padEnd(Math.ceil(outputHex.length/64)*64, '0');
-              const strOffset = '0000000000000000000000000000000000000000000000000000000000000040';
-              const strLen = (new TextEncoder().encode(output).length).toString(16).padStart(64,'0');
-              const calldata = deliverSelector + orderIdParam + strOffset + strLen + outputPadded;
-              await window.ethereum.request({
-                method: 'eth_sendTransaction',
-                params: [{ from: currentAccount, to: escrowCfg.address, data: calldata }]
-              });
-            } catch(e) {
-              console.warn('链上 deliver 调用失败（结果已保存到服务器）:', e);
-            }
-          }
+          // 卖家交付已完成
           showNotice('结果已提交！买家将收到通知');
           document.querySelector('div[style*="z-index:100000"]')?.remove();
           if (sellerOrdersOpen) { toggleSellerOrders(); toggleSellerOrders(); } // 刷新
         } else {
           showError(data.error || '提交失败');
         }
-      } catch(e) { showError('提交失败'); }
+      } catch(e) { showError('提交失败: ' + e.message); }
     }
 
     async function loadSellerNotif() {
@@ -2579,37 +2652,6 @@
         const data = await res.json();
         if (!data.ok) return;
 
-        // 收到的订单（区分已处理/待处理）
-        const orderList = document.getElementById('sellerOrderList');
-        if (orderList) {
-          if (data.orders.length === 0) {
-            orderList.innerHTML = '<div style="color:#475569;text-align:center;padding:16px;">暂无订单</div>';
-          } else {
-            orderList.innerHTML = data.orders.map(o => {
-              const time = new Date(o.time).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
-              const isAutoConfirmed = o.status === 'completed' || o.autoConfirm;
-              const statusColor = isAutoConfirmed ? '#34d399' : '#fbbf24';
-              const statusText = isAutoConfirmed ? '已自动处理' : '待处理';
-              const escrowBadge = o.escrowAddress ? '<span style="background:rgba(52,211,153,0.15);color:#34d399;padding:1px 4px;border-radius:3px;font-size:10px;margin-left:4px;">🔒</span>' : '';
-              const actionBtn = !isAutoConfirmed ? '<span style="color:#fbbf24;font-size:10px;"><i data-lucide="bot" class="icon-inline"></i> Agent 执行中</span>' : '';
-              return `<div style="padding:8px 0;border-bottom:1px solid rgba(139,92,246,0.06);">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                  <span style="color:#e2e8f0;font-size:12px;">${o.buyerName || '买家'}${escrowBadge}</span>
-                  <div style="display:flex;gap:6px;align-items:center;">
-                    <span style="color:${statusColor};font-size:11px;font-weight:600;">${statusText}</span>
-                    ${actionBtn}
-                  </div>
-                </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-                  <span style="color:#94a3b8;font-size:11px;">${o.serviceName || ''}</span>
-                  <span style="color:#34d399;font-size:12px;">+ ${o.price} BNB</span>
-                </div>
-                <div style="color:#475569;font-size:10px;margin-top:2px;">${time}</div>
-              </div>`;
-            }).join('');
-          }
-        }
-
         // 收支记录（表格：时间|买家|金额|路由|凭证|TX hash）
         const txList = document.getElementById('sellerTxList');
         if (txList) {
@@ -2684,36 +2726,36 @@
       } catch(e) {}
     }
 
-    // 加载我的服务详情
+    // 加载我的服务信息
     async function loadSellerService() {
       const wallet = currentAccount || getActiveWallet();
       if (!wallet) return;
       try {
-        const res = await fetch(`/api/my-services/${wallet}`);
+        const res = await fetch(`/api/sellers`);
         const data = await res.json();
         const el = document.getElementById('sellerServiceContent');
         if (!el) return;
-        if (!Array.isArray(data) || data.length === 0) {
-          el.innerHTML = '<div style="color:#475569;">暂无服务</div>';
+        const seller = (data.sellers || []).find(s => s.wallet?.toLowerCase() === wallet?.toLowerCase());
+        if (!seller) {
+          el.innerHTML = '<div style="color:#475569;">未入驻</div>';
           return;
         }
-        const s = data[0];
         el.innerHTML = `
-          <div style="color:#e2e8f0;font-weight:600;font-size:15px;margin-bottom:8px;">${s.name || '--'}</div>
-          <div style="color:#64748b;font-size:12px;margin-bottom:8px;line-height:1.6;">${s.description || '--'}</div>
+          <div style="color:#e2e8f0;font-weight:600;font-size:15px;margin-bottom:8px;">${seller.name || '--'}</div>
+          <div style="color:#64748b;font-size:12px;margin-bottom:8px;line-height:1.6;">${seller.desc || '--'}</div>
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-            <span style="color:#64748b;font-size:11px;">价格:</span>
-            <span style="color:#a78bfa;font-size:12px;font-weight:600;">${s.price || '--'} BNB</span>
+            <span style="color:#64748b;font-size:11px;">费率:</span>
+            <span style="color:#a78bfa;font-size:12px;font-weight:600;">${seller.feeRate || '--'}%</span>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="color:#64748b;font-size:11px;">状态:</span>
-            <span style="color:${s.active ? '#34d399' : '#f87171'};font-size:12px;font-weight:600;">${s.active ? '在线' : '离线'}</span>
+            <span style="color:${seller.active !== false ? '#34d399' : '#f87171'};font-size:12px;font-weight:600;">${seller.active !== false ? '在线' : '离线'}</span>
           </div>
         `;
       } catch(e) {}
     }
 
-    // 退出卖家市场
+    // 退出服务市场
     async function showDepositModal() {
       const quotaEl = document.getElementById('sellerQuota');
       const quotaDisplay = document.getElementById('depositMoreQuota');
@@ -2748,51 +2790,22 @@
     }
 
     async function exitSeller() {
-      if (!confirm('确定退出卖家市场？服务将下架，质押金将退还。')) return;
+      if (!confirm('确定退出服务市场？卖家信息将下线，押金将退还。')) return;
       try {
-        // 先获取当前用户的 expert 名称和服务信息
-        const wallet = currentAccount || getActiveWallet();
+        const wallet = currentAccount;
         if (!wallet) { showError('请先连接钱包'); return; }
-        const svcRes = await fetch(`/api/my-services/${wallet}`);
-        const myServices = await svcRes.json();
-        if (!Array.isArray(myServices) || myServices.length === 0) {
-          showError('未找到入驻服务'); return;
-        }
-        const svc = myServices[0];
-        const expert = svc.expert;
 
-        // 如果有质押，先链上 withdraw
-        if (svc.depositTx && window.ethereum) {
-          try {
-            const stakingRes = await fetch('/api/config/deposit');
-            const stakingCfg = await stakingRes.json();
-            if (stakingCfg.stakingAddress && stakingCfg.isOnChain) {
-              // withdraw(string skillId)
-              const withdrawSelector = '0x31fb67c2'; // withdraw(string)
-              const skillIdHex = Array.from(new TextEncoder().encode(svc.id || expert)).map(b => b.toString(16).padStart(2,'0')).join('');
-              const skillIdPadded = skillIdHex.padEnd(Math.ceil(skillIdHex.length/64)*64, '0');
-              const strOffset = '0000000000000000000000000000000000000000000000000000000000000020';
-              const strLen = (new TextEncoder().encode(svc.id || expert).length).toString(16).padStart(64,'0');
-              const calldata = withdrawSelector + strOffset + strLen + skillIdPadded;
-              await window.ethereum.request({
-                method: 'eth_sendTransaction',
-                params: [{ from: currentAccount, to: stakingCfg.stakingAddress, data: calldata }]
-              });
-            }
-          } catch(e) {
-            console.warn('链上 withdraw 失败:', e);
-            // 不阻断退出流程，后端会标记 refundStatus
-          }
-        }
-
-        const res = await fetch('/api/experts/exit', {
+        const res = await fetch('/api/sellers/exit', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ expert })
+          body: JSON.stringify({ wallet })
         });
         const data = await res.json();
         if (data.ok) {
-          showNotice('已退出卖家市场');
+          const msg = data.refundAmount > 0
+            ? `已退出，待退押金 ${data.refundAmount} BNB（管理员处理中）`
+            : '已退出服务市场';
+          showNotice('<i data-lucide="check-circle" class="icon-inline"></i> ' + msg);
           document.getElementById('sellerDashboard').style.display = 'none';
           document.getElementById('regFormArea').style.display = 'block';
           checkMyRegistration();
@@ -2814,7 +2827,7 @@
       const service = getServiceById(serviceId);
 
       if (!service) {
-        showError('服务信息缺失，请刷新页面后重试');
+        showError('卖家信息缺失，请刷新页面后重试');
         isPaymentInProgress = false;
         return;
       }
@@ -2853,19 +2866,19 @@
       document.getElementById('smartRouteModal').style.display = 'none';
     }
     
-    // 专家退出
-    function exitExpert() {
+    // 卖家退出
+    function exitSeller() {
       const modal = document.createElement('div');
-      modal.id = 'exitExpertModal';
+      modal.id = 'exitSellerModal';
       modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;justify-content:center;align-items:center;';
       modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:20px;line-height:1.6;">退出后押金将退还，服务将下架。</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('exitExpertModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doExitExpert()" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
+      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(239,68,68,0.4);border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center;"><div style="margin-bottom:16px;"><i data-lucide="door-open" style="width:48px;height:48px;color:#ef4444;"></i></div><div style="color:#e2e8f0;font-weight:600;font-size:18px;margin-bottom:8px;">确认退出？</div><div style="color:#94a3b8;font-size:13px;margin-bottom:20px;line-height:1.6;">退出后押金将退还，已接订单将完成。</div><div style="display:flex;gap:10px;justify-content:center;"><button onclick="document.getElementById('exitSellerModal').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;">取消</button><button onclick="doExitExpert()" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-size:14px;font-weight:600;">确认退出</button></div></div>`;
       document.body.appendChild(modal);
       lucide.createIcons();
     }
 
     async function doExitExpert() {
-      document.getElementById('exitExpertModal')?.remove();
+      document.getElementById('exitSellerModal')?.remove();
       
       if (!currentAccount) {
         showError('请先连接钱包');
@@ -2888,19 +2901,19 @@
         showError('退出失败：' + (data.error || '未知错误'));
       }
     }
-    // 标准服务类型枚举
+    // 卖家类型枚举
     const SERVICE_TYPES = {
-      'scan': '扫链服务',
+      'scan': '扫描',
       'risk': '风控分析',
-      'analysis': '深度分析',
-      'report': '投资分析'
+      'analysis': '链上分析',
+      'report': '结果汇总'
     };
 
     let depositTxHash = '';
     let depositConfig = { depositPoolAddress: '', isOnChain: false };
 
     // ── 审核日志（只读） ──
-    function registerExpert() {
+    function registerSeller() {
       if (!currentAccount) {
         showError('请先连接钱包');
         return;
@@ -2922,7 +2935,7 @@
       } catch(e) { console.error('Load deposit config error:', e); }
     }
 
-    let pendingServiceId = null; // 待支付押金的服务ID
+    let pendingSellerId = null; // 待支付押金的卖家ID
 
     // 新的押金弹窗逻辑
 async function payDeposit() {
@@ -2937,11 +2950,53 @@ async function payDeposit() {
     const desc = document.getElementById('regDesc').value.trim();
     const feeRate = parseFloat(document.getElementById('regPrice').value) || 0.01;
     const wallet = document.getElementById('regWallet').value.trim() || currentAccount;
+    const endpoint = document.getElementById('regSellerEndpoint').value.trim();
+    if (!endpoint) { showError('请填写 Agent API 地址，卖家必须有自己的大脑'); btn.disabled = false; btn.textContent = '入驻'; return; }
     
+    // 第一步：发押金交易
+    btn.textContent = '请在 MetaMask 确认押金交易...';
+    
+    await ensureChain('bsc');
+    
+    // 确保押金配置已加载
+    if (!depositConfig.depositPoolAddress) {
+      await loadDepositConfig();
+    }
+    
+    const depositAmount = 0.1; // 基础押金 0.1 BNB
+    const depositWei = '0x' + (depositAmount * 1e18).toString(16);
+    
+    let txHash;
+    if (depositConfig.isOnChain && depositConfig.depositPoolAddress && depositConfig.depositPoolAddress !== '0x0000000000000000000000000000000000000000') {
+      // 链上押金：发到押金池
+      txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: currentAccount,
+          to: depositConfig.depositPoolAddress,
+          value: depositWei,
+        }]
+      });
+    } else {
+      // 无押金池地址：发给自己（测试用）
+      txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: currentAccount,
+          to: currentAccount,
+          value: depositWei,
+        }]
+      });
+    }
+    
+    console.log('[payDeposit] 押金交易 txHash:', txHash);
+    btn.textContent = '注册卖家中...';
+    
+    // 第二步：提交注册（带押金交易哈希）
     const res = await fetch('/api/sellers/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, desc, feeRate, wallet })
+      body: JSON.stringify({ name, desc, feeRate, wallet, endpoint, depositTx: txHash })
     });
     const data = await res.json();
     
@@ -2952,12 +3007,12 @@ async function payDeposit() {
       return;
     }
     
-    showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 入驻成功！');
+    showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 入驻成功！押金已验证');
     closeRegisterModal();
     loadSellerData();
     
   } catch(e) {
-    showError('提交失败: ' + e.message);
+    showError('提交失败: ' + (e.message || e));
     btn.disabled = false;
     btn.textContent = '入驻';
   }
@@ -3027,7 +3082,7 @@ async function confirmDepositModal() {
     
     if (pendingServiceId) {
       try {
-        const depositRes = await fetch(`/api/services/${pendingServiceId}/deposit`, {
+        const depositRes = await fetch(`/api/sellers/${wallet}/deposit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ txHash, wallet: currentAccount })
@@ -3035,18 +3090,18 @@ async function confirmDepositModal() {
         const depositData = await depositRes.json();
         console.log('Deposit response:', depositData);
         if (depositData.ok) {
-          // 获取服务名称
-          const servicesRes = await fetch('/api/services');
+          // 获取卖家名称
+          const servicesRes = await fetch('/api/sellers');
           const services = await servicesRes.json();
           const svc = services.find(s => s.id === pendingServiceId);
           if (svc) {
-            document.getElementById('pendingServiceName').textContent = '服务名称: ' + svc.name;
+            document.getElementById('pendingServiceName').textContent = '卖家名称: ' + svc.name;
           }
           
           // 显示审核结果
           if (depositData.autoApproved) {
             status.style.color = '#34d399';
-            status.innerHTML = `<i data-lucide="check-circle" class="icon-inline"></i> 自动审核通过！服务已上架<br><a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;font-size:12px;">查看交易</a><br><br><button onclick="goToPendingPage()" style="background:linear-gradient(135deg,#34d399,#10b981);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">查看服务</button>`;
+            status.innerHTML = `<i data-lucide="check-circle" class="icon-inline"></i> 自动审核通过！卖家已上线<br><a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;font-size:12px;">查看交易</a><br><br><button onclick="goToPendingPage()" style="background:linear-gradient(135deg,#34d399,#10b981);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">查看卖家</button>`;
           } else {
             status.style.color = '#fbbf24';
             status.innerHTML = `<i data-lucide="clock" class="icon-inline"></i> 押金已缴纳，等待人工审核<br><a href="https://bscscan.com/tx/${txHash}" target="_blank" style="color:#8b5cf6;font-size:12px;">查看交易</a><br><br><button onclick="goToPendingPage()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">完成</button>`;
@@ -3071,7 +3126,7 @@ async function confirmDepositModal() {
     } else {
       console.log('No pendingServiceId');
       status.style.color = '#f87171';
-      status.textContent = '服务ID丢失，请重新提交入驻申请';
+      status.textContent = '卖家ID丢失，请重新提交入驻申请';
       btn.disabled = false;
       btn.textContent = '缴纳押金';
     }
@@ -3088,7 +3143,7 @@ async function confirmDepositModal() {
 
 
 
-    // 服务文件处理（已移除，改为服务契约声明）
+    // 文件处理（已移除，改为契约声明）
 
     // submitRegister 已移除（未使用，入驻流程由 payDeposit 处理）
     let currentSort = 'weight'; // 默认按权重
@@ -3139,7 +3194,7 @@ async function confirmDepositModal() {
     }
 
     function renderMarketCards(services) {
-      const list = document.getElementById('expertsList');
+      const list = document.getElementById('sellersList');
       const iconColors = ['purple','blue','cyan','green','amber'];
       list.innerHTML = services.map((s, i) => {
         return `
@@ -3190,16 +3245,16 @@ async function confirmDepositModal() {
       } catch(e) { console.error('reloadMarket error:', e); }
     }
 
-    // 提交 Agent 注册
+    // 提交买家 Agent 注册
     async function submitAgentRegister() {
       const name = document.getElementById('regAgentName').value.trim();
       if (!name) { showError('请输入 Agent 名称'); return; }
       const endpoint = document.getElementById('regAgentEndpoint')?.value?.trim() || '';
       try {
-        const res = await fetch('/api/sellers/register', {
+        const res = await fetch('/api/agents/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, wallet: currentAccount, endpoint })
+          body: JSON.stringify({ name, wallet: currentAccount, endpoint, framework: 'web' })
         });
         const data = await res.json();
         if (data.ok) {
@@ -3219,12 +3274,11 @@ async function confirmDepositModal() {
       }
     }
 
-    // 检查 Agent 是否已注册
+    // 检查买家 Agent 是否已注册
     async function checkAgentRegistered(wallet) {
       try {
-        const res = await fetch('/api/sellers');
-        const data = await res.json();
-        const agents = data.sellers || [];
+        const res = await fetch('/api/agents');
+        const agents = await res.json();
         return agents.find(a => (a.wallet || '').toLowerCase() === wallet.toLowerCase());
       } catch(e) { return null; }
     }
@@ -3268,7 +3322,7 @@ async function confirmDepositModal() {
         }
       } catch(e) {}
 
-      // 钱包连上了，刷新买家统计数据（订单、消费、已购服务）
+      // 钱包连上了，刷新买家统计数据（订单、消费、已购订单）
       loadBuyerStats();
       // 每15秒自动刷新 Agent 大脑
       if (!window._brainPollTimer) {
@@ -3297,7 +3351,7 @@ async function confirmDepositModal() {
       loadPendingPurchases();
     }, 15000);
 
-    // 加载待确认订单 + 检查 Escrow 超时自动释放
+    // 加载待确认订单
     async function loadPendingPurchases() {
       try {
         const res = await fetch('/api/purchases/pending');
@@ -3312,43 +3366,13 @@ async function confirmDepositModal() {
         section.style.display = 'block';
         count.textContent = data.count;
 
-        // 检查 Escrow 超时订单，自动 claimTimeout
-        if (window.ethereum) {
-          for (const p of data.purchases) {
-            if (p.escrowOrderId && p.escrowAddress) {
-              try {
-                const orderRes = await fetch(`/api/escrow/order/${p.escrowOrderId}`);
-                const orderData = await orderRes.json();
-                if (orderData.ok && orderData.order) {
-                  const o = orderData.order;
-                  // 链上已 Delivered，且确认窗口到期
-                  if (o.status === 'Delivered' && o.timeoutAt > 0 && Date.now()/1000 >= o.timeoutAt) {
-                    const escrowRes2 = await fetch('/api/escrow/config');
-                    const escrowCfg2 = await escrowRes2.json();
-                    const claimSelector = '0xaaa5a02a'; // claimTimeout(bytes32)
-                    const orderIdParam2 = p.escrowOrderId.replace('0x','').padStart(64,'0');
-                    await window.ethereum.request({
-                      method: 'eth_sendTransaction',
-                      params: [{ from: currentAccount, to: escrowCfg2.address, data: claimSelector + orderIdParam2 }]
-                    });
-                    console.log('Escrow 超时自动释放:', p.escrowOrderId);
-                  }
-                }
-              } catch(e) { /* 静默失败 */ }
-            }
-          }
-        }
-
         list.innerHTML = data.purchases.map(p => {
-          const escrowBadge = p.escrowAddress ? '<span style="background:rgba(52,211,153,0.15); color:#34d399; padding:1px 6px; border-radius:4px; font-size:10px; margin-left:4px;">🔒 担保</span>' : '';
-          const escrowLink = p.escrowOrderId ? `<a href="https://bscscan.com/tx/${p.txHash}" target="_blank" style="color:#8b5cf6; font-size:10px;">链上查看</a>` : '';
           return `<div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(251,191,36,0.1);">
             <div style="flex:1; min-width:0;">
-              <div style="color:#e2e8f0; font-size:12px; font-weight:600;">${p.buyerName || p.buyerWallet.slice(0,10)+'...'} → ${p.expert}${escrowBadge}</div>
-              <div style="color:#94a3b8; font-size:11px;">${p.serviceName} · ${p.price} BNB ${escrowLink}</div>
+              <div style="color:#e2e8f0; font-size:12px; font-weight:600;">${p.buyerName || p.buyerWallet.slice(0,10)+'...'} → ${p.expert}</div>
+              <div style="color:#94a3b8; font-size:11px;">${p.serviceName} · ${p.price} BNB</div>
             </div>
             <button onclick="confirmPurchase('${p.id}')" style="background:rgba(52,211,153,0.2); color:#34d399; border:1px solid rgba(52,211,153,0.3); border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer;">确认收货</button>
-            <button onclick="disputePurchase('${p.id}')" style="background:rgba(251,191,36,0.2); color:#fbbf24; border:1px solid rgba(251,191,36,0.3); border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer;">争议</button>
           </div>`;
         }).join('');
         lucide.createIcons();
@@ -3357,35 +3381,33 @@ async function confirmDepositModal() {
 
     async function confirmPurchase(purchaseId) {
       try {
-        // 先获取购买记录以检查是否有 escrow
-        const purchases = await fetch('/api/purchases').then(r => r.json()).catch(() => []);
-        const purchase = Array.isArray(purchases) ? purchases.find(p => p.id === purchaseId) : null;
+        // 先查订单是否有 escrowOrderId（走合约托管）
+        const purchasesRes = await fetch('/api/purchases');
+        const purchasesData = await purchasesRes.json();
+        const purchase = (purchasesData.purchases || purchasesData).find(p => p.id === purchaseId);
 
-        // 如果有 Escrow 订单，先链上调用 confirm()
-        if (purchase && purchase.escrowOrderId && window.ethereum) {
-          try {
-            const escrowRes = await fetch('/api/escrow/config');
-            const escrowCfg = await escrowRes.json();
-            // confirm(bytes32 orderId)
-            const confirmSelector = '0x797af627'; // confirm(bytes32)
-            const orderIdParam = purchase.escrowOrderId.replace('0x','').padStart(64,'0');
-            const calldata = confirmSelector + orderIdParam;
-            await window.ethereum.request({
-              method: 'eth_sendTransaction',
-              params: [{ from: currentAccount, to: escrowCfg.address, data: calldata }]
-            });
-          } catch(e) {
-            showError('链上确认失败：' + (e.message || '用户取消'));
-            return;
-          }
+        if (purchase?.escrowOrderId) {
+          // ── 走合约确认 → 释放 BNB 给卖家 ──
+          const escrowInfo = await fetch('/api/escrow/info').then(r => r.json());
+          if (!escrowInfo.ok) throw new Error('合约不可用');
+
+          const escrowContract = await loadEscrowContract(escrowInfo.address, escrowInfo.abi);
+          const wallet = getActiveWallet();
+          
+          // 调合约 confirm(orderId)
+          const confirmTx = await escrowContract.methods.confirm(purchase.escrowOrderId).send({
+            from: wallet,
+          });
+          console.log('[escrow] confirm tx:', confirmTx.transactionHash);
         }
 
+        // 后端确认（更新评分等）
         const res = await fetch('/api/purchases/confirm/' + purchaseId, { method: 'POST' });
         const data = await res.json();
         if (data.ok) { 
-          showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 购买已确认'); 
+          showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 购买已确认，BNB 已释放给卖家'); 
           loadPendingPurchases(); 
-          loadMyOrders(); // 刷新买家订单列表
+          loadMyOrders();
           reloadMarket(); 
         }
         else { showError(data.error); }
@@ -3393,42 +3415,46 @@ async function confirmDepositModal() {
     }
 
     // rejectPurchase 已移除（未使用）
+    // disputePurchase 已移除（直接付款模式，争议由评分机制自然淘汰）
 
-    // Escrow 争议：买家在链上提交争议
-    async function disputePurchase(purchaseId) {
+    // ── 卖家超时退款 ──
+    async function claimSellerTimeout(orderId, escrowOrderId) {
       try {
-        // 先获取购买记录
-        const purchases = getPurchases();
-        const purchase = purchases.find(p => p.id === purchaseId);
-        if (!purchase) { showError('订单不存在'); return; }
+        if (!escrowOrderId) throw new Error('无合约订单ID');
+        
+        const escrowInfo = await fetch('/api/escrow/info').then(r => r.json());
+        if (!escrowInfo.ok) throw new Error('合约不可用');
 
-        if (purchase.escrowAddress && purchase.escrowOrderId && window.ethereum) {
-          // 链上争议
-          const reason = prompt('请输入争议原因：');
-          if (!reason) return;
+        const escrowContract = await loadEscrowContract(escrowInfo.address, escrowInfo.abi);
+        const wallet = getActiveWallet();
+        
+        showNotice('<i data-lucide="loader" class="icon-inline spin"></i> 正在申请退款，请在 MetaMask 确认...');
 
-          const escrowRes = await fetch('/api/escrow/config');
-          const escrowCfg = await escrowRes.json();
+        // 调合约 claimSellerTimeout(orderId)
+        const refundTx = await escrowContract.methods.claimSellerTimeout(escrowOrderId).send({
+          from: wallet,
+        });
 
-          // dispute(bytes32 orderId)
-          const disputeSelector = '0xadd98c70'; // dispute(bytes32)
-          const orderIdParam = purchase.escrowOrderId.replace('0x','').padStart(64,'0');
-          const data = disputeSelector + orderIdParam;
+        console.log('[escrow] claimSellerTimeout tx:', refundTx.transactionHash);
 
-          const wallet = getActiveWallet();
-          const txHash = await window.ethereum.request({
-            method: 'eth_sendTransaction',
-            params: [{ from: wallet, to: escrowCfg.address, data: data }]
-          });
-          showNotice(`<i data-lucide="alert-triangle" class="icon-inline"></i> 争议已提交，TxHash: ${txHash}`);
+        // 后端更新订单状态
+        const res = await fetch(`/api/orders/${orderId}/refund`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'seller_timeout', txHash: refundTx.transactionHash })
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+          showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 退款成功！BNB 已退回您的钱包');
+          loadMyOrders();
+          reloadMarket();
         } else {
-          // 非链上订单，走后端拒绝
-          const res = await fetch('/api/purchases/reject/' + purchaseId, { method: 'POST' });
-          const data = await res.json();
-          if (data.ok) { showNotice('<i data-lucide="alert-triangle" class="icon-inline"></i> 争议已提交'); loadPendingPurchases(); }
-          else { showError(data.error); }
+          showError(data.error || '退款失败');
         }
-      } catch(e) { showError('争议失败: ' + e.message); }
+      } catch(e) {
+        showError('退款失败: ' + e.message);
+      }
     }
 
     // 初始加载
@@ -3453,7 +3479,7 @@ async function confirmDepositModal() {
 
       // --- 从真实购买订单计算 ---
       fetch('/api/purchases').then(r => r.json()).then(purchases => {
-        const allOrders = purchases.filter(p => p.status === 'completed' || p.status === 'delivered' || p.status === 'demo-completed');
+        const allOrders = purchases.filter(p => p.status === 'completed' || p.status === 'delivered');
 
         // 24h 订单
         const recent24h = allOrders.filter(p => {
@@ -3605,7 +3631,7 @@ async function confirmDepositModal() {
         registerBtn: '<i data-lucide="store" class="icon-inline"></i> Register Expert',
         // Register Guide Panel
         regGuide: '<i data-lucide="pen-line" class="icon-inline"></i> Agent Registration Guide',
-        regGuideDesc: 'CryptoMinds is an on-chain AI Agent service marketplace. Once a seller registers a capability as a hosted service, the platform handles order intake, execution, result delivery, and settlement through BNB Escrow or x402.',
+        regGuideDesc: 'CryptoMinds 是一个面向 AI Agent 的链上服务市场。卖家缴纳押金入驻，平台在买家付款后通知你的 Agent。你的 Agent 使用自己的模型和策略执行买币，将代币发送到买家钱包。',
         regFlow: '<i data-lucide="rocket" class="icon-inline"></i> Registration Process',
         regStep1Title: 'Prepare Wallet',
         regStep1Desc: 'Create a BSC wallet to receive service payments. Supports BNB and USDC.',
@@ -3614,13 +3640,13 @@ async function confirmDepositModal() {
         regStep3Title: 'List on Market',
         regStep3Desc: 'After review, your service enters the marketplace and can be auto-fulfilled by the platform.',
         regStep4Title: 'Earn Revenue',
-        regStep4Desc: 'When other Agents purchase your service, the platform tries auto-delivery first; Escrow orders release after confirmation, while x402 orders settle directly to your wallet.',
+        regStep4Desc: 'When other Agents purchase your service, the platform tries auto-delivery first; Orders are auto-notified to sellers; x402 orders settle directly to your wallet.',
         regMechanism: '<i data-lucide="dollar-sign" class="icon-inline"></i> Registration Mechanism',
         regMech1: '• Registration requires staking BNB as reputation deposit',
         regMech2: '• Stake amount correlates with service quality',
-        regMech3: '• Sellers set pricing, and buyers choose BNB Escrow or x402',
+        regMech3: '• Sellers set pricing, and buyers pay via BNB direct transfer or x402',
         regMech4: '• Hosted services auto-execute and write results back; sellers can manually fulfill if automation is blocked',
-        regMech5: '• Escrow orders follow the guarantee flow, while x402 orders pay directly',
+        regMech5: '• Direct BNB transfers go straight to seller wallets, x402 orders settle via protocol',
         regExit: '<i data-lucide="door-open" class="icon-inline"></i> Exit Mechanism',
         regExit1: '• Agents can exit anytime; listed services will be delisted',
         regExit2: '• Open orders must be settled or refunded before exit',
@@ -3649,8 +3675,8 @@ async function confirmDepositModal() {
         regModalWalletPlaceholder: '0x... (leave empty to use connected wallet)',
         regModalConfirm: '<i data-lucide="store" class="icon-inline"></i> Confirm Registration',
         regModalCancel: 'Cancel',
-        // 服务详情
-        skillDetailTitle: '<i data-lucide="clipboard-list" class="icon-inline"></i> Service Details',
+        // 订单详情
+        skillDetailTitle: '<i data-lucide="clipboard-list" class="icon-inline"></i> Seller Details',
         // Misc
         orders: 'orders',
         buyBtnLabel: 'Buy',
@@ -3732,14 +3758,14 @@ async function confirmDepositModal() {
         sellerNet: '净收入',
         sellerCompletedLabel: '已完成订单',
         sellerTxTitle: '收支记录',
-        adminTitle: '服务审核',
+        adminTitle: '卖家审核',
         loading: '加载中...',
         pendingReviewTitle: '入驻申请已提交',
-        pendingDepositOk: '押金已缴纳成功！<br>服务正在审核中，管理员审核通过后将自动上架。',
-        pendingServiceLabel: '服务名称: --',
+        pendingDepositOk: '押金已缴纳成功！<br>注册审核中，管理员审核通过后将自动上线。',
+        pendingServiceLabel: '卖家名称: --',
         pendingReviewStatus: '待审核',
         pendingEstTime: '预计 1-3 个工作日',
-        pendingNotify: '审核通过后，您将收到通知，服务将自动上架到市场。<br>如需修改或取消申请，请联系管理员。',
+        pendingNotify: '审核通过后，您将收到通知，卖家信息将自动上线到市场。<br>如需修改或取消申请，请联系管理员。',
         // My Agent
         myAgent: '我的 Agent',
         myAgentTitle: '我的 Agent',
@@ -3747,7 +3773,7 @@ async function confirmDepositModal() {
         walletBalance: '钱包余额',
         usdcSpent: 'USDC 已花费',
         bnbSpent: 'BNB 已花费',
-        servicesBought: '购买服务',
+        servicesBought: '雇佣卖家',
         // Tabs
         tabLive: '<i data-lucide="radio" class="icon-inline"></i> 经济脉搏',
         tabMarket: '<i data-lucide="store" class="icon-inline"></i> 服务市场',
@@ -3756,33 +3782,33 @@ async function confirmDepositModal() {
         tabAdmin: '<i data-lucide="shield" class="icon-inline"></i> 审核管理',
         // Market
         marketTitle: 'Agent Marketplace',
-        registerBtn: '<i data-lucide="store" class="icon-inline"></i> 专家入驻',
+        registerBtn: '<i data-lucide="store" class="icon-inline"></i> 卖家入驻',
         // Register Guide Panel
         regGuide: '<i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻指南',
-        regGuideDesc: 'CryptoMinds 是一个面向链上的 AI Agent 服务市场。卖家把能力注册为平台托管服务后，平台会负责接单、自动执行、回填结果，并按 BNB Escrow 或 x402 完成结算。',
+        regGuideDesc: 'CryptoMinds 是一个面向链上的 AI Agent 服务市场。卖家把能力注册为平台注册卖家后，平台会负责接单、自动执行、回填结果，买家付款后平台通知卖家 Agent 执行，卖家 Agent 自主完成买币并发送到买家钱包。',
         regFlow: '<i data-lucide="rocket" class="icon-inline"></i> 入驻流程',
         regStep1Title: '准备钱包',
-        regStep1Desc: '创建 BSC 链钱包，用于接收服务报酬。支持 BNB 和 USDC 收款。',
-        regStep2Title: '提交服务',
-        regStep2Desc: '填写服务名称、描述、输入输出格式、定价和押金，提交入驻申请。',
+        regStep1Desc: '创建 BSC 链钱包，用于接收订单报酬。支持 BNB 和 USDC 收款。',
+        regStep2Title: '注册卖家',
+        regStep2Desc: '填写卖家名称、描述、输入输出格式、定价和押金，提交入驻申请。',
         regStep3Title: '上架市场',
-        regStep3Desc: '服务通过审核后，会进入市场目录，供其他 Agent 发现、购买并由平台自动履约。',
+        regStep3Desc: '通过审核后，会进入市场目录，供其他 Agent 发现、雇佣，由卖家 Agent 自主执行。',
         regStep4Title: '获取收入',
-        regStep4Desc: '其他 Agent 购买你的服务后，平台会优先自动发货；Escrow 订单在确认后打款，x402 订单直接结算到你的钱包。',
+        regStep4Desc: '其他 Agent 雇佣你后，平台通知你的 Agent 执行；x402 订单直接结算到你的钱包。',
         regMechanism: '<i data-lucide="dollar-sign" class="icon-inline"></i> 入驻机制',
         regMech1: '• 入驻需质押一定数量 BNB 作为信誉保证金',
-        regMech2: '• 质押金额与服务质量挂钩，质押越多信誉越高',
-        regMech3: '• 服务定价由 Agent 自主设定，买家可选 BNB Escrow 或 x402',
-        regMech4: '• 平台托管服务会自动执行并回填结果，失败时由卖家主人手动补发',
-        regMech5: '• Escrow 订单按担保流程结算，x402 订单按协议直接支付',
+        regMech2: '• 质押金额与信誉挂钩，质押越多信誉越高',
+        regMech3: '• 手续费由 Agent 自主设定，买家可通过 BNB 直付或 x402 协议支付',
+        regMech4: '• 平台注册卖家会自动执行并回填结果，失败时由卖家主人手动补发',
+        regMech5: '• BNB 直转直接到卖家钱包，x402 订单按协议支付',
         regExit: '<i data-lucide="door-open" class="icon-inline"></i> 退出机制',
-        regExit1: '• Agent 可随时退出市场，已上架服务将下架',
+        regExit1: '• Agent 可随时退出市场，已上架卖家将下线',
         regExit2: '• 未完成的订单会先结清或退款，之后才能退出',
         regExit3: '• 退出时退还全部质押保证金至原钱包',
         regExit4: '• 退出后可随时重新入驻（需重新质押）',
         // My Agent Register Form
         myRegTitle: '注册你的 Agent',
-        myRegDesc: '连接钱包后，注册你的 Agent 信息，即可在 CryptoMinds 上购买服务',
+        myRegDesc: '连接钱包后，注册你的 Agent 信息，即可在 CryptoMinds 上雇佣卖家',
         myRegName: 'Agent 名称',
         myRegNamePlaceholder: '给你的 Agent 起个名字',
         myRegFramework: 'Agent 框架',
@@ -3793,28 +3819,28 @@ async function confirmDepositModal() {
         regModalTitle: '<i data-lucide="pen-line" class="icon-inline"></i> Agent 入驻',
         regModalAgentName: 'Agent 名称',
         regModalAgentPlaceholder: '如：链上分析师',
-        regModalSkillName: '服务名称',
+        regModalSkillName: '卖家名称',
         regModalSkillPlaceholder: '如：BSC 链上新币扫描',
-        regModalFrameworks: '服务交付方式',
-        regModalSkillDesc: '服务描述',
-        regModalDescPlaceholder: '描述你的服务 能做什么，输入输出是什么...',
+        regModalFrameworks: '交付方式',
+        regModalSkillDesc: '卖家描述',
+        regModalDescPlaceholder: '描述你的能力，能做什么...',
         regModalPrice: '定价（BNB）',
         regModalWallet: '收款钱包地址',
         regModalWalletPlaceholder: '0x...（留空则使用当前连接钱包）',
         regModalConfirm: '<i data-lucide="store" class="icon-inline"></i> 确认入驻',
         regModalCancel: '取消',
-        // 服务详情
-        skillDetailTitle: '<i data-lucide="clipboard-list" class="icon-inline"></i> 服务详情',
+        // 订单详情
+        skillDetailTitle: '<i data-lucide="clipboard-list" class="icon-inline"></i> 卖家详情',
         // Misc
         orders: '单',
         buyBtnLabel: '购买',
-        buyService: '<i data-lucide="rocket" class="icon-inline"></i> 购买服务',
+        buyService: '<i data-lucide="rocket" class="icon-inline"></i> 雇佣卖家',
         exitBtn: '<i data-lucide="door-open" class="icon-inline"></i> 退出市场',
         // Agent Card
         rating: '评分',
         orders: '单',
         buyBtnLabel: '购买',
-        buyService: '<i data-lucide="rocket" class="icon-inline"></i> 购买服务',
+        buyService: '<i data-lucide="rocket" class="icon-inline"></i> 雇佣卖家',
         // Tx Panel
         txPanelTitle: '最近交易',
         txRecent: '最新',
@@ -3825,8 +3851,8 @@ async function confirmDepositModal() {
         txAmount: '金额',
         txReason: '原因',
         txOnchain: 'TX Hash',
-        txExpert: '服务专家',
-        txService: '服务',
+        txExpert: '卖家 Agent',
+        txService: '订单',
         txRoute: '路由',
         txVerify: '验证',
         txReceipt: '凭证',
@@ -3968,10 +3994,10 @@ async function confirmDepositModal() {
       }
 
       // Update register/exit buttons
-      document.querySelectorAll('[onclick="registerExpert()"]').forEach(btn => {
+      document.querySelectorAll('[onclick="registerSeller()"]').forEach(btn => {
         btn.innerHTML = t('registerBtn');
       });
-      document.querySelectorAll('[onclick="exitExpert()"]').forEach(btn => {
+      document.querySelectorAll('[onclick="exitSeller()"]').forEach(btn => {
         btn.innerHTML = t('exitBtn');
       });
 
@@ -4018,6 +4044,10 @@ async function confirmDepositModal() {
           document.getElementById('myAddr').textContent = currentAccount;
           console.log('[autoReconnect] About to call loadBuyerStats');
           loadBuyerStats();
+          // 钱包连上后重新渲染交易feed（刷新方向+/-需要currentAccount）
+          loadTxsFeed();
+          // 重新检查卖家注册状态（刷新时currentAccount为空会误显示入驻指南）
+          checkMyRegistration();
           // 刷新 agent 大脑
           await loadMyAgents();
           await loadLiveFeed();
@@ -4054,12 +4084,28 @@ async function confirmDepositModal() {
       });
     };
 
+    // Demo模式标志（从服务端配置获取）
+    let isDemoMode = window.__BOOTSTRAP__?.demoMode || false;
+
+    function applyDemoMode() {
+      const reqSpan = document.getElementById('endpointRequired');
+      const hintDiv = document.getElementById('endpointHint');
+      if (isDemoMode) {
+        if (reqSpan) reqSpan.style.display = 'none';
+        if (hintDiv) hintDiv.textContent = 'Demo模式下可选填，未填则平台代执行';
+      } else {
+        if (reqSpan) reqSpan.style.display = '';
+        if (hintDiv) hintDiv.textContent = '卖家必须有自己的 Agent 大脑，平台不代决策代执行';
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       console.log('[DOMContentLoaded] START');
       initMetricsBackup();
       initLang();
+      applyDemoMode();
       // 立即加载所有数据（不等待），切tab时直接用缓存
-      updateMetrics(window.__BOOTSTRAP__.transactions, window.__BOOTSTRAP__.services);
+      updateMetrics(window.__BOOTSTRAP__.transactions, window.__BOOTSTRAP__.sellers);
       reloadMarket();
       // 预加载所有tab数据
       loadSellerData();
