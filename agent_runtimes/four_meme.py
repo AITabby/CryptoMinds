@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Four.meme 分析专家
+Four.meme 分析卖家
 获取最新 Four.meme 项目并分析
 """
 import json

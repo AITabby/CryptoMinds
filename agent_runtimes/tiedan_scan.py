@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-铁蛋 — 扫链专家
+Momentum One — 趋势卖家
 扫描 BSC 最新 meme 币，推荐有潜力的
 """
 import json
@@ -20,14 +20,14 @@ def run(task_description=None, token_address=None):
     except ImportError:
         _think = _exec = _result = lambda *a, **kw: None
 
-    _think("铁蛋", f"收到任务: {task_description or '扫描 BSC 最新 meme 币'}")
+    _think("Momentum One", f"收到任务: {task_description or '扫描 BSC 最新 meme 币'}")
     
     # 环境变量控制：CRYPTOMINDS_OFFLINE=1 时跳过链上查询，纯用样例数据
     offline = os.getenv('CRYPTOMINDS_OFFLINE', '').lower() in ('1', 'true')
     
     tokens = []
     if not offline:
-        _exec("铁蛋", "正在查询 PancakeSwap + DEXScreener 链上数据...")
+        _exec("Momentum One", "正在查询 PancakeSwap + DEXScreener 链上数据...")
         try:
             from four_meme_client import scan_four_meme_tokens
             tokens = scan_four_meme_tokens(count=5)
@@ -73,7 +73,7 @@ def run(task_description=None, token_address=None):
     if best:
         recommendation = f"🔥 {best['symbol']} — 24h涨幅 {best['price_change_24h']:+.1f}%, 流动性 ${best['liquidity_usd']:,.0f}"
 
-    _result("铁蛋", f"扫描完成，发现 {len(hot_tokens)} 个代币，{recommendation}")
+    _result("Momentum One", f"扫描完成，发现 {len(hot_tokens)} 个代币，{recommendation}")
 
     return {
         "scanning": {

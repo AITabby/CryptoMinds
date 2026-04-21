@@ -103,15 +103,56 @@ class AgentHandler(BaseHTTPRequestHandler):
             self._respond(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path == "/execute":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
-            try:
-                payload = json.loads(body)
-            except json.JSONDecodeError:
-                self._respond(400, {"error": "invalid JSON"})
-                return
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length)
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            self._respond(400, {"error": "invalid JSON"})
+            return
 
+        # 兼容两种协议
+        if self.path == "/executeOrder":
+            # 新协议：从市场平台发来的订单执行请求
+            action = payload.get("action", "executeOrder")
+            order_id = payload.get("orderId", payload.get("request_id", f"order-{int(time.time())}"))
+            seller_name = payload.get("sellerName", self.agent_name)
+            buyer_wallet = payload.get("buyerWallet", "")
+            amount = payload.get("amount", 0)
+            currency = payload.get("currency", "BNB")
+            strategy = payload.get("strategy", "")
+
+            print(f"  📥 [{self.agent_name}] 收到订单执行请求: orderId={order_id}, buyer={buyer_wallet[:10]}..., amount={amount} {currency}")
+
+            # 执行买币+转账
+            start_time = time.time()
+            success = False
+            error_message = None
+            try:
+                result = self._execute_order(order_id, buyer_wallet, amount, currency, strategy)
+                success = True
+                self._respond(200, result)
+            except Exception as e:
+                error_message = str(e)
+                success = False
+                self._respond(500, {"ok": False, "error": str(e)})
+
+            # 记录声誉
+            if REPUTATION_ENABLED:
+                try:
+                    rs = get_reputation_system()
+                    rs.record_transaction(
+                        agent_name=self.agent_name,
+                        success=success,
+                        response_time=time.time() - start_time,
+                        error_message=error_message,
+                        request_id=order_id
+                    )
+                except Exception:
+                    pass
+
+        elif self.path == "/execute":
+            # 旧协议：直接执行任务
             task = payload.get("task", "")
             token_address = payload.get("token_address")
             request_id = payload.get("request_id", f"req-{int(time.time())}")
@@ -192,6 +233,62 @@ class AgentHandler(BaseHTTPRequestHandler):
                         pass
         else:
             self._respond(404, {"error": "not found"})
+
+    def _execute_order(self, order_id, buyer_wallet, amount, currency, strategy):
+        """执行市场订单：选币 → 买币 → 转账给买家"""
+        import subprocess
+        PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        # 卖家Agent自主选币（这里简化：默认USDT，有runtime的走runtime决策）
+        token_address = None
+        if RUNTIMES_AVAILABLE:
+            runtime_fn = RUNTIMES.get(self.agent_name)
+            if runtime_fn:
+                try:
+                    decision = runtime_fn(task_description=f"选币: {strategy or 'default'}", token_address=None)
+                    if isinstance(decision, dict) and decision.get("token_address"):
+                        token_address = decision["token_address"]
+                except Exception as e:
+                    print(f"  ⚠️ [{self.agent_name}] runtime选币失败: {e}")
+
+        # 没选到就默认USDT
+        if not token_address:
+            token_address = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+            print(f"  ℹ️ [{self.agent_name}] 使用默认代币 USDC")
+
+        # 调用 token_buyer.py 执行买币+转账
+        script = os.path.join(PROJECT_ROOT, "token_buyer.py")
+        try:
+            output = subprocess.check_output(
+                [sys.executable, script, self.agent_name, buyer_wallet, token_address, str(amount)],
+                cwd=PROJECT_ROOT, timeout=180, stderr=subprocess.STDOUT, text=True
+            )
+            lines = output.strip().split("\n")
+            last_line = lines[-1]
+            result = json.loads(last_line)
+
+            if result.get("ok"):
+                # 返回市场期望的格式
+                return {
+                    "ok": True,
+                    "orderId": order_id,
+                    "swapHash": result.get("swapHash"),
+                    "transferHash": result.get("transferHash"),
+                    "token": result.get("token"),
+                    "tokenAddress": result.get("token"),
+                    "amount": result.get("amount"),
+                    "tokenAmount": result.get("amount"),
+                    "symbol": result.get("symbol", "USDC"),
+                    "bnbSpent": result.get("bnbSpent", amount),
+                    "path": result.get("path", "PancakeSwap"),
+                    "executedBy": self.agent_name,
+                }
+            else:
+                raise RuntimeError(result.get("error", "买币失败"))
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("买币超时(180s)")
+        except json.JSONDecodeError:
+            raise RuntimeError(f"买币输出解析失败: {output[-200:]}")
 
     def _execute_task(self, task, token_address=None):
         """从 agent_runtimes 导入执行"""

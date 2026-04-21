@@ -3,10 +3,10 @@ Agent 事件推送 — 把 Agent 思考过程推送到 Dashboard Live Feed
 用法:
     from agent_events import think, pay, execute, result
 
-    think("钢蛋", "用户想找 meme 币，先搜市场")
-    pay("钢蛋", "铁蛋", 0.000124, "购买扫链服务", tx_hash="0x...")
-    execute("铁蛋", "执行扫链中...")
-    result("铁蛋", "发现 3 个新代币")
+    think("Buyer Agent", "用户给了买币意图，开始搜索卖家")
+    pay("Buyer Agent", "Momentum One", 0.000124, "支付执行费", tx_hash="0x...")
+    execute("Momentum One", "执行买币中...")
+    result("Momentum One", "已完成买币并回传结果")
 """
 import os
 import json
@@ -14,7 +14,7 @@ import time
 import datetime
 import requests
 
-MARKET_URL = os.getenv("CRYPTOMINDS_MARKET", "http://localhost:3456")
+MARKET_URL = os.getenv("CRYPTOMINDS_MARKET", "http://localhost:3457")
 DISABLED = os.getenv("CRYPTOMINDS_EVENTS_OFF", "") == "1"
 
 def _push(event_type, agent, message, **kwargs):

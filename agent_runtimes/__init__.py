@@ -1,7 +1,6 @@
 """
 CryptoMinds Agent Runtimes
-每个 Agent 的具体业务逻辑，独立于 SDK。
-SDK 只管调用，不管怎么执行。
+保留一组最小运行时实现，供本地测试和兼容接口使用。
 """
 from .tiedan_scan import run as tiedan_scan
 from .choudan_risk import run as choudan_risk

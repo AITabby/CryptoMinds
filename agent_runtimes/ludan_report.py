@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-卤蛋 — 报告整理专家
-汇总各专家结果生成最终报告
+Flow Surfer — 汇总卖家
+汇总各卖家结果生成最终报告
 """
 import json
 import time
@@ -14,12 +14,12 @@ def run(task_description=None, token_address=None):
     except ImportError:
         _think = _exec = _result = lambda *a, **kw: None
 
-    _think("卤蛋", "收到报告任务，汇总各专家结果")
+    _think("Flow Surfer", "收到报告任务，汇总各卖家结果")
     
     scan_data = None
     risk_data = None
 
-    # 尝试从 task 中解析其他专家的结果
+    # 尝试从 task 中解析其他卖家的结果
     if isinstance(task_description, dict):
         scan_data = task_description.get("scan_result")
         risk_data = task_description.get("risk_result")
@@ -48,14 +48,14 @@ def run(task_description=None, token_address=None):
         ]
         report["recommendation"] = recommendation
     else:
-        report["scan_summary"] = "扫链数据未传入，请参考铁蛋的独立报告"
+        report["scan_summary"] = "扫描数据未传入，请参考独立报告"
 
     if risk_data and isinstance(risk_data, dict):
         report["risk_summary"] = f"{risk_data.get('symbol', '未知代币')} 风控评分: {risk_data.get('score', 'N/A')}/100 ({risk_data.get('risk', '未知')})"
         report["risk_conclusion"] = risk_data.get("conclusion", "风控分析未传入")
         report["risk_checks"] = risk_data.get("checks", [])
     else:
-        report["risk_summary"] = "风控数据未传入，请参考臭蛋的独立报告"
+        report["risk_summary"] = "风控数据未传入，请参考独立报告"
 
     # 综合建议
     if scan_data and risk_data:
@@ -70,8 +70,8 @@ def run(task_description=None, token_address=None):
         else:
             report["verdict"] = "❌ 暂不推荐：热点不足且风控风险较高"
     else:
-        report["verdict"] = "📋 各专家报告已收录，请综合参考后决策"
+        report["verdict"] = "📋 各卖家报告已收录，请综合参考后决策"
 
-    _result("卤蛋", f"报告生成完毕: {report.get('verdict', '')[:40]}")
+    _result("Flow Surfer", f"报告生成完毕: {report.get('verdict', '')[:40]}")
 
     return {"report": report}

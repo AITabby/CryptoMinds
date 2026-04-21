@@ -4,7 +4,7 @@ CryptoMinds v2 Orchestrator — 买家 Agent 自动交易流程
 
 核心流程：
   1. 买家给 Agent 发消息："拿 1 BNB 帮我买币"
-  2. Agent 搜索专家市场，按权重/评分/销量选卖家
+  2. Agent 搜索卖家市场，按权重/评分/销量选卖家
   3. Agent 直接付款（x402 或 BSC 链上转账）
   4. 平台创建订单，通知卖家 Agent
   5. 卖家 Agent 自动买币 + 转币到买家钱包
@@ -43,7 +43,7 @@ def load_wallets():
 
 def search_sellers(query=None, sort_by='weight', limit=10):
     """
-    搜索专家市场的卖家
+    搜索卖家市场的卖家
     
     Args:
         query: 搜索关键词（可选）
@@ -189,9 +189,9 @@ def pay_seller(buyer_name, seller_wallet, amount_bnb, service_id):
         return True, tx_hash
     except Exception as e:
         print(f"⚠️ BSC 转账失败: {e}")
-        # 最终降级：模拟
+        # 最终降级：离线占位交易
         tx_hash = f"0x{os.urandom(16).hex()}"
-        print(f"🧪 模拟转账: {tx_hash}")
+        print(f"⚠️ 离线占位转账: {tx_hash}")
         return True, tx_hash
 
 
@@ -285,7 +285,7 @@ def buy_tokens(buyer_name, amount_bnb, query=None):
     buyer_wallet = buyer_info['address']
     
     # 1. 搜索卖家
-    print(f"\n🔍 第一步：搜索专家市场...")
+    print(f"\n🔍 第一步：搜索卖家市场...")
     sellers = search_sellers(query=query)
     if not sellers:
         return {"error": "没有可用的卖家"}

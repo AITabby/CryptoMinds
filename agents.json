@@ -1,28 +1,28 @@
 [
   {
-    "id": "agent-1776349856763",
-    "name": "小钢蛋蛋",
+    "id": "agent-buyer-main",
+    "name": "Buyer Agent",
     "wallet": "0xd2f899ce74320aef9d8f2359183232a554f4c0e1",
-    "framework": "openclaw",
-    "registeredAt": "2026-04-16T14:30:56.763Z",
+    "framework": "generic",
+    "registeredAt": "2026-04-21T00:30:00.000Z",
     "skills": [
       "buy-service"
     ],
     "active": true,
-    "feeRate": 0.0,
-    "deposit": 0.0
+    "feeRate": 0,
+    "deposit": 0
   },
   {
-    "id": "agent-1776703171508",
-    "name": "小臭蛋蛋",
-    "wallet": "0x40992619077f0e42a1b7713c02b7324fa1d8715c",
-    "framework": "unknown",
-    "registeredAt": "2026-04-20T16:39:31.508Z",
+    "id": "agent-buyer-alt",
+    "name": "Scout Agent",
+    "wallet": "0x0badb40bed90515cb436282c1d5be059d17566bc",
+    "framework": "generic",
+    "registeredAt": "2026-04-21T00:32:00.000Z",
     "skills": [
       "buy-service"
     ],
     "active": true,
-    "feeRate": 0.0,
-    "deposit": 0.0
+    "feeRate": 0,
+    "deposit": 0
   }
 ]
