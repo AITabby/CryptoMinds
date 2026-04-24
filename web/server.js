@@ -11,6 +11,7 @@ const webpush = require('web-push');
 const { createAgentBuyHandlers } = require('./lib/agent_buy');
 const { createSellersStore, createSellersMarketHandlers } = require('./lib/sellers_market');
 const { getEscrowAddress, getEscrowContract, getEscrowStats, checkSellerTimeouts, orderIdToBytes32, escrowABI, deployEscrow } = require('./lib/escrow');
+const { buildBuyerActionMessage, verifyBuyerActionSignature } = require('./lib/buyer_auth');
 
 const upload = multer({ dest: '/tmp/cryptominds-uploads/', limits: { fileSize: 100 * 1024 } }); // 100KB max
 
@@ -272,6 +273,14 @@ async function callLocalMarketApi(apiPath, payload) {
     body: JSON.stringify(payload || {}),
   });
   return response.json();
+}
+
+function signBuyerAction(action, purchaseId, buyerWallet) {
+  const wallet = findManagedWalletByAddress(buyerWallet);
+  if (!wallet?.privateKey) return null;
+  const message = buildBuyerActionMessage(action, purchaseId, wallet.address);
+  const signed = w3.eth.accounts.sign(message, wallet.privateKey);
+  return { buyerWallet: wallet.address, message, signature: signed.signature };
 }
 
 function getPurchaseById(purchaseId) {
@@ -1229,7 +1238,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-402-Payment');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-402-Payment, X-Admin-Secret');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
@@ -1524,11 +1533,52 @@ app.get('/api/config/deposit', (req, res) => {
 
 
 
+// 管理员鉴权中间件
+const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+function hasAdminAuth(req) {
+  if (!ADMIN_SECRET) return false;
+  const auth = req.headers['x-admin-secret'] || req.query.secret || (req.body && req.body.adminSecret);
+  return auth === ADMIN_SECRET;
+}
+
+function requireAdmin(req, res, next) {
+  if (!ADMIN_SECRET) {
+    return res.status(503).json({ ok: false, error: 'ADMIN_SECRET 未配置，管理员接口已禁用' });
+  }
+  if (!hasAdminAuth(req)) {
+    return res.status(403).json({ ok: false, error: '管理员鉴权失败' });
+  }
+  next();
+}
+
+function isAuthorizedBuyer(req, purchase) {
+  if (hasAdminAuth(req)) return true;
+  const claimedWallet = (req.body?.buyerWallet || req.query?.buyerWallet || req.headers['x-buyer-wallet'] || '').toString().trim().toLowerCase();
+  const expectedWallet = (purchase?.buyerWallet || '').toString().trim().toLowerCase();
+  if (!claimedWallet || !expectedWallet || claimedWallet !== expectedWallet) return false;
+
+  const signature = (req.body?.signature || req.headers['x-buyer-signature'] || '').toString().trim();
+  const message = (req.body?.message || '').toString();
+  if (!signature || !message) return false;
+
+  return verifyBuyerActionSignature({
+    action: req.buyerAction || 'unknown',
+    purchaseId: purchase.id,
+    buyerWallet: expectedWallet,
+    message,
+    signature,
+  });
+}
+
 // 确认购买（待确认订单 → 完成）
 app.post('/api/purchases/confirm/:purchaseId', (req, res) => {
+  req.buyerAction = 'confirm';
   const purchases = getPurchases();
   const purchase = purchases.find(p => p.id === req.params.purchaseId);
   if (!purchase) return res.json({ ok: false, error: '订单不存在' });
+  if (!isAuthorizedBuyer(req, purchase)) {
+    return res.status(403).json({ ok: false, error: '只有买家或管理员可以确认订单' });
+  }
   if (purchase.status !== 'delivered' && purchase.status !== 'pending_confirm') {
     return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法确认` });
   }
@@ -1593,9 +1643,13 @@ app.post('/api/purchases/confirm/:purchaseId', (req, res) => {
 
 // 拒绝购买（待确认订单 → 取消）
 app.post('/api/purchases/reject/:purchaseId', (req, res) => {
+  req.buyerAction = 'reject';
   const purchases = getPurchases();
   const purchase = purchases.find(p => p.id === req.params.purchaseId);
   if (!purchase) return res.json({ ok: false, error: '订单不存在' });
+  if (!isAuthorizedBuyer(req, purchase)) {
+    return res.status(403).json({ ok: false, error: '只有买家或管理员可以拒绝订单' });
+  }
   if (purchase.status !== 'delivered' && purchase.status !== 'pending_confirm') return res.json({ ok: false, error: `订单状态为 ${purchase.status}，无法拒绝` });
 
   purchase.status = 'rejected';
@@ -1607,10 +1661,14 @@ app.post('/api/purchases/reject/:purchaseId', (req, res) => {
 
 // 卖家超时退款
 app.post('/api/orders/:orderId/refund', async (req, res) => {
+  req.buyerAction = 'refund';
   const { reason, txHash } = req.body;
   const purchases = getPurchases();
   const purchase = purchases.find(p => p.id === req.params.orderId);
   if (!purchase) return res.json({ ok: false, error: '订单不存在' });
+  if (!isAuthorizedBuyer(req, purchase)) {
+    return res.status(403).json({ ok: false, error: '只有买家或管理员可以标记退款' });
+  }
 
   purchase.status = 'seller_timeout';
   purchase.refundReason = reason || 'seller_timeout';
@@ -1650,17 +1708,6 @@ app.get('/api/purchases/pending', (req, res) => {
 // 质押方退款回调（Four.meme 或合约调用）
 // refund/callback 已移除（未使用）
 
-// 管理员审核服务
-// 管理员鉴权中间件
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'cryptominds-admin-2026';
-function requireAdmin(req, res, next) {
-  const auth = req.headers['x-admin-secret'] || req.query.secret || (req.body && req.body.adminSecret);
-  if (auth !== ADMIN_SECRET) {
-    return res.status(403).json({ ok: false, error: '管理员鉴权失败' });
-  }
-  next();
-}
-
 // admin/audit-log 已移除（未使用）
 
 
@@ -1686,7 +1733,7 @@ app.post('/api/sellers/:wallet/deposit', sellersMarketHandlers.depositSeller);
 app.post('/api/orders/:id/execute', sellersMarketHandlers.executeOrder);
 app.post('/api/orders/create', sellersMarketHandlers.createOrder);
 app.post('/api/sellers/exit', sellersMarketHandlers.exitSeller);
-app.post('/api/sellers/:wallet/refund', sellersMarketHandlers.adminRefundSeller);
+app.post('/api/sellers/:wallet/refund', requireAdmin, sellersMarketHandlers.adminRefundSeller);
 
 
 
@@ -2305,9 +2352,12 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
           purchase = await waitForPurchaseState(purchase.id, { timeoutMs: Number(req.body.waitTimeoutMs || 60000) });
           // 卖家交付后自动确认评分
           if (purchase?.status === 'delivered' && !purchase.autoConfirmed) {
+            const authPayload = signBuyerAction('confirm', purchase.id, requestedWallet);
             const confirmResp = await callLocalMarketApi(`/api/purchases/confirm/${purchase.id}`, {
               rating: 5,
               comment: '自动确认',
+              buyerWallet: requestedWallet,
+              ...authPayload,
             });
             if (!confirmResp.ok) {
               console.error('自动确认失败:', confirmResp.error);

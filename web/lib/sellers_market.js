@@ -346,8 +346,8 @@ function createSellersMarketHandlers({
     const order = (data.orders || []).find((o) => o.id === id);
 
     if (!order) return res.json({ ok: false, error: '订单不存在' });
-    if (order.status !== 'pending') {
-      return res.json({ ok: false, error: `订单状态不是 pending: ${order.status}` });
+    if (order.status !== ORDER_STATUS.PENDING && order.status !== ORDER_STATUS.PAID) {
+      return res.json({ ok: false, error: `订单状态不是 pending/paid: ${order.status}` });
     }
 
     const seller = data.sellers.find((s) => s.wallet.toLowerCase() === (sellerWallet || order.sellerWallet)?.toLowerCase());

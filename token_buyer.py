@@ -169,15 +169,14 @@ def buy_on_pancakeswap(seller_key, seller_addr, buyer_addr, token_addr, bnb_amou
         return None, None
 
 
-def transfer_tokens(seller_key, seller_addr, buyer_addr, token_addr):
+def transfer_tokens(seller_key, seller_addr, buyer_addr, token_addr, amount_raw):
     """将代币从卖家转到买家钱包"""
     token_cs = Web3.to_checksum_address(token_addr)
     token_contract = w3.eth.contract(address=token_cs, abi=ERC20_ABI)
-    
-    # 查卖家余额
-    balance = token_contract.functions.balanceOf(seller_addr).call()
-    if balance == 0:
-        print("卖家没有代币余额，跳过转账")
+
+    amount_raw = int(amount_raw or 0)
+    if amount_raw <= 0:
+        print("本次买入新增代币为 0，跳过转账")
         return None
     
     # ERC20 transfer
@@ -187,7 +186,7 @@ def transfer_tokens(seller_key, seller_addr, buyer_addr, token_addr):
     nonce = w3.eth.get_transaction_count(seller_addr)
     buyer_cs = Web3.to_checksum_address(buyer_addr)
     
-    tx = token_with_transfer.functions.transfer(buyer_cs, balance).build_transaction({
+    tx = token_with_transfer.functions.transfer(buyer_cs, amount_raw).build_transaction({
         'from': seller_addr,
         'gas': 100000,
         'gasPrice': w3.eth.gas_price,
@@ -211,12 +210,12 @@ def transfer_tokens(seller_key, seller_addr, buyer_addr, token_addr):
             dec = token_contract.functions.decimals().call()
         except:
             pass
-        readable = balance / (10 ** dec)
+        readable = amount_raw / (10 ** dec)
         print(f"✅ 转账成功! {readable:.4f} {symbol} → 买家")
-        return tx_hash.hex(), receipt
+        return tx_hash.hex(), receipt, amount_raw
     else:
         print(f"❌ 转账失败!")
-        return None, None
+        return None
 
 
 def wait_receipt(tx_hash, timeout=180):
@@ -247,6 +246,7 @@ def execute_buy(seller_name, buyer_addr, token_addr, bnb_amount):
         key = '0x' + key
     buyer_cs = Web3.to_checksum_address(buyer_addr)
     token_cs = Web3.to_checksum_address(token_addr)
+    token_contract = w3.eth.contract(address=token_cs, abi=ERC20_ABI)
     
     # 查卖家余额
     bal = w3.eth.get_balance(seller_addr)
@@ -256,6 +256,8 @@ def execute_buy(seller_name, buyer_addr, token_addr, bnb_amount):
     print(f"金额: {bnb_amount} BNB")
     print(f"卖家余额: {w3.from_wei(bal, 'ether'):.6f} BNB")
     
+    seller_token_before = token_contract.functions.balanceOf(seller_addr).call()
+
     # 判断路径
     graduated = is_graduated(token_cs)
     
@@ -271,15 +273,20 @@ def execute_buy(seller_name, buyer_addr, token_addr, bnb_amount):
     
     # 等一下让链上状态更新
     time.sleep(3)
+    seller_token_after = token_contract.functions.balanceOf(seller_addr).call()
+    purchased_amount = max(0, seller_token_after - seller_token_before)
     
     # 转代币给买家
-    transfer_hash, transfer_receipt = transfer_tokens(key, seller_addr, buyer_cs, token_cs)
+    transfer_result = transfer_tokens(key, seller_addr, buyer_cs, token_cs, purchased_amount)
+    if transfer_result:
+        transfer_hash, transfer_receipt, transferred_amount = transfer_result
+    else:
+        transfer_hash, transfer_receipt, transferred_amount = None, None, 0
     
     if not transfer_hash:
         return {"ok": False, "error": "买币成功但转账失败", "swapHash": swap_hash}
     
     # 查买家最终余额
-    token_contract = w3.eth.contract(address=token_cs, abi=ERC20_ABI)
     buyer_bal = token_contract.functions.balanceOf(buyer_cs).call()
     symbol = '?'
     dec = 18
@@ -288,7 +295,7 @@ def execute_buy(seller_name, buyer_addr, token_addr, bnb_amount):
         dec = token_contract.functions.decimals().call()
     except:
         pass
-    readable = buyer_bal / (10 ** dec)
+    readable = transferred_amount / (10 ** dec)
     
     result = {
         "ok": True,

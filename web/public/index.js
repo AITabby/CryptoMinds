@@ -3,6 +3,16 @@
     let progressRetryAction = null;
     let isPaymentInProgress = false;
     const marketServices = new Map();
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
     const CHAIN_CONFIG = {
       bsc: {
         chainId: '0x38',
@@ -1170,6 +1180,25 @@
       });
     }
 
+    function buildBuyerActionMessage(action, purchaseId, buyerWallet) {
+      return [
+        'CryptoMinds buyer action',
+        `Action: ${action}`,
+        `Purchase: ${purchaseId}`,
+        `Buyer: ${(buyerWallet || '').toLowerCase()}`,
+      ].join('\n');
+    }
+
+    async function signBuyerAction(action, purchaseId, buyerWallet) {
+      if (!window.ethereum) throw new Error('需要钱包签名');
+      const message = buildBuyerActionMessage(action, purchaseId, buyerWallet);
+      const signature = await window.ethereum.request({
+        method: 'personal_sign',
+        params: [message, buyerWallet]
+      });
+      return { buyerWallet, message, signature };
+    }
+
     // PancakeSwap V2 Router
     const PANCAKE_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
     const WBNB = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
@@ -2126,8 +2155,8 @@
           return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
-                <div style="color:#e2e8f0;font-weight:600;">${o.sellerName || '订单'}</div>
-                <div style="color:#64748b;font-size:11px;margin-top:4px;">卖家: ${o.expert || '未知'} | ${time}</div>
+                <div style="color:#e2e8f0;font-weight:600;">${escapeHtml(o.sellerName || '订单')}</div>
+                <div style="color:#64748b;font-size:11px;margin-top:4px;">卖家: ${escapeHtml(o.expert || '未知')} | ${escapeHtml(time)}</div>
                 <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
               </div>
               <div style="text-align:right;padding-right:4px;">
@@ -2201,8 +2230,8 @@
           return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
-                <div style="color:#e2e8f0;font-weight:600;">${o.sellerName || '订单'}</div>
-                <div style="color:#64748b;font-size:11px;margin-top:4px;">卖家: ${o.expert || '未知'} | ${time}</div>
+                <div style="color:#e2e8f0;font-weight:600;">${escapeHtml(o.sellerName || '订单')}</div>
+                <div style="color:#64748b;font-size:11px;margin-top:4px;">卖家: ${escapeHtml(o.expert || '未知')} | ${escapeHtml(time)}</div>
                 <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
               </div>
               <div style="text-align:right;padding-right:4px;">
@@ -2464,10 +2493,10 @@
           return `<div style="padding:12px 0;border-bottom:1px solid rgba(139,92,246,0.08);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <div>
-                <div style="color:#e2e8f0;font-weight:600;">${o.expert || o.sellerName || '订单'}</div>
-                <div style="color:#64748b;font-size:11px;margin-top:4px;">买家: ${o.buyerName || o.buyerWallet?.slice(0,10)+'...'} | ${time}</div>
+                <div style="color:#e2e8f0;font-weight:600;">${escapeHtml(o.expert || o.sellerName || '订单')}</div>
+                <div style="color:#64748b;font-size:11px;margin-top:4px;">买家: ${escapeHtml(o.buyerName || o.buyerWallet?.slice(0,10)+'...')} | ${escapeHtml(time)}</div>
                 <div style="color:#64748b;font-size:11px;">价格: ${o.price} BNB</div>
-                ${o.input ? `<div style="color:#64748b;font-size:11px;margin-top:2px;">输入: ${typeof o.input === 'string' ? o.input.slice(0,80) : JSON.stringify(o.input).slice(0,80)}</div>` : ''}
+                ${o.input ? `<div style="color:#64748b;font-size:11px;margin-top:2px;">输入: ${escapeHtml(typeof o.input === 'string' ? o.input.slice(0,80) : JSON.stringify(o.input).slice(0,80))}</div>` : ''}
               </div>
               <div style="text-align:right;">
                 <div style="color:${statusColor};font-size:12px;font-weight:600;">${statusText}</div>
@@ -2713,9 +2742,9 @@
           data.orders.forEach(o => {
             const t = new Date(o.time || o.createdAt).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai', hour12:false});
             if (o.status === 'completed' || o.status === 'delivered') {
-              activities.push(`<div style="padding:8px 0;border-bottom:1px solid rgba(139,92,246,0.06);display:flex;align-items:center;gap:8px;"><span style="color:#34d399;font-size:14px;">✅</span><span style="flex:1;">买家 <b style="color:#a78bfa;">${o.buyerName || '买家'}</b> 的订单已履约，收入 <span style="color:#34d399;">${o.price} BNB</span></span><span style="color:#475569;font-size:10px;">${t}</span></div>`);
+              activities.push(`<div style="padding:8px 0;border-bottom:1px solid rgba(139,92,246,0.06);display:flex;align-items:center;gap:8px;"><span style="color:#34d399;font-size:14px;">✅</span><span style="flex:1;">买家 <b style="color:#a78bfa;">${escapeHtml(o.buyerName || '买家')}</b> 的订单已履约，收入 <span style="color:#34d399;">${o.price} BNB</span></span><span style="color:#475569;font-size:10px;">${escapeHtml(t)}</span></div>`);
             } else if (o.status === 'pending') {
-              activities.push(`<div style="padding:8px 0;border-bottom:1px solid rgba(139,92,246,0.06);display:flex;align-items:center;gap:8px;"><span style="color:#fbbf24;font-size:14px;">⏳</span><span style="flex:1;">买家 <b style="color:#a78bfa;">${o.buyerName || '买家'}</b> 下单 <span style="color:#34d399;">${o.price} BNB</span>，Agent 执行中</span><span style="color:#475569;font-size:10px;">${t}</span></div>`);
+              activities.push(`<div style="padding:8px 0;border-bottom:1px solid rgba(139,92,246,0.06);display:flex;align-items:center;gap:8px;"><span style="color:#fbbf24;font-size:14px;">⏳</span><span style="flex:1;">买家 <b style="color:#a78bfa;">${escapeHtml(o.buyerName || '买家')}</b> 下单 <span style="color:#34d399;">${o.price} BNB</span>，Agent 执行中</span><span style="color:#475569;font-size:10px;">${escapeHtml(t)}</span></div>`);
             }
           });
           // 加点系统动态
@@ -3203,13 +3232,13 @@ async function confirmDepositModal() {
               <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
                 <div class="agent-icon ${iconColors[i % 5]}" style="width:34px;height:34px;">${identiconSvg(s.wallet || s.id, 34)}</div>
                 <div style="min-width:0;line-height:1.4;">
-                  <div class="agent-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:600;">${s.expert}</div>
+                  <div class="agent-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:600;">${escapeHtml(s.expert)}</div>
                   <div style="font-size:10px;color:#34d399;margin-top:1px;">★ ${s.rating || '--'} · ${s.sales || 0}单</div>
                 </div>
               </div>
               <div class="agent-price" style="font-size:12px;">${s.price} BNB</div>
             </div>
-            <div style="font-size:11px; color:#94a3b8; line-height:1.4; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; margin-bottom:6px;">${s.desc || ''}</div>
+            <div style="font-size:11px; color:#94a3b8; line-height:1.4; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; margin-bottom:6px;">${escapeHtml(s.desc || '')}</div>
             <div class="agent-footer" style="gap:6px;">
               <div class="agent-meta" style="color:#fbbf24;font-size:10px;"><i data-lucide="shield" class="icon-inline"></i> 押金 ${(s.deposit || 0.001)} BNB</div>
             </div>
@@ -3402,7 +3431,12 @@ async function confirmDepositModal() {
         }
 
         // 后端确认（更新评分等）
-        const res = await fetch('/api/purchases/confirm/' + purchaseId, { method: 'POST' });
+        const buyerAuth = await signBuyerAction('confirm', purchaseId, getActiveWallet());
+        const res = await fetch('/api/purchases/confirm/' + purchaseId, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buyerAuth)
+        });
         const data = await res.json();
         if (data.ok) { 
           showNotice('<i data-lucide="check-circle" class="icon-inline"></i> 购买已确认，BNB 已释放给卖家'); 
@@ -3438,10 +3472,11 @@ async function confirmDepositModal() {
         console.log('[escrow] claimSellerTimeout tx:', refundTx.transactionHash);
 
         // 后端更新订单状态
+        const buyerAuth = await signBuyerAction('refund', orderId, wallet);
         const res = await fetch(`/api/orders/${orderId}/refund`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason: 'seller_timeout', txHash: refundTx.transactionHash })
+          body: JSON.stringify({ reason: 'seller_timeout', txHash: refundTx.transactionHash, ...buyerAuth })
         });
         const data = await res.json();
         

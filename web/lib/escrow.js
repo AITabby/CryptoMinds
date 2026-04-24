@@ -171,9 +171,9 @@ async function checkSellerTimeouts(getSellers, saveSellers) {
       const chainOrder = await getOrderFromChain(order.escrowOrderId);
       if (!chainOrder) continue;
 
-      // 链上状态 = 0 (Pending) 且超时
+      // 链上状态 = 1 (Pending) 且超时；0 是 None
       const SELLER_TIMEOUT = 30 * 60; // 30分钟
-      if (Number(chainOrder.status) === 0 &&
+      if (Number(chainOrder.status) === 1 &&
           Number(chainOrder.createdAt) > 0 &&
           (now - Number(chainOrder.createdAt)) > SELLER_TIMEOUT) {
         

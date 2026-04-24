@@ -389,6 +389,45 @@ def get_my_balance(buyer_name):
 
 
 # ============================================================
+# Legacy SDK compatibility
+# ============================================================
+
+def discover_skills(query=None, limit=10):
+    """兼容旧版测试/SDK：技能发现映射到卖家市场搜索。"""
+    return search_sellers(query=query, limit=limit)
+
+
+def purchase_skill(buyer_name, seller_wallet=None, amount_bnb=0.001, query=None):
+    """兼容旧版测试/SDK：购买技能映射到 v2 买币订单流程。"""
+    if seller_wallet:
+        query = query or seller_wallet
+    return buy_tokens(buyer_name, amount_bnb, query=query)
+
+
+def run_skill(skill_id=None, task_description=None, token_address=None):
+    """兼容旧版测试/SDK：按 runtime 名称执行本地 Agent 能力。"""
+    if not skill_id:
+        raise ValueError("skill_id is required")
+    try:
+        from agent_runtimes import RUNTIMES
+    except ImportError as exc:
+        raise RuntimeError("agent_runtimes unavailable") from exc
+    runtime = RUNTIMES.get(skill_id)
+    if not runtime:
+        raise ValueError(f"unknown skill_id: {skill_id}")
+    return runtime(task_description=task_description, token_address=token_address)
+
+
+def get_installed_skills():
+    """兼容旧版测试/SDK：返回当前可用 runtime 名称。"""
+    try:
+        from agent_runtimes import RUNTIMES
+        return list(RUNTIMES.keys())
+    except ImportError:
+        return []
+
+
+# ============================================================
 # CLI
 # ============================================================
 
