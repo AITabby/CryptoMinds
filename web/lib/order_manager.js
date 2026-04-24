@@ -146,6 +146,8 @@ function syncToPurchase(order, seller) {
     serviceId: order.serviceId || `${seller.name || 'unknown'}-svc`,
     expert: seller.name || order.sellerName || '',
     expertWallet: order.sellerWallet,
+    sellerWallet: order.sellerWallet,
+    sellerName: seller.name || order.sellerName || '',
     serviceName: order.serviceName || seller.name || '',
     buyerWallet: order.buyerWallet,
     buyerName: order.buyerName,

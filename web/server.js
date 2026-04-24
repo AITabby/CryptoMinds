@@ -295,7 +295,7 @@ async function waitForPurchaseState(purchaseId, options = {}) {
 
   while (Date.now() - startedAt <= timeoutMs) {
     const purchase = getPurchaseById(purchaseId);
-    if (purchase && ['delivered', 'completed', 'rejected'].includes(purchase.status)) {
+    if (purchase && ['delivered', 'pending_confirm', 'completed', 'rejected', 'failed'].includes(purchase.status)) {
       return purchase;
     }
     await sleep(intervalMs);
@@ -629,6 +629,80 @@ async function createDirectPayment(service, buyerWallet) {
     to: service.wallet,
     amount: service.price,
   };
+}
+
+function decodeEscrowOrderId(receipt) {
+  const createdEvent = escrowABI.find(item => item.type === 'event' && item.name === 'OrderCreated');
+  if (!createdEvent) return null;
+  const signature = w3.eth.abi.encodeEventSignature(createdEvent);
+  const log = (receipt.logs || []).find(item => item.topics?.[0]?.toLowerCase() === signature.toLowerCase());
+  if (!log) return null;
+  const decoded = w3.eth.abi.decodeLog(createdEvent.inputs, log.data, log.topics.slice(1));
+  return decoded.orderId || decoded[0] || null;
+}
+
+async function createManagedEscrowPayment(service, buyerWallet) {
+  const wallet = findManagedWalletByAddress(buyerWallet);
+  if (!wallet?.privateKey || !wallet?.address) {
+    throw new Error('买家钱包未托管，无法自动创建担保订单');
+  }
+  const contract = getEscrowContract();
+  if (!contract) throw new Error('Escrow 合约未部署，无法创建担保订单');
+  if (!service.wallet) throw new Error('卖家钱包地址无效');
+
+  const account = w3.eth.accounts.privateKeyToAccount(wallet.privateKey);
+  const amount = w3.utils.toWei(String(service.price), 'ether');
+  const method = contract.methods.createOrder(service.wallet, service.id || service.name || 'seller-service', 86400, 1800);
+  const gas = await method.estimateGas({ from: account.address, value: amount });
+  const gasPrice = await w3.eth.getGasPrice();
+  const nonce = await w3.eth.getTransactionCount(account.address, 'pending');
+  const signed = await account.signTransaction({
+    from: account.address,
+    to: contract.options.address,
+    value: amount,
+    data: method.encodeABI(),
+    gas: Math.min(Math.ceil(Number(gas) * 1.2), 600000),
+    gasPrice,
+    nonce,
+    chainId: 56,
+  });
+  const receipt = await w3.eth.sendSignedTransaction(signed.rawTransaction);
+  const escrowOrderId = decodeEscrowOrderId(receipt);
+  if (!escrowOrderId) throw new Error('Escrow 订单创建成功但未解析到 orderId');
+  return {
+    txHash: receipt.transactionHash,
+    escrowOrderId,
+    escrowAddress: contract.options.address,
+    from: account.address,
+    to: contract.options.address,
+    amount: service.price,
+  };
+}
+
+async function confirmManagedEscrowOrder(purchase, buyerWallet) {
+  if (!purchase?.escrowOrderId) return null;
+  const wallet = findManagedWalletByAddress(buyerWallet);
+  if (!wallet?.privateKey || !wallet?.address) {
+    throw new Error('买家钱包未托管，无法自动释放担保资金');
+  }
+  const contract = getEscrowContract();
+  if (!contract) throw new Error('Escrow 合约未部署，无法自动确认订单');
+  const account = w3.eth.accounts.privateKeyToAccount(wallet.privateKey);
+  const method = contract.methods.confirm(purchase.escrowOrderId);
+  const gas = await method.estimateGas({ from: account.address });
+  const gasPrice = await w3.eth.getGasPrice();
+  const nonce = await w3.eth.getTransactionCount(account.address, 'pending');
+  const signed = await account.signTransaction({
+    from: account.address,
+    to: contract.options.address,
+    data: method.encodeABI(),
+    gas: Math.min(Math.ceil(Number(gas) * 1.2), 400000),
+    gasPrice,
+    nonce,
+    chainId: 56,
+  });
+  const receipt = await w3.eth.sendSignedTransaction(signed.rawTransaction);
+  return receipt.transactionHash;
 }
 
 // 自由市场——卖家自主入驻，自主定价
@@ -1589,12 +1663,21 @@ app.post('/api/purchases/confirm/:purchaseId', (req, res) => {
     purchase.autoConfirmed = req.body.auto === true || req.body.rating !== undefined;
     purchase.confirmedAt = new Date().toISOString();
     purchase.rating = rating;
+    if (req.body.escrowReleaseTx) purchase.escrowReleaseTx = req.body.escrowReleaseTx;
     if (req.body.comment) purchase.comment = req.body.comment;
     savePurchases(purchases);
 
     // 更新卖家评分+权重
     const data = getSellers();
     const seller = data.sellers?.find(s => s.wallet?.toLowerCase() === purchase.sellerWallet?.toLowerCase());
+    const sellerOrder = data.orders?.find(order => order.id === purchase.id);
+    if (sellerOrder) {
+      sellerOrder.status = 'completed';
+      sellerOrder.confirmedAt = purchase.confirmedAt;
+      sellerOrder.rating = rating;
+      sellerOrder.autoConfirmed = purchase.autoConfirmed;
+      if (req.body.escrowReleaseTx) sellerOrder.escrowReleaseTx = req.body.escrowReleaseTx;
+    }
     if (seller) {
       const totalRatings = seller.totalOrders || 0;
       const oldAvg = seller.rating || 5;
@@ -1602,8 +1685,6 @@ app.post('/api/purchases/confirm/:purchaseId', (req, res) => {
       seller.totalOrders = totalRatings + 1;
       seller.weight = calculateWeight(seller);
       if (rating <= 2) seller.badRatings = (seller.badRatings || 0) + 1;
-      saveSellers(data);
-
       // 通知卖家Agent订单已确认
       if (seller.endpoint) {
         try {
@@ -1622,6 +1703,7 @@ app.post('/api/purchases/confirm/:purchaseId', (req, res) => {
         }
       }
     }
+    saveSellers(data);
 
     addTx({
       time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
@@ -2156,11 +2238,43 @@ app.post('/api/agents/register', (req, res) => {
 
   // endpoint: 买家Agent的API地址，有则自有大脑决策，无则走平台MiniMax
   const endpoint = typeof req.body.endpoint === 'string' ? req.body.endpoint.trim() : '';
+  if (endpoint) {
+    validateServiceEndpoint(endpoint).then(validation => {
+      if (!validation.ok && !DEMO_MODE) {
+        return res.json({ ok: false, error: validation.error });
+      }
+
+      const agent = {
+        id: `agent-${Date.now()}`,
+        name: agentName, wallet: normalizedWallet,
+        framework: normalizedFramework,
+        endpoint: validation.endpoint || endpoint,
+        brainMode: 'self_api',
+        registeredAt: new Date().toISOString(),
+        skills: ['buy-service'],
+        active: true
+      };
+      agents.push(agent);
+      saveAgents(agents);
+
+      addTx({
+        time: new Date().toLocaleTimeString('zh-CN', {timeZone: 'Asia/Shanghai'}),
+        from: agentName, to: 'CryptoMinds', amount: 0,
+        reason: '买家 Agent 注册', tx: `reg-${agent.id}`
+      });
+
+      const injected = injectCryptoMindsSkill(agentName, normalizedWallet, req.body.workspacePath);
+      return res.json({ ok: true, agent, skill: getBuyServiceSkill(), injected: !!injected });
+    }).catch(error => res.json({ ok: false, error: error.message }));
+    return;
+  }
+
   const agent = {
     id: `agent-${Date.now()}`,
     name: agentName, wallet: normalizedWallet,
     framework: normalizedFramework,
-    endpoint, // 自有API模式：填了就有，没填=平台托管
+    endpoint: '',
+    brainMode: 'platform_minimax',
     registeredAt: new Date().toISOString(),
     skills: ['buy-service'],
     active: true
@@ -2246,10 +2360,96 @@ app.post('/api/agents/:wallet/discover-plan', (req, res) => {
   });
 });
 
+async function chooseBuyerPlan(buyerAgent, task, recommendedServices, fallbackPlan, maxServices) {
+  const candidates = recommendedServices.map(service => ({
+    serviceId: service.id,
+    name: service.name,
+    sellerName: service.expert,
+    wallet: service.wallet,
+    price: service.price,
+    score: service._score,
+    reasons: service._reasons || [],
+    desc: service.desc || '',
+  }));
+
+  if (buyerAgent.endpoint) {
+    try {
+      const resp = await fetch(buyerAgent.endpoint.replace(/\/$/, '') + '/decidePurchasePlan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'decidePurchasePlan',
+          buyerWallet: buyerAgent.wallet,
+          task,
+          candidates,
+          suggestedPlan: fallbackPlan.map(service => ({ serviceId: service.id })),
+          maxServices,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await resp.json();
+      const plan = data.purchasePlan || data.plan || data.serviceIds;
+      if (Array.isArray(plan) && plan.length > 0) {
+        return {
+          plan,
+          brainMode: 'self_api',
+          rationale: data.rationale || data.reason || '买家自有 Agent API 根据候选卖家自主决策',
+        };
+      }
+    } catch (e) {
+      console.log('[buyer-agent] 自有API决策失败，降级平台大脑:', e.message);
+    }
+  }
+
+  if (MINIMAX_API_KEY) {
+    try {
+      const prompt = [
+        '你是买家 Agent。根据用户目标，从卖家市场候选中选择最适合的服务。',
+        '只返回 JSON 数组，每项格式 {"serviceId":"...","input":"..."}，不要解释。',
+        `用户目标: ${task}`,
+        `最多选择 ${maxServices} 个服务。`,
+        `候选: ${JSON.stringify(candidates).slice(0, 6000)}`,
+      ].join('\n');
+      const mmRes = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MINIMAX_API_KEY}` },
+        body: JSON.stringify({
+          model: 'MiniMax-Text-01',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+          max_tokens: 500,
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+      const mmData = await mmRes.json();
+      const text = mmData.choices?.[0]?.message?.content?.trim() || '';
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return {
+            plan: parsed,
+            brainMode: 'platform_minimax',
+            rationale: '平台 MiniMax 托管买家大脑根据任务、价格、评分和候选理由生成购买计划',
+          };
+        }
+      }
+    } catch (e) {
+      console.log('[buyer-agent] MiniMax 决策失败，使用启发式计划:', e.message);
+    }
+  }
+
+  return {
+    plan: fallbackPlan.map(service => ({ serviceId: service.id })),
+    brainMode: buyerAgent.endpoint ? 'heuristic_after_self_api_failed' : 'heuristic_after_minimax_unavailable',
+    rationale: '使用启发式兜底：按任务相关性、卖家权重、评分和可接单额度选择服务',
+  };
+}
+
 app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
   const requestedWallet = typeof req.params.wallet === 'string' ? req.params.wallet.trim().toLowerCase() : '';
   const task = sanitizeText(req.body.task || req.body.prompt, 500);
-  const paymentPreference = sanitizeText(req.body.paymentPreference || req.body.paymentMode, 40).toLowerCase() || 'direct_bnb';
+  const paymentPreference = sanitizeText(req.body.paymentPreference || req.body.paymentMode, 40).toLowerCase() || 'escrow_bnb';
   const explicitTargetAddress = typeof req.body.targetAddress === 'string' ? req.body.targetAddress.trim() : '';
   const buyerNameInput = sanitizeText(req.body.buyerName, 60);
   const waitForResult = req.body.waitForResult !== false;
@@ -2278,7 +2478,7 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
   }
 
   const fallbackPlan = buildAutoBuyPlan(task, recommendedServices, maxServices).filter(service => service.wallet?.toLowerCase() !== requestedWallet);
-  const planItems = normalizePurchasePlan(req.body.purchasePlan || req.body.serviceIds, fallbackPlan);
+  let rawPlanItems = req.body.purchasePlan || req.body.serviceIds;
   if (!req.body.purchasePlan && !req.body.serviceIds && !autoExecute) {
     return res.json({
       ok: true,
@@ -2306,6 +2506,19 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
       message: '请由买家 Agent 根据候选列表自主决定 purchasePlan，再调用 auto-buy 执行购买',
     });
   }
+  let decisionMeta = {
+    brainMode: req.body.purchasePlan || req.body.serviceIds ? 'provided_plan' : 'manual_preview',
+    rationale: req.body.purchasePlan || req.body.serviceIds ? '外部调用方提供购买计划' : '仅返回候选和建议计划，未执行购买',
+  };
+  if (!rawPlanItems) {
+    const decision = await chooseBuyerPlan(buyerAgent, task, recommendedServices, fallbackPlan, maxServices);
+    rawPlanItems = decision.plan;
+    decisionMeta = {
+      brainMode: decision.brainMode,
+      rationale: decision.rationale,
+    };
+  }
+  const planItems = normalizePurchasePlan(rawPlanItems, fallbackPlan);
 
   let plan;
   try {
@@ -2330,33 +2543,51 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
       let paymentMeta = null;
       const stepPaymentPreference = item.paymentPreference || paymentPreference;
 
-      if (stepPaymentPreference === 'direct_bnb' || stepPaymentPreference === 'bnb') {
-        // 直接 BNB 转账：托管钱包签 BNB → 卖家钱包
-        console.log('[auto-buy] 开始创建直接支付, service:', service.id, 'buyer:', requestedWallet);
-        paymentMeta = await createDirectPayment(service, requestedWallet);
-        console.log('[auto-buy] 支付完成, txHash:', paymentMeta.txHash);
+      if (stepPaymentPreference === 'escrow_bnb' || stepPaymentPreference === 'escrow') {
+        console.log('[auto-buy] 开始创建担保支付, service:', service.id, 'buyer:', requestedWallet);
+        paymentMeta = await createManagedEscrowPayment(service, requestedWallet);
+        console.log('[auto-buy] 担保支付完成, txHash:', paymentMeta.txHash, 'escrowOrderId:', paymentMeta.escrowOrderId);
         purchaseResponse = await callLocalMarketApi('/api/orders/create', {
           serviceId: service.id,
+          serviceName: service.name || service.expert,
           buyerWallet: requestedWallet,
           buyerName: buyerNameInput || buyerAgent.name,
-          paymentMode: 'direct_bnb',
+          sellerWallet: service.wallet,
+          amount: service.price,
+          paymentMode: 'escrow_bnb',
           txHash: paymentMeta.txHash,
+          escrowOrderId: paymentMeta.escrowOrderId,
           input: stepInput,
         });
         if (!purchaseResponse.ok) {
           throw new Error(purchaseResponse.error || `自动购买 ${service.name} 失败`);
         }
-        purchase = purchaseResponse.purchase || null;
+        purchase = purchaseResponse.purchase || purchaseResponse.order || null;
+
+        if (purchase?.id) {
+          invocation = await callLocalMarketApi(`/api/orders/${purchase.id}/execute`, {
+            sellerWallet: service.wallet,
+            task: stepInput,
+            buyerWallet: requestedWallet,
+          });
+          if (!invocation.ok) {
+            throw new Error(invocation.error || `卖家 Agent 执行 ${service.name} 失败`);
+          }
+          purchase = getPurchaseById(purchase.id) || purchase;
+        }
 
         if (purchase && waitForResult) {
-          purchase = await waitForPurchaseState(purchase.id, { timeoutMs: Number(req.body.waitTimeoutMs || 60000) });
+          purchase = await waitForPurchaseState(purchase.id, { timeoutMs: Number(req.body.waitTimeoutMs || 180000) });
           // 卖家交付后自动确认评分
-          if (purchase?.status === 'delivered' && !purchase.autoConfirmed) {
+          if ((purchase?.status === 'delivered' || purchase?.status === 'pending_confirm') && !purchase.autoConfirmed) {
             const authPayload = signBuyerAction('confirm', purchase.id, requestedWallet);
+            if (!authPayload) throw new Error('买家钱包未托管，无法自动确认订单');
+            const escrowReleaseTx = await confirmManagedEscrowOrder(purchase, requestedWallet);
             const confirmResp = await callLocalMarketApi(`/api/purchases/confirm/${purchase.id}`, {
               rating: 5,
-              comment: '自动确认',
+              comment: '买家 Agent 自动确认：已收到卖家转入代币',
               buyerWallet: requestedWallet,
+              escrowReleaseTx,
               ...authPayload,
             });
             if (!confirmResp.ok) {
@@ -2365,6 +2596,36 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
               purchase = getPurchaseById(purchase.id) || purchase;
             }
           }
+        }
+      } else if (stepPaymentPreference === 'direct_bnb' || stepPaymentPreference === 'bnb') {
+        // 兼容旧演示：直接 BNB 转账。正式主路径应使用 escrow_bnb。
+        console.log('[auto-buy] 开始创建直接支付, service:', service.id, 'buyer:', requestedWallet);
+        paymentMeta = await createDirectPayment(service, requestedWallet);
+        console.log('[auto-buy] 支付完成, txHash:', paymentMeta.txHash);
+        purchaseResponse = await callLocalMarketApi('/api/orders/create', {
+          serviceId: service.id,
+          serviceName: service.name || service.expert,
+          buyerWallet: requestedWallet,
+          buyerName: buyerNameInput || buyerAgent.name,
+          sellerWallet: service.wallet,
+          amount: service.price,
+          paymentMode: 'direct_bnb',
+          txHash: paymentMeta.txHash,
+          input: stepInput,
+        });
+        if (!purchaseResponse.ok) {
+          throw new Error(purchaseResponse.error || `自动购买 ${service.name} 失败`);
+        }
+        purchase = purchaseResponse.purchase || purchaseResponse.order || null;
+
+        if (purchase?.id) {
+          invocation = await callLocalMarketApi(`/api/orders/${purchase.id}/execute`, {
+            sellerWallet: service.wallet,
+            task: stepInput,
+            buyerWallet: requestedWallet,
+          });
+          if (!invocation.ok) throw new Error(invocation.error || `卖家 Agent 执行 ${service.name} 失败`);
+          purchase = getPurchaseById(purchase.id) || purchase;
         }
       } else if (stepPaymentPreference === 'x402') {
         const providedHeader = typeof req.body.paymentHeader === 'string' ? req.body.paymentHeader : '';
@@ -2413,6 +2674,12 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
         sellerName: service.expert,
         paymentPreference: stepPaymentPreference,
         input: stepInput,
+        buyerDecision: {
+          brainMode: decisionMeta.brainMode,
+          rationale: decisionMeta.rationale,
+          sellerReasons: service._reasons || [],
+          sellerScore: service._score,
+        },
         purchase,
         invocation,
         paymentMeta,
@@ -2430,6 +2697,7 @@ app.post('/api/agents/:wallet/auto-buy', async (req, res) => {
       },
       task,
       paymentPreference,
+      buyerDecision: decisionMeta,
       plannedServices: plan.map(item => ({
         id: item.service.id,
         name: item.service.name,

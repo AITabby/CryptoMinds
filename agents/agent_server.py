@@ -239,8 +239,20 @@ class AgentHandler(BaseHTTPRequestHandler):
         import subprocess
         PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        # 卖家Agent自主选币（这里简化：默认USDT，有runtime的走runtime决策）
+        def _score_token(token):
+            liquidity = float(token.get("liquidity_usd") or 0)
+            volume = float(token.get("volume_24h") or 0)
+            change = float(token.get("price_change_24h") or 0)
+            market_cap = float(token.get("market_cap") or 0)
+            liquidity_score = min(liquidity / 100000, 3)
+            volume_score = min(volume / 100000, 3)
+            momentum_score = max(min(change / 10, 2), -2)
+            cap_penalty = 1 if market_cap and market_cap > 50000000 else 0
+            return liquidity_score + volume_score + momentum_score - cap_penalty
+
+        # 卖家 Agent 自主选币：优先 runtime 决策，支持 four.meme / PancakeSwap 上所有 BSC 代币地址
         token_address = None
+        token_decision = None
         if RUNTIMES_AVAILABLE:
             runtime_fn = RUNTIMES.get(self.agent_name)
             if runtime_fn:
@@ -248,13 +260,30 @@ class AgentHandler(BaseHTTPRequestHandler):
                     decision = runtime_fn(task_description=f"选币: {strategy or 'default'}", token_address=None)
                     if isinstance(decision, dict) and decision.get("token_address"):
                         token_address = decision["token_address"]
+                        token_decision = {"address": token_address, "reason": "runtime 直接返回 token_address"}
+                    elif isinstance(decision, dict):
+                        scanning = decision.get("scanning") or decision.get("four_meme_analysis") or {}
+                        tokens = scanning.get("hot_tokens") or scanning.get("tokens") or []
+                        candidates = [
+                            {**token, "_score": _score_token(token)}
+                            for token in tokens
+                            if isinstance(token, dict)
+                            and isinstance(token.get("address"), str)
+                            and token["address"].startswith("0x")
+                            and len(token["address"]) == 42
+                        ]
+                        candidates.sort(key=lambda item: item.get("_score", 0), reverse=True)
+                        if candidates:
+                            token_decision = candidates[0]
+                            token_address = token_decision["address"]
                 except Exception as e:
                     print(f"  ⚠️ [{self.agent_name}] runtime选币失败: {e}")
 
-        # 没选到就默认USDT
+        # 没选到就默认一个已毕业 meme 代币，避免退回稳定币路径
         if not token_address:
-            token_address = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
-            print(f"  ℹ️ [{self.agent_name}] 使用默认代币 USDC")
+            token_address = "0x3518D7aEE5248b9307b8A82B7c3Fa49e073c4444"
+            token_decision = {"address": token_address, "symbol": "AIBT", "reason": "runtime 未返回可用代币，使用默认 meme 代币"}
+            print(f"  ℹ️ [{self.agent_name}] 使用默认 meme 代币 AIBT")
 
         # 调用 token_buyer.py 执行买币+转账
         script = os.path.join(PROJECT_ROOT, "token_buyer.py")
@@ -282,6 +311,7 @@ class AgentHandler(BaseHTTPRequestHandler):
                     "bnbSpent": result.get("bnbSpent", amount),
                     "path": result.get("path", "PancakeSwap"),
                     "executedBy": self.agent_name,
+                    "tokenDecision": token_decision,
                 }
             else:
                 raise RuntimeError(result.get("error", "买币失败"))

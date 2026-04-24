@@ -215,9 +215,9 @@ function createSellersMarketHandlers({
     if (!name || !wallet) {
       return res.json({ ok: false, error: '缺少必填字段（名称、钱包）' });
     }
-    // 真实模式下卖家必须有endpoint（自有大脑），Demo模式下可选
-    if (!demoMode && !endpoint) {
-      return res.json({ ok: false, error: '缺少 Agent API 地址（真实模式下卖家必须有自有大脑）' });
+    // 卖家必须有自有 Agent 大脑；平台 MiniMax 只允许买家侧托管决策
+    if (!endpoint) {
+      return res.json({ ok: false, error: '缺少 Agent API 地址（卖家必须有自有大脑，不能使用平台托管）' });
     }
 
     const data = getSellers();
@@ -230,11 +230,24 @@ function createSellersMarketHandlers({
       return res.json({ ok: false, error: '该名称已被占用，请换个名字' });
     }
 
-    const endpointValidation = await validateServiceEndpoint(endpoint);
-    if (!endpointValidation.ok) {
-      return res.json({ ok: false, error: endpointValidation.error });
+    let normalizedEndpoint = '';
+    if (demoMode) {
+      try {
+        const demoUrl = new URL(endpoint.trim());
+        if (!['http:', 'https:'].includes(demoUrl.protocol)) {
+          return res.json({ ok: false, error: 'Agent API 地址仅支持 http/https' });
+        }
+        normalizedEndpoint = demoUrl.toString().replace(/\/$/, '');
+      } catch {
+        return res.json({ ok: false, error: 'Agent API 地址不是合法 URL' });
+      }
+    } else {
+      const endpointValidation = await validateServiceEndpoint(endpoint);
+      if (!endpointValidation.ok) {
+        return res.json({ ok: false, error: endpointValidation.error });
+      }
+      normalizedEndpoint = endpointValidation.endpoint;
     }
-    const normalizedEndpoint = endpointValidation.endpoint;
 
     // 链上验证初始押金（0.1 BNB）— Demo模式下跳过
     let verifiedDeposit = minDeposit;
@@ -255,8 +268,7 @@ function createSellersMarketHandlers({
     // 预检 Agent API 可用性（有endpoint时才检查，Demo模式下跳过）
     if (normalizedEndpoint && !demoMode) {
       try {
-        const fetch = (await import('node-fetch')).default;
-        const resp = await fetch(normalizedEndpoint + '/health', { method: 'GET', timeout: 5000 });
+        const resp = await fetch(normalizedEndpoint + '/health', { method: 'GET', signal: AbortSignal.timeout(5000) });
         if (!resp.ok) {
           return res.json({ ok: false, error: `Agent API 预检失败: HTTP ${resp.status}` });
         }
@@ -356,106 +368,131 @@ function createSellersMarketHandlers({
     const buyerAddr = order.buyerWallet;
     const sellerWalletLower = seller.wallet.toLowerCase();
     const sellerName = managedWalletAliases[sellerWalletLower];
-
-    if (!sellerName) {
-      return res.json({ ok: false, error: '卖家钱包未在托管列表中，无法执行链上交易' });
+    if (!seller.endpoint) {
+      return res.json({ ok: false, error: '卖家没有 Agent API，无法自主执行订单' });
     }
 
     // 确定要买的代币地址
     let tokenAddr = tokenAddress;
     if (!tokenAddr) {
-      // 如果卖家有 endpoint，让卖家 Agent 全权执行（选币+买币+转账）
-      if (seller.endpoint) {
-        // 更新订单状态为 executing
-        order.status = 'executing';
-        saveSellers(data);
-        
-        try {
-          console.log(`[executeOrder] 通知卖家Agent执行: ${seller.name} (${seller.endpoint})`);
-          const agentUrl = seller.endpoint.replace(/\/$/, '') + '/executeOrder';
-          const resp = await fetch(agentUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'executeOrder',
-              orderId: order.id,
-              sellerName: seller.name,
-              strategy: seller.strategy,
-              buyerWallet: buyerAddr,
-              amount: order.amount,
-              currency: 'BNB'
-            }),
-            signal: AbortSignal.timeout(60000), // Agent执行可能较慢
-          });
-          const agentResult = await resp.json();
+      order.status = ORDER_STATUS.EXECUTING;
+      order.executingAt = new Date().toISOString();
+      saveSellers(data);
 
-          if (agentResult.ok) {
-            // 卖家Agent执行成功，更新订单状态
-            updateOrderStatus(order, ORDER_STATUS.COMPLETED, {
-              buyTx: agentResult.swapHash || agentResult.txHash,
-              transferTx: agentResult.transferHash,
-              tokenAddress: agentResult.token || agentResult.tokenAddress,
-              tokenAmount: agentResult.amount || agentResult.tokenAmount,
-              tokenSymbol: agentResult.symbol,
-              executedBy: 'seller_agent',
-            });
+      try {
+        console.log(`[executeOrder] 通知卖家Agent执行: ${seller.name} (${seller.endpoint})`);
+        const agentUrl = seller.endpoint.replace(/\/$/, '') + '/executeOrder';
+        const resp = await fetch(agentUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'executeOrder',
+            orderId: order.id,
+            sellerName: seller.name,
+            strategy: seller.strategy,
+            buyerWallet: buyerAddr,
+            amount: order.amount,
+            currency: 'BNB',
+            market: 'bsc-meme',
+            venues: ['four.meme', 'pancakeswap'],
+          }),
+          signal: AbortSignal.timeout(180000),
+        });
+        const agentResult = await resp.json();
 
-            seller.totalOrders = (seller.totalOrders || 0) + 1;
-            seller.activeOrders = Math.max(0, (seller.activeOrders || 1) - 1);
-            saveSellers(data);
-
-            // 同步 purchases
-            try {
-              const purchases = getPurchases();
-              const purchase = purchases.find((p) => p.id === order.id);
-              if (purchase) {
-                purchase.status = 'completed';
-                purchase.txHash = agentResult.swapHash || agentResult.txHash;
-                purchase.transferHash = agentResult.transferHash;
-                purchase.tokenAmount = agentResult.amount || agentResult.tokenAmount;
-                purchase.token = agentResult.token || agentResult.tokenAddress;
-                purchase.completedAt = order.completedAt;
-                savePurchases(purchases);
-              }
-            } catch (e) {
-              console.error('[executeOrder] 同步 purchase 失败:', e.message);
+        if (!agentResult.ok) {
+          updateOrderStatus(order, ORDER_STATUS.FAILED, { error: agentResult.error || '卖家Agent执行失败' });
+          seller.activeOrders = Math.max(0, (seller.activeOrders || 1) - 1);
+          saveSellers(data);
+          try {
+            const purchases = getPurchases();
+            const purchase = purchases.find((p) => p.id === order.id);
+            if (purchase) {
+              purchase.status = 'failed';
+              purchase.error = agentResult.error || '卖家Agent执行失败';
+              purchase.failedAt = order.failedAt;
+              savePurchases(purchases);
             }
+          } catch {}
+          return res.json({ ok: false, error: agentResult.error || '卖家Agent执行失败' });
+        }
 
-            addTx({
-              time: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-              from: seller.name, fromWallet: seller.wallet,
-              to: order.buyerName || buyerAddr.slice(0, 10), toWallet: buyerAddr,
-              amount: order.amount,
-              reason: `卖家Agent执行: ${agentResult.symbol || 'Token'}`,
-              tx: agentResult.swapHash || agentResult.txHash,
-            });
+        const deliveredAt = new Date().toISOString();
+        updateOrderStatus(order, 'delivered', {
+          buyTx: agentResult.swapHash || agentResult.txHash,
+          transferTx: agentResult.transferHash,
+          tokenAddress: agentResult.token || agentResult.tokenAddress,
+          tokenAmount: agentResult.amount || agentResult.tokenAmount,
+          tokenSymbol: agentResult.symbol,
+          executedBy: 'seller_agent',
+          deliveredAt,
+        });
 
-            console.log('[executeOrder] 卖家Agent执行完成:', agentResult.swapHash || agentResult.txHash);
-            return res.json({
-              ok: true,
-              executedBy: 'seller_agent',
-              buy_tx: agentResult.swapHash || agentResult.txHash,
-              transfer_tx: agentResult.transferHash,
-              token: agentResult.token || agentResult.tokenAddress,
-              tokenAmount: agentResult.amount || agentResult.tokenAmount,
-              symbol: agentResult.symbol,
-            });
-          } else {
-            // 卖家Agent返回失败，降级到平台代执行
-            console.log('[executeOrder] 卖家Agent执行失败，降级平台代执行:', agentResult.error);
+        seller.activeOrders = Math.max(0, (seller.activeOrders || 1) - 1);
+        saveSellers(data);
+
+        try {
+          const purchases = getPurchases();
+          const purchase = purchases.find((p) => p.id === order.id);
+          if (purchase) {
+            purchase.status = 'delivered';
+            purchase.txHash = agentResult.swapHash || agentResult.txHash;
+            purchase.transferHash = agentResult.transferHash;
+            purchase.tokenAmount = agentResult.amount || agentResult.tokenAmount;
+            purchase.token = agentResult.token || agentResult.tokenAddress;
+            purchase.result = agentResult;
+            purchase.resultAt = deliveredAt;
+            purchase.deliveredAt = deliveredAt;
+            purchase.pendingConfirm = true;
+            savePurchases(purchases);
           }
         } catch (e) {
-          console.log('[executeOrder] 卖家Agent调用失败，降级平台代执行:', e.message);
+          console.error('[executeOrder] 同步 purchase 失败:', e.message);
         }
-      }
-      // 兜底：默认买一个已知可交易的 meme 代币，避免 Demo 表达退回到稳定币兑换
-      if (!tokenAddr) {
-        tokenAddr = '0x3518D7aEE5248b9307b8A82B7c3Fa49e073c4444';
-        console.log('[executeOrder] Demo模式：使用默认 meme 代币 AIBT');
+
+        addTx({
+          time: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+          from: seller.name, fromWallet: seller.wallet,
+          to: order.buyerName || buyerAddr.slice(0, 10), toWallet: buyerAddr,
+          amount: order.amount,
+          reason: `卖家Agent交付: ${agentResult.symbol || 'Token'}`,
+          tx: agentResult.swapHash || agentResult.txHash,
+        });
+
+        console.log('[executeOrder] 卖家Agent已交付:', agentResult.swapHash || agentResult.txHash);
+        return res.json({
+          ok: true,
+          status: 'delivered',
+          executedBy: 'seller_agent',
+          buy_tx: agentResult.swapHash || agentResult.txHash,
+          transfer_tx: agentResult.transferHash,
+          token: agentResult.token || agentResult.tokenAddress,
+          tokenAmount: agentResult.amount || agentResult.tokenAmount,
+          symbol: agentResult.symbol,
+        });
+      } catch (e) {
+        updateOrderStatus(order, ORDER_STATUS.FAILED, { error: e.message.slice(0, 200) });
+        seller.activeOrders = Math.max(0, (seller.activeOrders || 1) - 1);
+        saveSellers(data);
+        try {
+          const purchases = getPurchases();
+          const purchase = purchases.find((p) => p.id === order.id);
+          if (purchase) {
+            purchase.status = 'failed';
+            purchase.error = e.message.slice(0, 200);
+            purchase.failedAt = order.failedAt;
+            savePurchases(purchases);
+          }
+        } catch {}
+        return res.json({ ok: false, error: '卖家Agent调用失败: ' + e.message.slice(0, 200) });
       }
     }
 
     console.log(`[executeOrder] 执行买币: seller=${sellerName}, buyer=${buyerAddr}, token=${tokenAddr}, amount=${order.amount} BNB`);
+
+    if (!sellerName) {
+      return res.json({ ok: false, error: '卖家钱包未在托管列表中，无法执行指定代币链上交易' });
+    }
 
     try {
       // 调用 token_buyer.py 执行真实链上买币 + 转账给买家
