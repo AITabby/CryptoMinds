@@ -22,6 +22,15 @@ agent_events.json
 __pycache__/
 **/__pycache__/
 *.pyc
+.pytest_cache/
+
+# Test coverage
+.coverage
+htmlcov/
+
+# SQLite runtime data
+*.db
+agents_registry.json
 
 # OS
 .DS_Store

@@ -1,0 +1,134 @@
+/**
+ * 支付路由
+ *
+ * /api/pay/x402
+ * /api/pay/x402/split
+ * /api/smart-route
+ */
+
+const express = require('express');
+const router = express.Router();
+const path = require('path');
+const { execFileSync } = require('child_process');
+const { verifyBuyerActionSignature } = require('../lib/buyer_auth');
+
+function requireBuyerAuth(req, res, next) {
+  const { action, purchaseId, buyerWallet, message, signature } = req.body;
+  if (!verifyBuyerActionSignature({ action, purchaseId, buyerWallet, message, signature })) {
+    return res.json({ ok: false, error: '买家签名验证失败' });
+  }
+  next();
+}
+
+function createPaymentRoutes({
+  PYTHON_BIN,
+  SDK_DIR,
+  MANAGED_X402_SCRIPT,
+  X402_VERIFY_SCRIPT,
+  SMART_ROUTER_SCRIPT,
+  demoMode,
+  w3,
+}) {
+  // x402 支付
+  router.post('/pay/x402', requireBuyerAuth, async (req, res) => {
+    const { fromWallet, toWallet, amount, paymentInfo } = req.body;
+
+    if (!fromWallet || !toWallet || !amount) {
+      return res.json({ ok: false, error: '缺少必要参数' });
+    }
+
+    if (demoMode) {
+      return res.json({
+        ok: true,
+        txHash: '0x' + '0'.repeat(64),
+        demo: true,
+        message: 'Demo 模式：支付已模拟',
+      });
+    }
+
+    try {
+      const output = execFileSync(PYTHON_BIN, [
+        MANAGED_X402_SCRIPT,
+        JSON.stringify({ fromWallet, toWallet, amount, paymentInfo }),
+      ], {
+        timeout: 60000,
+        encoding: 'utf-8',
+      });
+
+      const result = JSON.parse(output.trim().split('\n').pop());
+      res.json(result);
+    } catch (err) {
+      res.json({ ok: false, error: err.message });
+    }
+  });
+
+  // x402 分拆支付
+  router.post('/pay/x402/split', requireBuyerAuth, async (req, res) => {
+    const { fromWallet, recipients, totalAmount } = req.body;
+
+    if (!fromWallet || !recipients || !totalAmount) {
+      return res.json({ ok: false, error: '缺少必要参数' });
+    }
+
+    if (demoMode) {
+      return res.json({
+        ok: true,
+        txHash: '0x' + '0'.repeat(64),
+        demo: true,
+        splits: recipients,
+      });
+    }
+
+    try {
+      // 验证分拆总额
+      const splitTotal = recipients.reduce((sum, r) => sum + (r.amount || 0), 0);
+      if (Math.abs(splitTotal - totalAmount) > 0.0001) {
+        return res.json({ ok: false, error: '分拆金额与总额不符' });
+      }
+
+      const output = execFileSync(PYTHON_BIN, [
+        MANAGED_X402_SCRIPT,
+        JSON.stringify({ fromWallet, recipients, totalAmount, mode: 'split' }),
+      ], {
+        timeout: 60000,
+        encoding: 'utf-8',
+      });
+
+      const result = JSON.parse(output.trim().split('\n').pop());
+      res.json(result);
+    } catch (err) {
+      res.json({ ok: false, error: err.message });
+    }
+  });
+
+  // 智能路由
+  router.post('/smart-route', async (req, res) => {
+    const { fromWallet, toWallet, amount, preferX402 } = req.body;
+
+    if (!fromWallet || !toWallet || !amount) {
+      return res.json({ ok: false, error: '缺少必要参数' });
+    }
+
+    try {
+      const output = execFileSync(PYTHON_BIN, [
+        SMART_ROUTER_SCRIPT,
+        fromWallet,
+        toWallet,
+        String(amount),
+        preferX402 ? 'true' : 'false',
+      ], {
+        timeout: 30000,
+        encoding: 'utf-8',
+      });
+
+      const result = JSON.parse(output.trim().split('\n').pop());
+      res.json(result);
+    } catch (err) {
+      res.json({ ok: false, error: err.message });
+    }
+  });
+
+  return router;
+}
+
+module.exports = { createPaymentRoutes };

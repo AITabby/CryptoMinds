@@ -6,6 +6,8 @@ CryptoMinds 协议入口
 
 from typing import Dict, List, Optional, Tuple
 from decimal import Decimal
+import os
+from pathlib import Path
 
 from settlement import ChannelRegistry, init_default_channels
 from settlement.base import PaymentResult
@@ -15,6 +17,8 @@ from agent import AgentRegistry, AgentCapability, CapabilitySpec
 from reputation import RecordStore, ReputationCalculator, CreditRegistry
 from reputation.record import PerformanceRecord, TaskStatus
 
+from data.sqlite_store import SqliteRecordStore, SqliteCreditStore, SqliteAgentBridge
+
 
 def init_protocol():
     """初始化协议（结算 + 验证 + Agent + 信誉）"""
@@ -22,11 +26,18 @@ def init_protocol():
     init_default_gates()
 
 
-# 全局实例
-_record_store = RecordStore()
-_reputation_calculator = ReputationCalculator(_record_store)
-_credit_registry = CreditRegistry()
+# SQLite 数据库路径
+_DB_PATH = str(Path(__file__).parent / "web" / "cryptominds.db")
 
+# 全局实例 — 使用 SQLite 替代 JSON/内存存储
+_record_store = SqliteRecordStore(_DB_PATH)
+_reputation_calculator = ReputationCalculator(_record_store)
+_credit_registry = SqliteCreditStore(_DB_PATH)
+_agent_bridge = SqliteAgentBridge(_DB_PATH)
+
+# AgentRegistry 仍使用内存+JSON 作为主存储，但通过 bridge 同步到 SQLite
+AgentRegistry.set_persistence(os.path.join(os.path.dirname(__file__), 'agents_registry.json'))
+AgentRegistry.set_sqlite_bridge(_agent_bridge)
 
 # 自动初始化
 init_protocol()
@@ -493,7 +504,7 @@ def record_task_completion(
         chain=chain,
         amount=amount,
         status=status,
-        success=(status == TaskStatus.VERIFIED),
+        success=(status == TaskStatus.SETTLED),
         score=score,
         response_time_ms=response_time_ms,
         payment_tx=payment_tx,

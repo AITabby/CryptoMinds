@@ -8,7 +8,7 @@ CryptoMinds 真实买币执行器
 import sys, json, time
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
-from config import BSC_RPC, WALLETS_FILE, DEFAULT_SLIPPAGE_BPS
+from config import BSC_RPC, load_wallets, get_wallet_key, DEFAULT_SLIPPAGE_BPS
 
 w3 = Web3(Web3.HTTPProvider(BSC_RPC))
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
@@ -238,12 +238,10 @@ def execute_buy(seller_name, buyer_addr, token_addr, bnb_amount):
     token_addr: 代币合约地址
     bnb_amount: BNB 数量 (如 0.001)
     """
-    wallets = json.load(open(WALLETS_FILE))
+    wallets = load_wallets()
     seller_info = wallets[seller_name]
     seller_addr = Web3.to_checksum_address(seller_info['address'])
-    key = seller_info.get('private_key') or seller_info.get('privateKey')
-    if not key.startswith('0x'):
-        key = '0x' + key
+    key = get_wallet_key(seller_name)
     buyer_cs = Web3.to_checksum_address(buyer_addr)
     token_cs = Web3.to_checksum_address(token_addr)
     token_contract = w3.eth.contract(address=token_cs, abi=ERC20_ABI)

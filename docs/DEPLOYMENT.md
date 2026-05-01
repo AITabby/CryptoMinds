@@ -3,7 +3,8 @@
 ## 环境要求
 
 - Node.js >= 18
-- Python >= 3.9（可选，用于测试）
+- Python >= 3.9
+- SQLite3
 - MetaMask 或其他 Web3 钱包
 
 ## 快速开始
@@ -16,24 +17,71 @@ cd CryptoMinds
 
 ### 2. 安装依赖
 ```bash
+# Node.js 依赖
 cd web
 npm install
+
+# Python 依赖（可选，协议层）
+cd ..
+pip install -r requirements.txt 2>/dev/null || pip3 install web3 requests
 ```
 
 ### 3. 配置环境变量
 ```bash
-cp ../.env.example ../.env
+cp .env.example .env
 # 编辑 .env 填入真实值
 ```
 
 ### 4. 启动服务
 ```bash
-npm start
-# 或 Demo 模式
+# 方式一：同时启动 Node.js + Python
+cd web
+./start_services.sh
+
+# 方式二：单独启动
+npm start                    # Node.js API (3457)
+python3 api_server.py        # Python API (3458)
+
+# Demo 模式
 npm run demo
 ```
 
 访问 http://localhost:3457
+
+---
+
+## 服务架构
+
+```
+┌─────────────────────────────────────────────┐
+│                  客户端                      │
+└─────────────────┬───────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────┐
+│         Node.js API (端口 3457)             │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
+│  │ market  │ │  order  │ │  agent  │       │
+│  │ routes  │ │ routes  │ │ routes  │       │
+│  └─────────┘ └─────────┘ └─────────┘       │
+│                    │                         │
+│         /api/protocol/* 代理                 │
+└────────────────────┬────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────┐
+│         Python API (端口 3458)              │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
+│  │settle-  │ │verify-  │ │ agent   │       │
+│  │ment     │ │gates    │ │registry │       │
+│  └─────────┘ └─────────┘ └─────────┘       │
+└─────────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────┐
+│              SQLite (cryptominds.db)        │
+└─────────────────────────────────────────────┘
+```
 
 ---
 
@@ -93,9 +141,49 @@ pm2 start web/server.js --name cryptominds
 
 ## 测试
 
+### 运行所有测试
 ```bash
-cd tests
-python test_all.py
+./tests/run_all_tests.sh
+```
+
+### 单独测试
+```bash
+# Python 测试
+python3 tests/test_verification.py -v
+python3 tests/test_settlement.py -v
+
+# Node.js 测试
+node tests/test_database.js
+```
+
+### API 集成测试
+```bash
+node web/test_api.js
+```
+
+---
+
+## 数据库
+
+### 数据库位置
+```
+web/cryptominds.db
+```
+
+### 数据库表结构
+- `sellers` - 卖家信息
+- `orders` - 订单记录
+- `purchases` - 购买记录
+- `tx_logs` - 交易日志
+- `notifications` - 通知
+- `push_subs` - Web Push 订阅
+- `agents` - Agent 注册信息
+
+### 数据迁移
+如果从旧版本 JSON 数据迁移：
+```bash
+cd web
+node migrate_to_sqlite.js
 ```
 
 ---

@@ -6,7 +6,7 @@
 import sys, json, time
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
-from config import BSC_RPC, WALLETS_FILE, DEFAULT_SLIPPAGE_BPS
+from config import BSC_RPC, load_wallets, get_wallet_key, DEFAULT_SLIPPAGE_BPS
 
 ROUTER = Web3.to_checksum_address('0x10ED43C718714eb63d5aA57B78B54704E256024E')
 WBNB = Web3.to_checksum_address('0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c')
@@ -63,15 +63,13 @@ def main():
     w3 = Web3(Web3.HTTPProvider(BSC_RPC))
     w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 
-    wallets = json.load(open(WALLETS_FILE))
+    wallets = load_wallets()
     seller_info = wallets.get(seller_name)
     if not seller_info:
         print(json.dumps({"ok": False, "error": f"找不到卖家 {seller_name}"}))
         sys.exit(1)
 
-    seller_key = seller_info.get('private_key') or seller_info.get('privateKey')
-    if not seller_key.startswith('0x'):
-        seller_key = '0x' + seller_key
+    seller_key = get_wallet_key(seller_name)
     account = w3.eth.account.from_key(seller_key)
     seller_addr = account.address
 
@@ -84,10 +82,9 @@ def main():
     print(f"卖家余额: {w3.from_wei(bal, 'ether'):.4f} BNB", file=sys.stderr)
     if bal < w3.to_wei(amount_bnb + 0.001, 'ether'):
         # 尝试用 four_meme 代执行
-        fm = wallets.get('four_meme', {})
-        if fm.get('private_key'):
-            seller_key = fm['private_key'] if fm['private_key'].startswith('0x') else '0x' + fm['private_key']
-            account = w3.eth.account.from_key(seller_key)
+        fm_key = get_wallet_key('four_meme')
+        if fm_key:
+            account = w3.eth.account.from_key(fm_key)
             seller_addr = account.address
             print(f"余额不足，改用 four_meme 代执行 ({seller_addr[:10]}...)", file=sys.stderr)
 

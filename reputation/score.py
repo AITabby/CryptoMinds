@@ -140,8 +140,8 @@ class ReputationCalculator:
 
         # 计算基础指标
         total = len(records)
-        completed = len([r for r in records if r.status == TaskStatus.VERIFIED])
-        failed = len([r for r in records if r.status == TaskStatus.FAILED])
+        completed = len([r for r in records if r.status == TaskStatus.SETTLED])
+        failed = len([r for r in records if r.status in (TaskStatus.FAILED, TaskStatus.SETTLEMENT_FAILED)])
         disputed = len([r for r in records if r.disputed])
 
         success_rate = completed / total if total > 0 else 0
@@ -165,12 +165,12 @@ class ReputationCalculator:
 
         last_24h_records = [r for r in records if r.created_at >= day_ago]
         last_24h_tasks = len(last_24h_records)
-        last_24h_completed = len([r for r in last_24h_records if r.status == TaskStatus.VERIFIED])
+        last_24h_completed = len([r for r in last_24h_records if r.status == TaskStatus.SETTLED])
         last_24h_success_rate = last_24h_completed / last_24h_tasks if last_24h_tasks > 0 else 0
 
         last_7d_records = [r for r in records if r.created_at >= week_ago]
         last_7d_tasks = len(last_7d_records)
-        last_7d_completed = len([r for r in last_7d_records if r.status == TaskStatus.VERIFIED])
+        last_7d_completed = len([r for r in last_7d_records if r.status == TaskStatus.SETTLED])
         last_7d_success_rate = last_7d_completed / last_7d_tasks if last_7d_tasks > 0 else 0
 
         # 计算综合评分

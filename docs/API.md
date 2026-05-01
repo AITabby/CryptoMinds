@@ -2,19 +2,50 @@
 
 ## 基础信息
 
-- **Base URL**: `http://localhost:3457`
-- **链**: BNB Chain (BSC)
+- **统一入口**: `http://localhost:3457` (Node.js)
+- **协议层**: `http://localhost:3458` (Python，内部微服务)
+- **链**: BNB Chain (BSC), ETH, Solana, Mock
 - **合约**: `0x1A81a18dFC26676AC30f95f4659Fe4c0b4355EC3`
 
 ---
 
-## 买家 API
+## 架构说明
+
+```
+客户端 → Node.js (3457) → Python (3458)
+              ↓
+           SQLite
+```
+
+- Node.js 处理市场、订单、通知等业务逻辑
+- Python 处理协议层（验证门、结算通道、Agent 注册）
+- `/api/protocol/*` 路由自动代理到 Python
+
+---
+
+## 市场 API
 
 ### 获取卖家列表
 ```
 GET /api/sellers
 ```
 返回所有已激活的卖家服务。
+
+### 获取市场信息
+```
+GET /api/market
+```
+返回市场统计信息。
+
+### 获取余额
+```
+GET /api/balance?wallet=0x...
+```
+
+### 获取购买记录
+```
+GET /api/purchases?wallet=0x...
+```
 
 ### 购买服务
 ```
@@ -149,6 +180,93 @@ escrowContract.methods.confirm(
 escrowContract.methods.claimSellerTimeout(
   escrowOrderId
 ).send({ from: buyerWallet })
+```
+
+---
+
+## Agent API (协议层)
+
+### 注册 Agent
+```
+POST /api/agents/register
+```
+```json
+{
+  "agent_id": "my-agent",
+  "wallet": "0x...",
+  "task_types": ["token_delivery", "data_delivery"],
+  "supported_chains": ["bsc", "mock"],
+  "capabilities": {...}
+}
+```
+
+### 获取 Agent 列表
+```
+GET /api/agents
+```
+
+### Agent 自主下单
+```
+POST /api/agent-buy
+```
+```json
+{
+  "buyer_wallet": "0x...",
+  "amount_bnb": 0.01,
+  "task_type": "token_delivery",
+  "params": {"keyword": "meme"}
+}
+```
+
+---
+
+## 协议 API (Python 微服务)
+
+通过 Node.js 代理访问：`/api/protocol/*`
+
+### 协议信息
+```
+GET /api/protocol/info
+```
+
+### 结算通道列表
+```
+GET /api/protocol/channels
+```
+
+### 验证门列表
+```
+GET /api/protocol/gates
+```
+
+### 创建任务
+```
+POST /api/protocol/tasks/create
+```
+```json
+{
+  "task_type": "token_delivery",
+  "buyer_wallet": "0x...",
+  "seller_wallet": "0x...",
+  "amount": 0.01,
+  "chain": "bsc",
+  "params": {...}
+}
+```
+
+### 验证任务
+```
+POST /api/protocol/tasks/verify
+```
+```json
+{
+  "task_id": "task-001",
+  "output": {
+    "tx_hash": "0x...",
+    "token_address": "0x...",
+    "token_amount": "1000000"
+  }
+}
 ```
 
 ---

@@ -1,0 +1,94 @@
+version: "3.8"
+
+services:
+  web-api:
+    build: .
+    container_name: cryptominds-web
+    ports:
+      - "3457:3457"
+    environment:
+      - PORT=3457
+      - PYTHON_API_URL=http://python-api:3458
+      - CRYPTOMINDS_DEMO=${CRYPTOMINDS_DEMO:-0}
+      - DEMO_MODE=${DEMO_MODE:-false}
+      - ADMIN_SECRET=${ADMIN_SECRET:-}
+      - ADMIN_WALLETS=${ADMIN_WALLETS:-}
+      - BSC_RPC=${BSC_RPC:-https://bsc-dataseed1.binance.org/}
+      - DEPOSIT_POOL_ADDRESS=${DEPOSIT_POOL_ADDRESS:-}
+    volumes:
+      - ./wallets.json:/app/wallets.json:ro
+      - ./web/cryptominds.db:/app/web/cryptominds.db
+      - ./.env:/app/.env:ro
+    depends_on:
+      python-api:
+        condition: service_healthy
+    command: ["node", "web/server_modular.js"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3457/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  python-api:
+    build: .
+    container_name: cryptominds-python
+    ports:
+      - "3458:3458"
+    environment:
+      - CRYPTOMINDS_API_PORT=3458
+      - CRYPTOMINDS_INTERNAL_TOKEN=${CRYPTOMINDS_INTERNAL_TOKEN:-}
+      - CRYPTOMINDS_DEBUG=${CRYPTOMINDS_DEBUG:-false}
+      - BSC_RPC=${BSC_RPC:-https://bsc-dataseed1.binance.org/}
+    volumes:
+      - ./wallets.json:/app/wallets.json:ro
+      - ./.env:/app/.env:ro
+    command: ["python3", "api_server.py"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3458/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  agent-tiedan:
+    build: .
+    container_name: cryptominds-tiedan
+    ports:
+      - "5001:5001"
+    environment:
+      - CRYPTOMINDS_DEMO=${CRYPTOMINDS_DEMO:-0}
+    volumes:
+      - ./wallets.json:/app/wallets.json:ro
+    command: ["python3", "agents/agent_server.py", "--agent", "tiedan", "--port", "5001"]
+
+  agent-choudan:
+    build: .
+    container_name: cryptominds-choudan
+    ports:
+      - "5002:5002"
+    environment:
+      - CRYPTOMINDS_DEMO=${CRYPTOMINDS_DEMO:-0}
+    volumes:
+      - ./wallets.json:/app/wallets.json:ro
+    command: ["python3", "agents/agent_server.py", "--agent", "choudan", "--port", "5002"]
+
+  agent-ludan:
+    build: .
+    container_name: cryptominds-ludan
+    ports:
+      - "5003:5003"
+    environment:
+      - CRYPTOMINDS_DEMO=${CRYPTOMINDS_DEMO:-0}
+    volumes:
+      - ./wallets.json:/app/wallets.json:ro
+    command: ["python3", "agents/agent_server.py", "--agent", "ludan", "--port", "5003"]
+
+  agent-four-meme:
+    build: .
+    container_name: cryptominds-four-meme
+    ports:
+      - "5004:5004"
+    environment:
+      - CRYPTOMINDS_DEMO=${CRYPTOMINDS_DEMO:-0}
+    volumes:
+      - ./wallets.json:/app/wallets.json:ro
+    command: ["python3", "agents/agent_server.py", "--agent", "four_meme", "--port", "5004"]

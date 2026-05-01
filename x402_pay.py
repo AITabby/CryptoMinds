@@ -15,12 +15,9 @@ TEST_MODE = os.getenv("X402_TEST_MODE", "false").lower() == "true"
 import json
 import time
 import hashlib
-from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-DIR = Path(__file__).parent
-WALLETS_FILE = DIR / "wallets.json"
-from config import BSC_RPC
+from config import BSC_RPC, load_wallets, get_wallet_key
 
 # ── 当前：BNB 原生支付 ──
 NATIVE_TOKEN = "BNB"
@@ -99,12 +96,6 @@ class X402PaymentRequest:
             return signature
 
 
-def load_wallets() -> Dict:
-    """加载钱包配置"""
-    with open(WALLETS_FILE) as f:
-        return json.load(f)
-
-
 def get_bnb_balance(address: str) -> float:
     """查询 BNB 余额"""
     try:
@@ -157,7 +148,7 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
     
     # 2. 签名支付请求
     try:
-        signature = payment_req.sign(from_wallet["private_key"])
+        signature = payment_req.sign(get_wallet_key(from_name))
         print(f"   📝 支付请求已签名")
     except Exception as e:
         return False, "", {"error": f"签名失败: {e}"}
@@ -212,7 +203,7 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
         }
         
         # 签名并发送
-        signed_tx = w3.eth.account.sign_transaction(tx, from_wallet["private_key"])
+        signed_tx = w3.eth.account.sign_transaction(tx, get_wallet_key(from_name))
         raw_tx = getattr(signed_tx, 'raw_transaction', None) or getattr(signed_tx, 'rawTransaction')
         tx_hash = w3.eth.send_raw_transaction(raw_tx)
         tx_hash_hex = tx_hash.hex()

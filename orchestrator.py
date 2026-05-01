@@ -21,6 +21,8 @@ from pathlib import Path
 
 import requests as req
 
+from config import load_wallets, get_wallet_key
+
 DIR = str(Path(__file__).parent)
 MARKET_URL = os.getenv("CRYPTOMINDS_MARKET", "http://localhost:3457")
 
@@ -30,11 +32,6 @@ try:
     X402_ENABLED = True
 except ImportError:
     X402_ENABLED = False
-
-
-def load_wallets():
-    with open(f"{DIR}/wallets.json") as f:
-        return json.load(f)
 
 
 # ============================================================
@@ -167,7 +164,7 @@ def pay_seller(buyer_name, seller_wallet, amount_bnb, service_id):
         from web3.middleware import ExtraDataToPOAMiddleware
         w3 = Web3(Web3.HTTPProvider('https://bsc-dataseed1.binance.org'))
         w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-        buyer_key = buyer_info.get('privateKey') or buyer_info.get('private_key') or buyer_info.get('key')
+        buyer_key = get_wallet_key(buyer_name)
         if not buyer_key:
             print(f"⚠️ 找不到 {buyer_name} 的私钥")
             return False, ""
@@ -189,10 +186,8 @@ def pay_seller(buyer_name, seller_wallet, amount_bnb, service_id):
         return True, tx_hash
     except Exception as e:
         print(f"⚠️ BSC 转账失败: {e}")
-        # 最终降级：离线占位交易
-        tx_hash = f"0x{os.urandom(16).hex()}"
-        print(f"⚠️ 离线占位转账: {tx_hash}")
-        return True, tx_hash
+        # 不再生成假 txHash，转账失败就是失败
+        return False, ""
 
 
 # ============================================================

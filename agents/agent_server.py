@@ -21,6 +21,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, DIR)
 
+from config import load_wallets
+
 # 声誉系统
 try:
     from agents.agent_reputation import get_reputation_system
@@ -44,15 +46,6 @@ try:
 except ImportError:
     RUNTIMES_AVAILABLE = False
     print("⚠️ agent_runtimes 不可用，Agent 将无法执行任务")
-
-
-def _load_wallets():
-    wallets_file = os.path.join(DIR, "wallets.json")
-    try:
-        with open(wallets_file) as f:
-            return json.load(f)
-    except Exception:
-        return {}
 
 
 # Agent 服务价格表 (USDC)
@@ -187,7 +180,7 @@ class AgentHandler(BaseHTTPRequestHandler):
                     "error": "需要支付",
                     "x402_required": True,
                     "price": price,
-                    "payment_address": _load_wallets().get(self.agent_name, {}).get("address", ""),
+                    "payment_address": load_wallets().get(self.agent_name, {}).get("address", ""),
                     "token": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
                     "chain": "bsc"
                 })

@@ -17,6 +17,8 @@ class TaskStatus(Enum):
     PENDING = "pending"
     EXECUTING = "executing"
     VERIFIED = "verified"        # 验证通过
+    SETTLED = "settled"          # 验证且结算完成
+    SETTLEMENT_FAILED = "settlement_failed"  # 验证通过但结算失败
     FAILED = "failed"            # 执行失败
     DISPUTED = "disputed"        # 发生争议
     REFUNDED = "refunded"        # 已退款
@@ -239,8 +241,8 @@ class RecordStore:
         records = self.get_by_seller(seller_wallet, limit=10000)
 
         total = len(records)
-        completed = len([r for r in records if r.status == TaskStatus.VERIFIED])
-        failed = len([r for r in records if r.status == TaskStatus.FAILED])
+        completed = len([r for r in records if r.status == TaskStatus.SETTLED])
+        failed = len([r for r in records if r.status in (TaskStatus.FAILED, TaskStatus.SETTLEMENT_FAILED)])
         disputed = len([r for r in records if r.disputed])
 
         total_volume = sum(r.payment_amount for r in records if r.success)

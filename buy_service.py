@@ -2,26 +2,22 @@
 """示例脚本：买家钱包向卖家钱包支付雇佣费。"""
 import json
 import sys
-import os
 from eth_account import Account
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
 
-sys.path.insert(0, '/Users/aitabby/projects/cryptominds')
-from config import BSC_RPC
+from config import BSC_RPC, load_wallets, get_wallet_key
 
 w3 = Web3(Web3.HTTPProvider(BSC_RPC))
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 
 # 钱包信息
-WALLETS_FILE = '/Users/aitabby/projects/cryptominds/wallets.json'
-with open(WALLETS_FILE) as f:
-    wallets = json.load(f)
+wallets = load_wallets()
 
 # 买家钱包
 from_wallet = wallets['choudan']
 from_addr = from_wallet['address']
-from_pk = from_wallet['private_key']
+from_pk = get_wallet_key('choudan')
 
 # 卖家钱包
 to_addr = wallets['gangdan']['address']

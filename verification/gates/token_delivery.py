@@ -140,10 +140,36 @@ class TokenDeliveryGate(VerificationGate):
             token_address = output.token_address
             buyer_wallet = input.buyer_wallet
 
-            balance = verifier.get_token_balance(buyer_wallet, token_address)
-
             # 验证数量
             expected_min = self._calculate_min_expected(input, output)
+            if expected_min <= 0:
+                return VerificationResult(
+                    success=False,
+                    score=0,
+                    gate_id=self.gate_id,
+                    task_type=self.task_type,
+                    chain=chain,
+                    error="无法计算最小期望交付数量",
+                )
+
+            transfer_ok, transfer_msg, transfer_evidence = verifier.verify_token_transfer(
+                tx_hash=output.tx_hash,
+                token=token_address,
+                expected_to=buyer_wallet,
+                min_amount=expected_min,
+            )
+            if not transfer_ok:
+                return VerificationResult(
+                    success=False,
+                    score=0,
+                    gate_id=self.gate_id,
+                    task_type=self.task_type,
+                    chain=chain,
+                    error=transfer_msg,
+                    evidence=transfer_evidence,
+                )
+
+            balance = verifier.get_token_balance(buyer_wallet, token_address)
 
             if balance >= expected_min:
                 return VerificationResult(
@@ -157,6 +183,7 @@ class TokenDeliveryGate(VerificationGate):
                         "balance": str(balance),
                         "expected_min": str(expected_min),
                         "tx_hash": output.tx_hash,
+                        **transfer_evidence,
                     },
                 )
             else:
@@ -278,13 +305,82 @@ class EVMVerifier:
         # 查余额
         balance_raw = contract.functions.balanceOf(wallet_cs).call()
 
-        # 查精度
-        try:
-            decimals = contract.functions.decimals().call()
-        except:
-            decimals = 18
+        decimals = self.get_token_decimals(token_cs)
 
         return Decimal(str(balance_raw)) / Decimal(str(10 ** decimals))
+
+    def get_token_decimals(self, token: str) -> int:
+        """查询 ERC20 精度"""
+        from web3 import Web3
+
+        token_cs = Web3.to_checksum_address(token)
+        ERC20_DECIMALS_ABI = [
+            {
+                "inputs": [],
+                "name": "decimals",
+                "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+                "stateMutability": "view",
+                "type": "function",
+            },
+        ]
+        contract = self.w3.eth.contract(address=token_cs, abi=ERC20_DECIMALS_ABI)
+        try:
+            return contract.functions.decimals().call()
+        except:
+            return 18
+
+    def verify_token_transfer(
+        self,
+        tx_hash: str,
+        token: str,
+        expected_to: str,
+        min_amount: Decimal,
+    ) -> Tuple[bool, str, Dict]:
+        """验证 tx 中存在目标 ERC20 转入买家钱包的 Transfer 事件"""
+        try:
+            from web3 import Web3
+
+            receipt = self.w3.eth.get_transaction_receipt(tx_hash)
+            if receipt.status != 1:
+                return False, "交易执行失败", {"tx_hash": tx_hash}
+
+            token_cs = Web3.to_checksum_address(token)
+            expected_to_cs = Web3.to_checksum_address(expected_to)
+            decimals = self.get_token_decimals(token_cs)
+            min_raw = int(min_amount * Decimal(str(10 ** decimals)))
+            transfer_topic = Web3.keccak(text="Transfer(address,address,uint256)").hex()
+            expected_to_topic = "0x" + expected_to_cs.lower().replace("0x", "").rjust(64, "0")
+
+            matched_amount_raw = 0
+            for log in receipt.logs:
+                topics = [t.hex() if hasattr(t, "hex") else str(t) for t in log.get("topics", [])]
+                if len(topics) < 3:
+                    continue
+                if log.get("address", "").lower() != token_cs.lower():
+                    continue
+                if topics[0].lower() != transfer_topic.lower():
+                    continue
+                if topics[2].lower() != expected_to_topic.lower():
+                    continue
+
+                raw_data = log.get("data", "0x0")
+                amount_raw = int(raw_data.hex() if hasattr(raw_data, "hex") else str(raw_data), 16)
+                matched_amount_raw += amount_raw
+
+            matched_amount = Decimal(matched_amount_raw) / Decimal(str(10 ** decimals))
+            evidence = {
+                "tx_hash": tx_hash,
+                "transfer_amount": str(matched_amount),
+                "expected_min": str(min_amount),
+                "transfer_to": expected_to_cs,
+            }
+
+            if matched_amount_raw < min_raw:
+                return False, f"交易未向买家交付足额代币: 收到 {matched_amount}, 期望至少 {min_amount}", evidence
+
+            return True, "交易交付验证通过", evidence
+        except Exception as e:
+            return False, f"交易验证失败: {e}", {"tx_hash": tx_hash}
 
     def verify_transaction(self, tx_hash: str, expected_from: str, expected_to: str) -> bool:
         """验证交易"""

@@ -3,22 +3,20 @@
 import sys, json
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
-from config import BSC_RPC, WALLETS_FILE
+from config import BSC_RPC, load_wallets, get_wallet_key
 
 w3 = Web3(Web3.HTTPProvider(BSC_RPC))
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
 
 def transfer_bnb(from_name, to_addr, amount):
     """从 from_name 钱包转 BNB 到 to_addr"""
-    wallets = json.load(open(WALLETS_FILE))
+    wallets = load_wallets()
     if from_name not in wallets:
         return {"ok": False, "error": f"钱包 {from_name} 不存在"}
-    
+
     from_info = wallets[from_name]
     from_addr = Web3.to_checksum_address(from_info['address'])
-    key = from_info.get('private_key') or from_info.get('privateKey')
-    if not key.startswith('0x'):
-        key = '0x' + key
+    key = get_wallet_key(from_name)
     
     to_cs = Web3.to_checksum_address(to_addr)
     nonce = w3.eth.get_transaction_count(from_addr)

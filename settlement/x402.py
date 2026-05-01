@@ -8,12 +8,17 @@ import os
 import json
 from decimal import Decimal
 from typing import Dict, Optional, Tuple
-from pathlib import Path
 
 from .registry import ChannelRegistry
 from .base import PaymentRequest, PaymentResult
 from .channels.bsc_native import BSCNativeChannel
 from .channels.mock import MockChannel
+
+# 集中式钱包加载（从项目根 config.py）
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import load_wallets, get_wallet_key
 
 
 # ── 初始化默认通道 ──────────────────────────────────
@@ -32,29 +37,13 @@ def init_default_channels():
 init_default_channels()
 
 
-# ── 钱包加载 ────────────────────────────────────────
-
-WALLETS_FILE = Path(__file__).parent.parent / "wallets.json"
-
-
-def load_wallets() -> Dict:
-    """加载钱包配置"""
-    if WALLETS_FILE.exists():
-        return json.loads(WALLETS_FILE.read_text())
-    return {}
+# ── 钱包加载（使用集中式 config.py）─────────────────────
 
 
 def get_wallet_address(name: str) -> Optional[str]:
     """获取钱包地址"""
     wallets = load_wallets()
     return wallets.get(name, {}).get("address")
-
-
-def get_wallet_key(name: str) -> Optional[str]:
-    """获取钱包私钥"""
-    wallets = load_wallets()
-    info = wallets.get(name, {})
-    return info.get("private_key") or info.get("privateKey") or info.get("key")
 
 
 # ── x402 支付接口（兼容旧版）─────────────────────────

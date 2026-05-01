@@ -17,16 +17,13 @@ from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass
 import logging
 
+from logging_config import setup_logging
+setup_logging()
+logger = logging.getLogger(__name__)
+
 from agent_daemon import AgentDaemon, AgentConfig, Task, AgentState
 from market_listener import MarketListener, TaskMatcher, MarketTask
 from task_closer import TaskCloser, EscrowManager
-
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -289,7 +286,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="CryptoMinds Agent 服务")
     parser.add_argument("--agent-id", required=True, help="Agent ID")
     parser.add_argument("--wallet", required=True, help="钱包地址")
-    parser.add_argument("--private-key", default="", help="私钥")
     parser.add_argument("--task-types", default="token_delivery", help="任务类型（逗号分隔）")
     parser.add_argument("--chains", default="mock,bsc", help="支持的链（逗号分隔）")
     parser.add_argument("--market-url", default="http://localhost:3458", help="市场 API 地址")
@@ -302,7 +298,7 @@ if __name__ == "__main__":
     config = AgentServiceConfig(
         agent_id=args.agent_id,
         wallet=args.wallet,
-        private_key=args.private_key,
+        private_key="",
         task_types=args.task_types.split(","),
         supported_chains=args.chains.split(","),
         market_url=args.market_url,

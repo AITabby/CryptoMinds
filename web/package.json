@@ -1,22 +1,33 @@
 {
-  "name": "web",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "cryptominds-web",
+  "version": "2.1.0",
+  "description": "CryptoMinds Agent Economy Protocol - Web API",
+  "main": "server_modular.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "demo": "DEMO_MODE=true node server.js",
+    "start": "node server_modular.js",
+    "start:legacy": "node server.js",
+    "start:all": "./start_services.sh",
+    "dev": "node --watch server_modular.js",
+    "demo": "DEMO_MODE=true node server_modular.js",
+    "migrate": "node migrate_to_sqlite.js",
     "test": "node --test ../tests/*.test.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "agent",
+    "blockchain",
+    "bsc",
+    "eth",
+    "solana"
+  ],
+  "author": "CryptoMinds",
+  "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "ejs": "^5.0.1",
     "express": "^5.2.1",
+    "morgan": "^1.10.1",
     "multer": "^2.1.1",
+    "sqlite3": "^6.0.1",
     "web-push": "^3.6.7",
     "web3": "^4.16.0"
   }

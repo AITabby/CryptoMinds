@@ -82,7 +82,7 @@ class TaskOutput:
             "tx_hash": self.tx_hash,
             "token_address": self.token_address,
             "token_amount": self.token_amount,
-            "data": data,
+            "data": self.data,
             "file_hash": self.file_hash,
             "extra": self.extra,
         }

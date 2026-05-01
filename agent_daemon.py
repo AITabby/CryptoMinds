@@ -12,6 +12,7 @@ import os
 import json
 import time
 import threading
+import hashlib
 from decimal import Decimal
 from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass, field
@@ -19,11 +20,8 @@ from enum import Enum
 from queue import Queue, Empty
 import logging
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s'
-)
+from logging_config import setup_logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -206,32 +204,202 @@ class Executor:
 
     def _execute_token_delivery(self, task: Task) -> Dict:
         """执行代币交付"""
-        # 这里需要调用实际的买币逻辑
-        # 简化处理：返回模拟结果
-        import hashlib
+        # 尝试使用真实买币执行器
+        try:
+            from token_buyer import execute_buy
+            import json
 
-        return {
-            "tx_hash": "0x" + hashlib.sha256(f"{task.task_id}{time.time()}".encode()).hexdigest()[:64],
-            "token_address": task.params.get("token_address", "0x" + "0" * 40),
-            "token_amount": str(task.amount * 1000),  # 模拟数量
-            "mock": True,
-        }
+            # 从任务参数获取必要信息
+            token_address = task.params.get("token_address")
+            seller_name = task.params.get("seller_name", "gangdan")
+
+            if not token_address:
+                # 没有指定代币地址，返回模拟结果（测试用）
+                mock_tx = "0x" + hashlib.sha256(f"{task.task_id}{time.time()}".encode()).hexdigest()[:64]
+                logger.info(f"无代币地址，使用模拟执行: {task.task_id}")
+                return {
+                    "tx_hash": mock_tx,
+                    "token_address": "0x" + "0" * 40,
+                    "token_amount": str(task.amount * 1000),
+                    "mock": True,
+                }
+
+            # 执行真实买币
+            result = execute_buy(
+                seller_name=seller_name,
+                buyer_addr=task.buyer_wallet,
+                token_addr=token_address,
+                bnb_amount=float(task.amount)
+            )
+
+            if result.get("ok"):
+                return {
+                    "tx_hash": result.get("swapHash", ""),
+                    "transfer_tx": result.get("transferHash", ""),
+                    "token_address": result.get("token", token_address),
+                    "token_amount": str(result.get("amount", 0)),
+                    "token_symbol": result.get("symbol", "?"),
+                    "bnb_spent": result.get("bnbSpent", str(task.amount)),
+                    "graduated": result.get("graduated", False),
+                    "path": result.get("path", "unknown"),
+                    "mock": False,
+                }
+            else:
+                return {
+                    "error": result.get("error", "买币失败"),
+                    "swap_hash": result.get("swapHash", ""),
+                }
+
+        except ImportError as e:
+            # token_buyer 不可用，使用模拟
+            logger.warning(f"token_buyer 不可用: {e}，使用模拟执行")
+            return {
+                "tx_hash": "0x" + hashlib.sha256(f"{task.task_id}{time.time()}".encode()).hexdigest()[:64],
+                "token_address": task.params.get("token_address", "0x" + "0" * 40),
+                "token_amount": str(task.amount * 1000),
+                "mock": True,
+            }
+        except Exception as e:
+            logger.error(f"代币交付执行失败: {e}")
+            return {"error": str(e)}
 
     def _execute_data_delivery(self, task: Task) -> Dict:
         """执行数据交付"""
-        # 模拟数据处理
-        return {
-            "data": json.dumps({"result": "processed", "task_id": task.task_id}),
-            "file_hash": hashlib.sha256(task.task_id.encode()).hexdigest(),
-        }
+        # 尝试使用自定义执行器或智能处理
+        data_type = task.params.get("data_type", "raw")
+        query = task.params.get("query", "")
+
+        try:
+            # 根据数据类型处理
+            if data_type == "api_fetch":
+                # API 数据获取
+                import requests
+                url = task.params.get("url", "")
+                if url:
+                    resp = requests.get(url, timeout=30)
+                    return {
+                        "data": resp.text[:10000],  # 限制大小
+                        "status_code": resp.status_code,
+                        "mock": False,
+                    }
+
+            elif data_type == "analysis":
+                # 数据分析任务
+                input_data = task.params.get("input_data", "")
+                if input_data:
+                    # 简化分析：统计和格式化
+                    try:
+                        parsed = json.loads(input_data)
+                        analysis = {
+                            "type": type(parsed).__name__,
+                            "size": len(str(parsed)),
+                            "keys": list(parsed.keys()) if isinstance(parsed, dict) else None,
+                            "summary": "数据分析完成"
+                        }
+                        return {
+                            "data": json.dumps(analysis),
+                            "mock": False,
+                        }
+                    except json.JSONDecodeError:
+                        return {
+                            "data": json.dumps({"summary": "非JSON数据", "length": len(input_data)}),
+                            "mock": False,
+                        }
+
+            elif data_type == "translation":
+                # 翻译任务（需要外部 API）
+                # 这里只是占位，实际需要接入翻译 API
+                text = task.params.get("text", "")
+                target_lang = task.params.get("target_lang", "en")
+                return {
+                    "data": f"[待翻译: {text[:100]}... → {target_lang}]",
+                    "mock": True,
+                    "note": "需要接入翻译 API"
+                }
+
+            # 默认：返回任务信息
+            return {
+                "data": json.dumps({
+                    "result": "processed",
+                    "task_id": task.task_id,
+                    "data_type": data_type,
+                    "query": query[:200] if query else None,
+                }),
+                "file_hash": hashlib.sha256(task.task_id.encode()).hexdigest(),
+                "mock": True,
+            }
+
+        except Exception as e:
+            logger.error(f"数据交付执行失败: {e}")
+            return {"error": str(e)}
 
     def _execute_compute(self, task: Task) -> Dict:
         """执行计算任务"""
-        # 模拟计算
-        return {
-            "data": json.dumps({"output": 42}),
-            "confidence": 0.95,
-        }
+        compute_type = task.params.get("compute_type", "inference")
+        expected_format = task.params.get("expected_format", "json")
+
+        try:
+            if compute_type == "inference":
+                # AI 推理任务
+                input_data = task.params.get("input", "")
+                model = task.params.get("model", "default")
+
+                # 这里需要接入实际的 AI 模型
+                # 简化处理：返回占位结果
+                return {
+                    "data": json.dumps({
+                        "output": f"推理结果 (模型: {model})",
+                        "confidence": 0.95,
+                        "input_length": len(input_data),
+                    }),
+                    "mock": True,
+                    "note": "需要接入 AI 模型"
+                }
+
+            elif compute_type == "calculation":
+                # 数学计算（安全解析，不使用 eval）
+                expression = task.params.get("expression", "")
+                if expression:
+                    try:
+                        from safe_calculator import safe_eval
+                        result = safe_eval(expression)
+                        return {
+                            "data": json.dumps({
+                                "result": result,
+                                "expression": expression,
+                            }),
+                            "mock": False,
+                        }
+                    except ValueError as ve:
+                        return {"error": f"表达式不合法: {ve}"}
+                    except Exception as calc_err:
+                        return {"error": f"计算错误: {calc_err}"}
+
+            elif compute_type == "transform":
+                # 数据转换
+                input_data = task.params.get("input_data", "")
+                transform_type = task.params.get("transform_type", "json")
+
+                if transform_type == "json" and input_data:
+                    try:
+                        parsed = json.loads(input_data)
+                        return {
+                            "data": json.dumps(parsed, indent=2),
+                            "mock": False,
+                        }
+                    except json.JSONDecodeError:
+                        return {"error": "JSON 解析失败"}
+
+            # 默认计算结果
+            return {
+                "data": json.dumps({"output": 42}),
+                "confidence": 0.95,
+                "mock": True,
+            }
+
+        except Exception as e:
+            logger.error(f"计算任务执行失败: {e}")
+            return {"error": str(e)}
 
 
 class AgentDaemon:

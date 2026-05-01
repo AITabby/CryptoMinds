@@ -85,13 +85,58 @@ class CreditRegistry:
     """
     信用货币注册表
 
-    管理所有信用货币的发行、转账、验证。
+    支持内存+JSON 持久化，重启后自动恢复。
     """
+
+    _persistence_path: Optional[str] = None
 
     def __init__(self):
         self._currencies: Dict[str, CreditCurrency] = {}
         self._balances: Dict[str, Dict[str, Decimal]] = {}  # currency_id -> {wallet -> balance}
         self._issuer_index: Dict[str, str] = {}  # issuer_wallet -> currency_id
+        self._load()
+
+    def set_persistence(self, path: str):
+        """设置持久化文件路径"""
+        CreditRegistry._persistence_path = path
+        self._load()
+
+    def _save(self):
+        """持久化到 JSON"""
+        if not CreditRegistry._persistence_path:
+            return
+        try:
+            import json
+            data = {
+                'currencies': {cid: c.to_dict() for cid, c in self._currencies.items()},
+                'balances': {cid: {w: str(b) for w, b in bals.items()} for cid, bals in self._balances.items()},
+                'issuer_index': self._issuer_index,
+            }
+            with open(CreditRegistry._persistence_path, 'w') as f:
+                json.dump(data, f, ensure_ascii=False)
+        except Exception as e:
+            print(f"[CreditRegistry] 持久化失败: {e}")
+
+    def _load(self):
+        """从 JSON 恢复"""
+        if not CreditRegistry._persistence_path:
+            return
+        try:
+            import json, os
+            if not os.path.exists(CreditRegistry._persistence_path):
+                return
+            with open(CreditRegistry._persistence_path, 'r') as f:
+                data = json.load(f)
+            for cid, c_dict in data.get('currencies', {}).items():
+                self._currencies[cid] = CreditCurrency(**{k: (Decimal(str(v)) if k in ('total_supply', 'max_supply') else v) for k, v in c_dict.items() if k != 'accepted_by'})
+                if 'accepted_by' in c_dict:
+                    self._currencies[cid].accepted_by = c_dict['accepted_by']
+            for cid, bals in data.get('balances', {}).items():
+                self._balances[cid] = {w: Decimal(b) for w, b in bals.items()}
+            self._issuer_index = data.get('issuer_index', {})
+            print(f"[CreditRegistry] 从 {CreditRegistry._persistence_path} 恢复 {len(self._currencies)} 个信用货币")
+        except Exception as e:
+            print(f"[CreditRegistry] 恢复失败: {e}")
 
     # ── 发行 ─────────────────────────────────────────
 
@@ -145,6 +190,7 @@ class CreditRegistry:
         self._issuer_index[issuer_wallet] = currency_id
         self._balances[currency_id] = {issuer_wallet: max_supply}  # 初始发行给发行者
 
+        self._save()
         return {
             "ok": True,
             "currency_id": currency_id,
@@ -189,6 +235,7 @@ class CreditRegistry:
         balances[from_wallet] = from_balance - amount
         balances[to_wallet] = balances.get(to_wallet, Decimal("0")) + amount
 
+        self._save()
         return {
             "ok": True,
             "from_balance": str(balances[from_wallet]),
@@ -235,6 +282,7 @@ class CreditRegistry:
         if agent_id not in currency.accepted_by:
             currency.accepted_by.append(agent_id)
 
+        self._save()
         return True
 
     def reject_currency(self, currency_id: str, agent_id: str) -> bool:
@@ -246,6 +294,7 @@ class CreditRegistry:
         if agent_id in currency.accepted_by:
             currency.accepted_by.remove(agent_id)
 
+        self._save()
         return True
 
     # ── 信用货币支付 ──────────────────────────────────
@@ -292,6 +341,8 @@ class CreditRegistry:
         # 执行转账
         balances[from_wallet] = from_balance - amount
         balances[to_wallet] = balances.get(to_wallet, Decimal("0")) + amount
+
+        self._save()
 
         # 记录交易
         import hashlib
@@ -407,3 +458,4 @@ class CreditRegistry:
         self._currencies.clear()
         self._balances.clear()
         self._issuer_index.clear()
+        self._save()

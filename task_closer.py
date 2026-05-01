@@ -150,8 +150,24 @@ class TaskCloser:
             result.tx_hash = payment_result.get("tx_hash", "")
             logger.info(f"[{task_id}] 结算完成: {result.tx_hash[:20]}...")
         else:
-            # 结算失败但验证通过，记录待处理
-            logger.warning(f"[{task_id}] 结算失败: {payment_result.get('error')}")
+            result.error = f"结算失败: {payment_result.get('error')}"
+            logger.warning(f"[{task_id}] {result.error}")
+            self._record_task(
+                task_id=task_id,
+                task_type=task_type,
+                buyer_wallet=buyer_wallet,
+                seller_wallet=seller_wallet,
+                seller_agent_id=seller_agent_id,
+                chain=chain,
+                amount=amount,
+                status=TaskStatus.SETTLEMENT_FAILED,
+                score=verify_result.score,
+                evidence={
+                    **(verify_result.evidence or {}),
+                    "settlement_error": payment_result.get("error", ""),
+                },
+            )
+            return result
 
         # 4. 记录履约
         logger.info(f"[{task_id}] 记录履约...")
@@ -163,7 +179,7 @@ class TaskCloser:
             seller_agent_id=seller_agent_id,
             chain=chain,
             amount=amount,
-            status=TaskStatus.VERIFIED,
+            status=TaskStatus.SETTLED,
             score=verify_result.score,
             payment_tx=result.tx_hash,
             payment_amount=amount if result.paid else Decimal("0"),

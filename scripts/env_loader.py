@@ -3,6 +3,7 @@ CryptoMinds 环境变量加载器
 启动时加载 .env 并校验，缺失关键配置时报错退出
 """
 import os
+import stat
 import sys
 from pathlib import Path
 
@@ -34,6 +35,8 @@ def load_env():
     wallets_path = project_root / 'wallets.json'
     if not wallets_path.exists():
         errors.append("wallets.json 不存在，请确保钱包配置文件在项目根目录")
+    elif wallets_path.stat().st_mode & stat.S_IROTH:
+        errors.append("wallets.json 权限过于宽松，请运行: chmod 600 wallets.json")
 
     if errors:
         for err in errors:

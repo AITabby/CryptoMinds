@@ -4,10 +4,11 @@ CryptoMinds API 服务层
 将协议暴露为 HTTP API，供 Agent 调用。
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 from decimal import Decimal
 import json
 import os
+import time
 
 from protocol import (
     get_protocol_info,
@@ -28,6 +29,54 @@ app = Flask(__name__)
 # 配置
 API_PORT = int(os.getenv("CRYPTOMINDS_API_PORT", "3458"))
 DEBUG_MODE = os.getenv("CRYPTOMINDS_DEBUG", "false").lower() == "true"
+INTERNAL_TOKEN = os.getenv("CRYPTOMINDS_INTERNAL_TOKEN", "")
+MARKET_TASKS = []
+
+
+import hmac
+import logging
+from functools import wraps
+
+logger = logging.getLogger(__name__)
+
+# ── 请求日志中间件 ──────────────────────────────────────
+
+@app.before_request
+def log_request_start():
+    g._start_time = time.time()
+
+@app.after_request
+def log_request_end(response):
+    duration_ms = (time.time() - g.get('_start_time', time.time())) * 1000
+    logger.info("request", extra={
+        "method": request.method,
+        "path": request.path,
+        "status": response.status_code,
+        "duration_ms": round(duration_ms, 2),
+    })
+    return response
+
+
+def require_internal_token():
+    """Require an explicit shared secret for state-mutating internal APIs."""
+    if not INTERNAL_TOKEN:
+        if os.getenv("CRYPTOMINDS_DEBUG", "false").lower() == "true":
+            return True
+        return False
+    supplied = request.headers.get("X-CryptoMinds-Internal-Token", "")
+    if len(supplied) != len(INTERNAL_TOKEN):
+        return False
+    return hmac.compare_digest(supplied, INTERNAL_TOKEN)
+
+
+def require_auth(f):
+    """Decorator: require internal token for state-mutating endpoints."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not require_internal_token():
+            return jsonify({"error": "forbidden: internal token required"}), 403
+        return f(*args, **kwargs)
+    return decorated
 
 
 # ── 协议信息 ────────────────────────────────────────
@@ -53,6 +102,7 @@ def api_gates():
 # ── Agent 管理 ──────────────────────────────────────
 
 @app.route("/api/agents/register", methods=["POST"])
+@require_auth
 def api_register_agent():
     """注册 Agent"""
     data = request.get_json()
@@ -144,6 +194,7 @@ def api_get_reputation(agent_id):
 
 
 @app.route("/api/agents/<agent_id>/reputation/update", methods=["POST"])
+@require_auth
 def api_update_reputation(agent_id):
     """更新 Agent 信誉分"""
     result = update_agent_reputation(agent_id)
@@ -167,12 +218,22 @@ def api_get_records(agent_id):
 # ── 任务执行 ────────────────────────────────────────
 
 @app.route("/api/tasks/create", methods=["POST"])
+@require_auth
 def api_create_task():
     """创建任务"""
     data = request.get_json()
 
     if not data:
         return jsonify({"error": "缺少请求体"}), 400
+
+    # Validate compute expressions at API boundary
+    task_type = data.get("task_type", "")
+    if task_type == "compute_result":
+        params = data.get("params", {})
+        if params.get("compute_type") == "calculation":
+            expression = params.get("expression", "")
+            if expression and len(expression) > 200:
+                return jsonify({"error": "计算表达式过长"}), 400
 
     result = create_task(
         task_type=data.get("task_type", ""),
@@ -181,6 +242,7 @@ def api_create_task():
         amount=Decimal(str(data.get("amount", 0))),
         chain=data.get("chain", "bsc"),
         channel_id=data.get("channel_id"),
+        **data.get("params", {}),
     )
 
     if result.get("ok"):
@@ -189,6 +251,7 @@ def api_create_task():
 
 
 @app.route("/api/tasks/verify", methods=["POST"])
+@require_auth
 def api_verify_task():
     """验证任务"""
     data = request.get_json()
@@ -219,6 +282,7 @@ def api_verify_task():
 
 
 @app.route("/api/tasks/complete", methods=["POST"])
+@require_auth
 def api_complete_task():
     """记录任务完成"""
     data = request.get_json()
@@ -226,8 +290,8 @@ def api_complete_task():
     if not data:
         return jsonify({"error": "缺少请求体"}), 400
 
-    status_str = data.get("status", "verified")
-    status = TaskStatus(status_str) if status_str in [s.value for s in TaskStatus] else TaskStatus.VERIFIED
+    status_str = data.get("status", "settled")
+    status = TaskStatus(status_str) if status_str in [s.value for s in TaskStatus] else TaskStatus.SETTLED
 
     result = record_task_completion(
         task_id=data.get("task_id", ""),
@@ -250,9 +314,46 @@ def api_complete_task():
     return jsonify(result), 400
 
 
+# ── 市场任务 ────────────────────────────────────────
+
+@app.route("/api/market/tasks", methods=["GET"])
+def api_market_tasks_get():
+    """Agent 市场任务队列（读取）"""
+    limit = int(request.args.get("limit", "100"))
+    return jsonify({"tasks": MARKET_TASKS[:limit]})
+
+
+@app.route("/api/market/tasks", methods=["POST"])
+@require_auth
+def api_market_tasks_post():
+    """Agent 市场任务队列（发布）"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "缺少请求体"}), 400
+
+    task = {
+        "task_id": data.get("task_id") or f"task-{int(time.time())}-{len(MARKET_TASKS)}",
+        "task_type": data.get("task_type", ""),
+        "buyer_wallet": data.get("buyer_wallet", ""),
+        "amount": str(data.get("amount", 0)),
+        "chain": data.get("chain", "bsc"),
+        "channel_id": data.get("channel_id", ""),
+        "params": data.get("params", {}),
+        "created_at": data.get("created_at") or int(time.time()),
+        "deadline": data.get("deadline", 0),
+    }
+
+    MARKET_TASKS.insert(0, task)
+    if len(MARKET_TASKS) > 1000:
+        del MARKET_TASKS[1000:]
+
+    return jsonify({"ok": True, "task": task}), 201
+
+
 # ── Agent 自主下单 ──────────────────────────────────
 
 @app.route("/api/agent-buy", methods=["POST"])
+@require_auth
 def api_agent_buy():
     """Agent 自主下单"""
     data = request.get_json()
@@ -299,6 +400,7 @@ def api_best_match():
 # ── 信用货币 ────────────────────────────────────────
 
 @app.route("/api/credit/issue", methods=["POST"])
+@require_auth
 def api_issue_credit():
     """发行信用货币"""
     data = request.get_json()
@@ -327,6 +429,7 @@ def api_list_credit():
 
 
 @app.route("/api/credit/<currency_id>/accept", methods=["POST"])
+@require_auth
 def api_accept_credit(currency_id):
     """接受信用货币"""
     data = request.get_json()
@@ -345,7 +448,41 @@ def api_accept_credit(currency_id):
 @app.route("/healthz", methods=["GET"])
 def health_check():
     """健康检查"""
-    return jsonify({"status": "ok", "protocol": get_protocol_info()})
+    checks = {
+        "agents": {"registered": len(AgentRegistry._agents)},
+        "records": {"total": len(_record_store._records) if hasattr(_record_store, '_records') else 0},
+        "channels": {"available": ChannelRegistry.list_all()},
+        "gates": {"available": GateRegistry.list_all()},
+    }
+    return jsonify({
+        "status": "ok",
+        "version": "2.2.0",
+        "timestamp": time.time(),
+        "checks": checks,
+    })
+
+# ── Prometheus 指标 ────────────────────────────────────
+
+_metrics_counters = {
+    "agents_registered": 0,
+    "tasks_created": 0,
+    "tasks_completed": 0,
+    "tasks_verified": 0,
+    "credits_issued": 0,
+    "agent_buys": 0,
+}
+
+@app.route("/metrics", methods=["GET"])
+def metrics():
+    """Prometheus text format metrics"""
+    lines = []
+    for name, value in _metrics_counters.items():
+        lines.append(f"# TYPE cryptominds_python_{name} counter")
+        lines.append(f"cryptominds_python_{name} {value}")
+    lines.append(f"# TYPE cryptominds_python_agents_registered gauge")
+    lines.append(f"cryptominds_python_agents_online {len(AgentRegistry._agents)}")
+    lines.append(f"cryptominds_python_market_tasks {len(MARKET_TASKS)}")
+    return "\n".join(lines) + "\n", 200, {"Content-Type": "text/plain; version=0.0.4"}
 
 
 # ── 启动 ────────────────────────────────────────────
@@ -358,7 +495,14 @@ def start_api(port=None, debug=None):
     print(f"CryptoMinds API 服务启动: http://localhost:{port}")
     print(f"协议信息: {json.dumps(get_protocol_info(), indent=2)}")
 
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    if not debug:
+        try:
+            import gunicorn  # noqa: F401
+            print("提示: 生产环境建议使用 gunicorn -b 127.0.0.1:3458 api_server:app")
+        except ImportError:
+            pass
+
+    app.run(host="127.0.0.1", port=port, debug=debug)
 
 
 if __name__ == "__main__":

@@ -151,6 +151,20 @@ result = cm.auto_buy(amount_bnb=0.01)
 - 状态机（idle → working → idle）
 - 并发控制
 
+**内置执行器：**
+- `token_delivery` - 代币交付（支持 four.meme + PancakeSwap）
+- `data_delivery` - 数据交付（支持 API 获取、分析、翻译）
+- `compute_result` - 计算任务（支持推理、计算、转换）
+
+**自定义执行器：**
+```python
+def my_executor(task):
+    # 执行任务逻辑
+    return {"result": "success"}
+
+daemon.register_executor("custom_task", my_executor)
+```
+
 ### 任务闭环处理器 (`task_closer.py`)
 
 完整的任务生命周期：
@@ -188,22 +202,49 @@ Agent 自动发现任务：
 
 ## API 服务
 
-```bash
-# 启动 API 服务
-python3 api_server.py
+### 启动服务
 
-# 端点
+```bash
+# 启动所有服务（Node.js + Python）
+cd web && ./start_services.sh
+
+# 或单独启动
+npm start          # Node.js API (3457)
+python3 api_server.py  # Python API (3458)
+```
+
+### API 端点
+
+**统一入口 (Node.js:3457)**
+
+```
+# 市场相关
+GET  /api/sellers           # 卖家列表
+GET  /api/purchases         # 购买记录
+GET  /api/market            # 市场信息
+GET  /api/balance           # 余额查询
+
+# Agent 相关
+POST /api/agents/register   # 注册 Agent
+GET  /api/agents            # Agent 列表
+
+# 协议相关（代理到 Python）
+GET  /api/protocol/info     # 协议信息
+POST /api/protocol/agents/register  # 注册 Agent（协议层）
+POST /api/protocol/tasks/create     # 创建任务
+POST /api/protocol/tasks/verify     # 验证任务
+```
+
+**Python API (3458)**
+
+```
 GET  /api/info              # 协议信息
 GET  /api/channels          # 结算通道列表
 GET  /api/gates             # 验证门列表
 POST /api/agents/register   # 注册 Agent
-GET  /api/agents            # 搜索 Agent
 POST /api/tasks/create      # 创建任务
 POST /api/tasks/verify      # 验证任务
-POST /api/tasks/complete    # 完成任务
 POST /api/agent-buy         # Agent 自主下单
-POST /api/credit/issue      # 发行信用货币
-POST /api/credit/pay        # 信用货币支付
 ```
 
 ---
@@ -212,6 +253,22 @@ POST /api/credit/pay        # 信用货币支付
 
 ```
 cryptominds/
+├── web/                        # Web 服务
+│   ├── server_modular.js       # 主入口（模块化）
+│   ├── routes/                 # 路由层
+│   │   ├── agent.js            # Agent 路由
+│   │   ├── admin.js            # 管理路由
+│   │   ├── market.js           # 市场路由
+│   │   ├── notification.js     # 通知路由
+│   │   ├── order.js            # 订单路由
+│   │   ├── payment.js          # 支付路由
+│   │   └── protocol.js         # 协议代理
+│   ├── lib/                    # 数据层
+│   │   ├── database.js         # SQLite 封装
+│   │   ├── datastore.js        # 数据存储适配器
+│   │   └── sellers_market_sqlite.js
+│   └── cryptominds.db          # SQLite 数据库
+│
 ├── settlement/                 # 结算层
 │   ├── base.py                 # SettlementChannel 抽象
 │   ├── registry.py             # ChannelRegistry
@@ -228,7 +285,7 @@ cryptominds/
 │       ├── token_delivery.py   # 代币交付
 │       ├── data_delivery.py    # 数据交付
 │       ├── compute_result.py   # 计算结果
-│       ├── signal_content.py   # 信号订阅 + 内容交付
+│       └── signal_content.py   # 信号订阅 + 内容交付
 │
 ├── agent/                      # Agent 层
 │   ├── capability.py           # AgentCapability
@@ -239,13 +296,19 @@ cryptominds/
 │   ├── score.py                # ReputationCalculator
 │   └── credit.py               # CreditCurrency
 │
+├── tests/                      # 测试
+│   ├── test_database.js        # 数据库测试
+│   ├── test_verification.py    # 验证门测试
+│   ├── test_settlement.py      # 结算通道测试
+│   └── test_protocol_regressions.py
+│
 ├── agent_daemon.py             # Agent 守护进程
 ├── market_listener.py          # 市场监听器
 ├── task_closer.py              # 任务闭环处理器
 ├── agent_service.py            # Agent 服务 (整合)
-├── api_server.py               # API 服务
+├── api_server.py               # Python API 服务
 ├── protocol.py                 # 协议统一入口
-└── cryptominds_sdk.py          # SDK (兼容旧版)
+└── cryptominds_sdk.py          # SDK
 ```
 
 ---

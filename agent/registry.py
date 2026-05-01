@@ -15,29 +15,58 @@ class AgentRegistry:
     """
     Agent 注册表
 
-    用法:
-        # 注册 Agent
-        agent = AgentCapability(
-            agent_id="meme-sniper-001",
-            name="Meme 狙击手",
-            wallet="0x...",
-            capabilities=[...]
-        )
-        AgentRegistry.register(agent)
-
-        # 搜索 Agent
-        agents = AgentRegistry.search(
-            task_type="token_delivery",
-            chain="bsc",
-            amount=Decimal("0.01")
-        )
-
-        # 获取 Agent
-        agent = AgentRegistry.get("meme-sniper-001")
+    支持内存+JSON 持久化，重启后自动恢复。
     """
 
     _agents: Dict[str, AgentCapability] = {}
     _wallet_index: Dict[str, str] = {}  # wallet -> agent_id
+    _persistence_path: Optional[str] = None  # JSON 持久化路径
+    _sqlite_bridge: Optional[object] = None  # SqliteAgentBridge instance
+
+    @classmethod
+    def set_persistence(cls, path: str):
+        """设置持久化文件路径"""
+        cls._persistence_path = path
+        cls._load()
+
+    @classmethod
+    def set_sqlite_bridge(cls, bridge):
+        """设置 SQLite bridge，注册/注销时同步到 SQLite"""
+        cls._sqlite_bridge = bridge
+
+    @classmethod
+    def _save(cls):
+        """持久化到 JSON"""
+        if not cls._persistence_path:
+            return
+        try:
+            import json
+            data = {aid: a.to_dict() for aid, a in cls._agents.items()}
+            with open(cls._persistence_path, 'w') as f:
+                json.dump(data, f, ensure_ascii=False)
+        except Exception as e:
+            print(f"[AgentRegistry] 持久化失败: {e}")
+
+    @classmethod
+    def _load(cls):
+        """从 JSON 恢复"""
+        if not cls._persistence_path:
+            return
+        try:
+            import json
+            import os
+            if not os.path.exists(cls._persistence_path):
+                return
+            with open(cls._persistence_path, 'r') as f:
+                data = json.load(f)
+            for aid, agent_dict in data.items():
+                agent = AgentCapability.from_dict(agent_dict)
+                cls._agents[aid] = agent
+                if agent.wallet:
+                    cls._wallet_index[agent.wallet.lower()] = aid
+            print(f"[AgentRegistry] 从 {cls._persistence_path} 恢复 {len(cls._agents)} 个 Agent")
+        except Exception as e:
+            print(f"[AgentRegistry] 恢复失败: {e}")
 
     # ── 注册/注销 ─────────────────────────────────────
 
@@ -53,6 +82,10 @@ class AgentRegistry:
         if agent.wallet:
             cls._wallet_index[agent.wallet.lower()] = agent.agent_id
 
+        cls._save()
+        if cls._sqlite_bridge:
+            cls._sqlite_bridge.save_agent(agent)
+
     @classmethod
     def unregister(cls, agent_id: str) -> bool:
         """注销 Agent"""
@@ -62,6 +95,9 @@ class AgentRegistry:
             if agent.wallet and agent.wallet.lower() in cls._wallet_index:
                 del cls._wallet_index[agent.wallet.lower()]
             del cls._agents[agent_id]
+            cls._save()
+            if cls._sqlite_bridge:
+                cls._sqlite_bridge.remove_agent(agent_id, agent.wallet or "")
             return True
         return False
 
@@ -77,6 +113,7 @@ class AgentRegistry:
                 setattr(agent, key, value)
 
         agent.updated_at = int(time.time())
+        cls._save()
         return agent
 
     # ── 查询 ─────────────────────────────────────────
@@ -260,6 +297,7 @@ class AgentRegistry:
         """清空所有注册（测试用）"""
         cls._agents.clear()
         cls._wallet_index.clear()
+        cls._save()
 
 
 # 导入 Dict 类型
