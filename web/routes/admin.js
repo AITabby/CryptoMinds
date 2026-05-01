@@ -30,11 +30,14 @@ function createAdminRoutes({
     const adminSecret = process.env.ADMIN_SECRET;
     if (adminSecret) {
       const supplied = req.headers['x-admin-secret'] || req.body.adminSecret;
-      if (supplied && crypto.timingSafeEqual(
-        Buffer.from(supplied, 'utf8'),
-        Buffer.from(adminSecret, 'utf8')
-      )) {
-        return next();
+      if (supplied) {
+        const suppliedBuf = Buffer.from(supplied, 'utf8');
+        const secretBuf = Buffer.from(adminSecret, 'utf8');
+        // timingSafeEqual requires equal-length buffers; pad shorter one
+        if (suppliedBuf.length === secretBuf.length &&
+            crypto.timingSafeEqual(suppliedBuf, secretBuf)) {
+          return next();
+        }
       }
     }
 

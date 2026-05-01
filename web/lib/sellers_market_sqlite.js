@@ -443,7 +443,7 @@ function createSellersMarketHandlers({
         return res.json({ ok: false, error: '卖家无 Agent API，需提供 tokenAddress 由平台代执行' });
       }
 
-      const sellerName = managedWalletAliases[sellerWalletLower];
+      const sellerName = MANAGED_WALLET_ALIASES[sellerWalletLower];
       if (!sellerName) {
         return res.json({ ok: false, error: '卖家钱包未在托管列表中，无法执行链上交易' });
       }
@@ -506,6 +506,16 @@ function createSellersMarketHandlers({
     }
     if (!amount || amount <= 0) {
       return res.json({ ok: false, error: '无效金额' });
+    }
+
+    // txHash 格式校验（必须 0x + 64 hex chars，或者 demo/模拟订单）
+    if (txHash && txHash !== 'direct_payment') {
+      if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+        return res.json({ ok: false, error: '交易哈希格式无效，必须为 0x + 64位十六进制' });
+      }
+    }
+    if (!txHash && !escrowOrderId) {
+      return res.json({ ok: false, error: '缺少交易哈希或托管订单ID' });
     }
 
     try {

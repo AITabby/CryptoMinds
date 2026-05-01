@@ -10,21 +10,34 @@ from x402_pay import x402_pay
 
 
 def main():
-    if len(sys.argv) < 6:
-      print(json.dumps({"ok": False, "error": "usage: managed_x402_payment.py <from_name> <to_name> <amount_bnb> <service_id> <description>"}))
-      return
+    if len(sys.argv) < 2:
+        print(json.dumps({"ok": False, "error": "usage: managed_x402_payment.py <json_payload>"}))
+        return
 
-    from_name = sys.argv[1]
-    to_name = sys.argv[2]
-    amount_bnb = float(sys.argv[3])
-    service_id = sys.argv[4]
-    description = sys.argv[5]
+    # Accept either a JSON payload (single arg) or positional args (5 args)
+    if len(sys.argv) == 2:
+        try:
+            payload = json.loads(sys.argv[1])
+        except json.JSONDecodeError:
+            print(json.dumps({"ok": False, "error": "无法解析 JSON 参数"}))
+            return
+        from_name = payload.get("from_name", "")
+        to_name = payload.get("to_name", "")
+        amount_bnb = float(payload.get("amount_bnb", payload.get("amount", 0)))
+        order_id = payload.get("order_id", payload.get("service_id", ""))
+        description = payload.get("description", "CryptoMinds x402 支付")
+    else:
+        from_name = sys.argv[1]
+        to_name = sys.argv[2]
+        amount_bnb = float(sys.argv[3])
+        order_id = sys.argv[4]
+        description = sys.argv[5]
 
     success, tx_hash, payment_info = x402_pay(
         from_name=from_name,
         to_name=to_name,
         amount_bnb=amount_bnb,
-        service_id=service_id,
+        order_id=order_id,
         description=description,
     )
 

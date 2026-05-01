@@ -206,12 +206,6 @@ const rateLimiter = {
       return { allowed: false, remaining: 0 };
     }
     return { allowed: true, remaining: max - entry.count };
-    }
-    entry.count++;
-    if (entry.count > max) {
-      return { allowed: false, remaining: 0 };
-    }
-    return { allowed: true, remaining: max - entry.count }; 
   }
 };
 
@@ -301,6 +295,7 @@ async function setupRoutes() {
     SMART_ROUTER_SCRIPT,
     demoMode: DEMO_MODE,
     w3,
+    getWallets,
   }));
 
   // 订单路由

@@ -26,8 +26,8 @@ def init_protocol():
     init_default_gates()
 
 
-# SQLite 数据库路径
-_DB_PATH = str(Path(__file__).parent / "web" / "cryptominds.db")
+# SQLite 数据库路径（可通过 env var 注入，方便测试和生产隔离）
+_DB_PATH = os.getenv("CRYPTOMINDS_DB_PATH", str(Path(__file__).parent / "web" / "cryptominds.db"))
 
 # 全局实例 — 使用 SQLite 替代 JSON/内存存储
 _record_store = SqliteRecordStore(_DB_PATH)

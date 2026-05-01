@@ -28,7 +28,18 @@ function createPaymentRoutes({
   SMART_ROUTER_SCRIPT,
   demoMode,
   w3,
+  getWallets,
 }) {
+  function _resolveWalletName(address) {
+    const wallets = getWallets();
+    const lowerAddr = (address || '').toLowerCase();
+    for (const [name, info] of Object.entries(wallets)) {
+      if ((info.address || '').toLowerCase() === lowerAddr) {
+        return name;
+      }
+    }
+    return address.slice(0, 10);
+  }
   // x402 支付
   router.post('/pay/x402', requireBuyerAuth, async (req, res) => {
     const { fromWallet, toWallet, amount, paymentInfo } = req.body;
@@ -47,9 +58,18 @@ function createPaymentRoutes({
     }
 
     try {
+      const fromName = _resolveWalletName(fromWallet);
+      const toName = _resolveWalletName(toWallet);
+      const payload = JSON.stringify({
+        from_name: fromName,
+        to_name: toName,
+        amount_bnb: amount,
+        order_id: paymentInfo?.order_id || `order-${Date.now()}`,
+        description: paymentInfo?.description || 'CryptoMinds x402 支付',
+      });
       const output = execFileSync(PYTHON_BIN, [
         MANAGED_X402_SCRIPT,
-        JSON.stringify({ fromWallet, toWallet, amount, paymentInfo }),
+        payload,
       ], {
         timeout: 60000,
         encoding: 'utf-8',
