@@ -141,7 +141,7 @@ class MarketListener:
             import urllib.request
             import urllib.error
 
-            url = f"{self.market_url}/api/market/tasks"
+            url = f"{self.market_url}/api/v1/market/tasks"
             req = urllib.request.Request(url)
             resp = urllib.request.urlopen(req, timeout=10)
             data = json.loads(resp.read())
@@ -195,7 +195,7 @@ class MarketListener:
         try:
             import urllib.request
 
-            url = f"{self.market_url}/api/market/tasks"
+            url = f"{self.market_url}/api/v1/market/tasks"
             data = json.dumps(task.to_dict()).encode()
             req = urllib.request.Request(
                 url,

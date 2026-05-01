@@ -77,7 +77,7 @@ class ProtocolRegressionTests(unittest.TestCase):
         from api_server import app
 
         client = app.test_client()
-        resp = client.post("/api/tasks/complete", json={
+        resp = client.post("/api/v1/tasks/complete", json={
             "task_id": "task-1",
             "task_type": "token_delivery",
             "buyer_wallet": "0xbuyer",
@@ -97,7 +97,7 @@ class ProtocolRegressionTests(unittest.TestCase):
         client = app.test_client()
         # POST requires internal token
         headers = {"X-CryptoMinds-Internal-Token": "test-token"}
-        create_resp = client.post("/api/market/tasks", json={
+        create_resp = client.post("/api/v1/market/tasks", json={
             "task_id": "market-task-1",
             "task_type": "data_delivery",
             "buyer_wallet": "0xbuyer",
@@ -106,7 +106,7 @@ class ProtocolRegressionTests(unittest.TestCase):
             "channel_id": "mock",
             "params": {"data_type": "raw"},
         }, headers=headers)
-        list_resp = client.get("/api/market/tasks")
+        list_resp = client.get("/api/v1/market/tasks")
 
         self.assertEqual(create_resp.status_code, 201)
         self.assertEqual(list_resp.status_code, 200)

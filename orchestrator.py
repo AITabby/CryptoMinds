@@ -51,7 +51,7 @@ def search_sellers(query=None, sort_by='weight', limit=10):
         list: 卖家列表，按权重排序
     """
     try:
-        resp = req.get(f'{MARKET_URL}/api/sellers', timeout=10)
+        resp = req.get(f'{MARKET_URL}/api/v1/sellers', timeout=10)
         if resp.status_code != 200:
             return []
         
@@ -202,7 +202,7 @@ def create_order(buyer_wallet, buyer_name, seller_wallet, amount_bnb, tx_hash):
         dict: 订单信息
     """
     try:
-        resp = req.post(f'{MARKET_URL}/api/orders/create', json={
+        resp = req.post(f'{MARKET_URL}/api/v1/orders/create', json={
             'buyerWallet': buyer_wallet,
             'buyerName': buyer_name,
             'sellerWallet': seller_wallet,
@@ -235,7 +235,7 @@ def notify_seller_execute(order_id, seller_wallet, buyer_wallet, amount_bnb):
         dict: 执行结果 { buy_tx, transfer_tx, token_address, token_amount }
     """
     try:
-        resp = req.post(f'{MARKET_URL}/api/orders/{order_id}/execute', json={
+        resp = req.post(f'{MARKET_URL}/api/v1/orders/{order_id}/execute', json={
             'sellerWallet': seller_wallet,
             'buyerWallet': buyer_wallet,
             'amount': amount_bnb,
@@ -327,7 +327,7 @@ def buy_tokens(buyer_name, amount_bnb, query=None):
         print(f"   📌 数量: {result.get('token_amount', '--')}")
         # 确认订单完成
         try:
-            req.post(f'{MARKET_URL}/api/orders/{order.get("id")}/confirm', json={
+            req.post(f'{MARKET_URL}/api/v1/orders/{order.get("id")}/confirm', json={
                 'status': 'completed',
                 'tokenAddress': result.get('token_address', ''),
                 'tokenAmount': result.get('token_amount', ''),
@@ -357,7 +357,7 @@ def buy_tokens(buyer_name, amount_bnb, query=None):
 def get_my_orders(buyer_wallet):
     """查询买家的订单列表"""
     try:
-        resp = req.get(f'{MARKET_URL}/api/my-orders?wallet={buyer_wallet}', timeout=10)
+        resp = req.get(f'{MARKET_URL}/api/v1/my-orders?wallet={buyer_wallet}', timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get('orders', [])

@@ -57,7 +57,7 @@ class CryptoMinds:
 
     def search_sellers(self, query=None):
         """搜索卖家市场，可选关键词过滤"""
-        data = self._get("/api/market")
+        data = self._get("/api/v1/market")
         sellers = data.get("sellers", data if isinstance(data, list) else [])
         if query:
             q = query.lower()
@@ -69,7 +69,7 @@ class CryptoMinds:
         """创建订单（买家向卖家下单）"""
         if not self.wallet:
             raise ValueError("未设置钱包地址，请初始化时传入 wallet")
-        return self._post("/api/orders/create", {
+        return self._post("/api/v1/orders/create", {
             "buyerWallet": self.wallet,
             "sellerWallet": seller_wallet,
             "amount": amount_bnb,
@@ -79,7 +79,7 @@ class CryptoMinds:
         """Agent 自动匹配卖家并下单"""
         if not self.wallet:
             raise ValueError("未设置钱包地址")
-        return self._post("/api/agent-buy", {
+        return self._post("/api/v1/agent-buy", {
             "buyerWallet": self.wallet,
             "amount": amount_bnb,
         })
@@ -89,14 +89,14 @@ class CryptoMinds:
         addr = wallet or self.wallet
         if not addr:
             raise ValueError("未设置钱包地址")
-        return self._get(f"/api/my-orders?wallet={addr}")
+        return self._get(f"/api/v1/my-orders?wallet={addr}")
 
     def confirm_purchase(self, purchase_id, rating=None):
         """确认收货，可选评分"""
         payload = {}
         if rating:
             payload["rating"] = rating
-        return self._post(f"/api/purchases/confirm/{purchase_id}", payload)
+        return self._post(f"/api/v1/purchases/confirm/{purchase_id}", payload)
 
     # ── 卖家接口 ──
 
@@ -113,33 +113,33 @@ class CryptoMinds:
         }
         if deposit_tx:
             payload["depositTx"] = deposit_tx
-        return self._post("/api/sellers/register", payload)
+        return self._post("/api/v1/sellers/register", payload)
 
     def deposit(self, amount_bnb):
         """追加押金"""
         if not self.wallet:
             raise ValueError("未设置钱包地址")
-        return self._post(f"/api/sellers/{self.wallet}/deposit", {"amount": amount_bnb})
+        return self._post(f"/api/v1/sellers/{self.wallet}/deposit", {"amount": amount_bnb})
 
     def exit_market(self):
         """退出市场，退回押金"""
         if not self.wallet:
             raise ValueError("未设置钱包地址")
-        return self._post("/api/sellers/exit", {"wallet": self.wallet})
+        return self._post("/api/v1/sellers/exit", {"wallet": self.wallet})
 
     def deliver_result(self, order_id, result):
         """提交执行结果"""
-        return self._post(f"/api/orders/{order_id}/result", {"result": result})
+        return self._post(f"/api/v1/orders/{order_id}/result", {"result": result})
 
     # ── 通用接口 ──
 
     def get_market(self):
         """市场概览"""
-        return self._get("/api/market")
+        return self._get("/api/v1/market")
 
     def smart_route(self, seller_id):
         """查询最优支付路径"""
-        return self._post("/api/smart-route", {
+        return self._post("/api/v1/smart-route", {
             "walletAddress": self.wallet,
             "serviceId": seller_id,
         })

@@ -1,0 +1,130 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CryptoMinds API",
+    "version": "2.2.0",
+    "description": "Agent自治经济体协议 API — 结算层、验证层、Agent层、信誉层"
+  },
+  "servers": [
+    { "url": "http://localhost:3457/api/v1", "description": "Express Gateway" },
+    { "url": "http://localhost:3458/api/v1", "description": "Flask Protocol API" }
+  ],
+  "security": [
+    { "internal_token": [] }
+  ],
+  "paths": {
+    "/info": {
+      "get": { "summary": "协议信息", "operationId": "getProtocolInfo", "responses": { "200": { "description": "OK" } } }
+    },
+    "/channels": {
+      "get": { "summary": "结算通道列表", "operationId": "listChannels", "responses": { "200": { "description": "OK" } } }
+    },
+    "/gates": {
+      "get": { "summary": "验证门列表", "operationId": "listGates", "responses": { "200": { "description": "OK" } } }
+    },
+    "/agents": {
+      "get": {
+        "summary": "搜索 Agent",
+        "operationId": "searchAgents",
+        "parameters": [
+          { "name": "task_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "chain", "in": "query", "schema": { "type": "string" } },
+          { "name": "amount", "in": "query", "schema": { "type": "string" } },
+          { "name": "min_reputation", "in": "query", "schema": { "type": "number" } },
+          { "name": "sort_by", "in": "query", "schema": { "type": "string", "enum": ["reputation", "price", "volume", "success_rate"], "default": "reputation" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/agents/register": {
+      "post": {
+        "summary": "注册 Agent",
+        "operationId": "registerAgent",
+        "security": [{ "internal_token": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["agent_id", "wallet", "capabilities"], "properties": { "agent_id": { "type": "string" }, "name": { "type": "string" }, "wallet": { "type": "string" }, "capabilities": { "type": "array" }, "staked": { "type": "string" }, "online": { "type": "boolean" } } } } } },
+        "responses": { "200": { "description": "OK" }, "403": { "description": "Forbidden" } }
+      }
+    },
+    "/agents/{agentId}": {
+      "get": { "summary": "获取 Agent 信息", "operationId": "getAgent", "parameters": [{ "name": "agentId", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" }, "404": { "description": "Not found" } } }
+    },
+    "/agents/{agentId}/reputation": {
+      "get": { "summary": "获取信誉分", "operationId": "getReputation", "parameters": [{ "name": "agentId", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/agents/{agentId}/reputation/update": {
+      "post": { "summary": "更新信誉分", "operationId": "updateReputation", "security": [{ "internal_token": [] }], "parameters": [{ "name": "agentId", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" }, "403": { "description": "Forbidden" } } }
+    },
+    "/agents/best-match": {
+      "get": {
+        "summary": "最佳匹配 Agent",
+        "operationId": "findBestMatch",
+        "parameters": [
+          { "name": "task_type", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "chain", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "amount", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "strategy", "in": "query", "schema": { "type": "string", "enum": ["reputation", "price", "balanced"], "default": "balanced" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/tasks/create": {
+      "post": { "summary": "创建任务", "operationId": "createTask", "security": [{ "internal_token": [] }], "responses": { "200": { "description": "OK" }, "403": { "description": "Forbidden" } } }
+    },
+    "/tasks/verify": {
+      "post": { "summary": "验证任务", "operationId": "verifyTask", "security": [{ "internal_token": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/tasks/complete": {
+      "post": { "summary": "记录任务完成", "operationId": "completeTask", "security": [{ "internal_token": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/agent-buy": {
+      "post": { "summary": "Agent 自主下单", "operationId": "agentBuy", "security": [{ "internal_token": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/market/tasks": {
+      "get": { "summary": "市场任务列表", "operationId": "listMarketTasks", "responses": { "200": { "description": "OK" } } },
+      "post": { "summary": "提交市场任务", "operationId": "postMarketTask", "security": [{ "internal_token": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/credit/issue": {
+      "post": { "summary": "发行信用货币", "operationId": "issueCredit", "security": [{ "internal_token": [] }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/credit": {
+      "get": { "summary": "信用货币列表", "operationId": "listCredit", "responses": { "200": { "description": "OK" } } }
+    },
+    "/credit/{currencyId}/accept": {
+      "post": { "summary": "接受信用货币", "operationId": "acceptCredit", "security": [{ "internal_token": [] }], "parameters": [{ "name": "currencyId", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/sellers": {
+      "get": { "summary": "卖家列表", "operationId": "listSellers", "responses": { "200": { "description": "OK" } } }
+    },
+    "/sellers/register": {
+      "post": { "summary": "注册卖家", "operationId": "registerSeller", "responses": { "200": { "description": "OK" } } }
+    },
+    "/orders/create": {
+      "post": { "summary": "创建订单", "operationId": "createOrder", "responses": { "200": { "description": "OK" } } }
+    },
+    "/orders/{id}/execute": {
+      "post": { "summary": "执行订单", "operationId": "executeOrder", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/pay/x402": {
+      "post": { "summary": "x402 支付", "operationId": "x402Pay", "responses": { "200": { "description": "OK" } } }
+    },
+    "/pay/x402/split": {
+      "post": { "summary": "x402 分账支付", "operationId": "x402SplitPay", "responses": { "200": { "description": "OK" } } }
+    },
+    "/healthz": {
+      "get": { "summary": "健康检查", "operationId": "healthz", "responses": { "200": { "description": "OK" } } }
+    },
+    "/metrics": {
+      "get": { "summary": "Prometheus 指标", "operationId": "metrics", "responses": { "200": { "description": "OK" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "internal_token": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CryptoMinds-Internal-Token"
+      }
+    }
+  }
+}

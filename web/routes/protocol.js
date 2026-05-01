@@ -44,85 +44,85 @@ async function proxyToPython(req, res, path) {
 // ── 协议信息 ─────────────────────────────────────
 
 router.get('/protocol/info', async (req, res) => {
-  await proxyToPython(req, res, '/api/info');
+  await proxyToPython(req, res, '/api/v1/info');
 });
 
 router.get('/protocol/channels', async (req, res) => {
-  await proxyToPython(req, res, '/api/channels');
+  await proxyToPython(req, res, '/api/v1/channels');
 });
 
 router.get('/protocol/gates', async (req, res) => {
-  await proxyToPython(req, res, '/api/gates');
+  await proxyToPython(req, res, '/api/v1/gates');
 });
 
 // ── Agent 协议 ───────────────────────────────────
 
 router.post('/protocol/agents/register', async (req, res) => {
-  await proxyToPython(req, res, '/api/agents/register');
+  await proxyToPython(req, res, '/api/v1/agents/register');
 });
 
 router.get('/protocol/agents/:agentId', async (req, res) => {
-  await proxyToPython(req, res, `/api/agents/${req.params.agentId}`);
+  await proxyToPython(req, res, `/api/v1/agents/${req.params.agentId}`);
 });
 
 router.get('/protocol/agents/:agentId/reputation', async (req, res) => {
-  await proxyToPython(req, res, `/api/agents/${req.params.agentId}/reputation`);
+  await proxyToPython(req, res, `/api/v1/agents/${req.params.agentId}/reputation`);
 });
 
 router.post('/protocol/agents/:agentId/reputation/update', async (req, res) => {
-  await proxyToPython(req, res, `/api/agents/${req.params.agentId}/reputation/update`);
+  await proxyToPython(req, res, `/api/v1/agents/${req.params.agentId}/reputation/update`);
 });
 
 router.get('/protocol/agents/:agentId/records', async (req, res) => {
-  await proxyToPython(req, res, `/api/agents/${req.params.agentId}/records`);
+  await proxyToPython(req, res, `/api/v1/agents/${req.params.agentId}/records`);
 });
 
 // ── 任务协议 ─────────────────────────────────────
 
 router.post('/protocol/tasks/create', async (req, res) => {
-  await proxyToPython(req, res, '/api/tasks/create');
+  await proxyToPython(req, res, '/api/v1/tasks/create');
 });
 
 router.post('/protocol/tasks/verify', async (req, res) => {
-  await proxyToPython(req, res, '/api/tasks/verify');
+  await proxyToPython(req, res, '/api/v1/tasks/verify');
 });
 
 router.post('/protocol/tasks/complete', async (req, res) => {
-  await proxyToPython(req, res, '/api/tasks/complete');
+  await proxyToPython(req, res, '/api/v1/tasks/complete');
 });
 
 // ── Agent 自主下单 ───────────────────────────────
 
 router.post('/protocol/agent-buy', async (req, res) => {
-  await proxyToPython(req, res, '/api/agent-buy');
+  await proxyToPython(req, res, '/api/v1/agent-buy');
 });
 
 router.get('/protocol/agents/best-match', async (req, res) => {
-  await proxyToPython(req, res, `/api/agents/best-match?${new URLSearchParams(req.query).toString()}`);
+  await proxyToPython(req, res, `/api/v1/agents/best-match?${new URLSearchParams(req.query).toString()}`);
 });
 
 // ── 市场任务 ─────────────────────────────────────
 
 router.get('/protocol/market/tasks', async (req, res) => {
-  await proxyToPython(req, res, '/api/market/tasks');
+  await proxyToPython(req, res, '/api/v1/market/tasks');
 });
 
 router.post('/protocol/market/tasks', async (req, res) => {
-  await proxyToPython(req, res, '/api/market/tasks');
+  await proxyToPython(req, res, '/api/v1/market/tasks');
 });
 
 // ── 信用货币 ─────────────────────────────────────
 
 router.post('/protocol/credit/issue', async (req, res) => {
-  await proxyToPython(req, res, '/api/credit/issue');
+  await proxyToPython(req, res, '/api/v1/credit/issue');
 });
 
 router.get('/protocol/credit', async (req, res) => {
-  await proxyToPython(req, res, '/api/credit');
+  await proxyToPython(req, res, '/api/v1/credit');
 });
 
 router.post('/protocol/credit/:currencyId/accept', async (req, res) => {
-  await proxyToPython(req, res, `/api/credit/${req.params.currencyId}/accept`);
+  await proxyToPython(req, res, `/api/v1/credit/${req.params.currencyId}/accept`);
 });
 
 module.exports = { createProtocolRoutes: () => router };

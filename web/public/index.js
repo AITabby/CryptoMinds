@@ -332,7 +332,7 @@
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 60000); // 60秒超时
-        const res = await fetch('/api/agent-buy', {
+        const res = await fetch('/api/v1/agent-buy', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
@@ -420,7 +420,7 @@
       const rating = parseInt(stars);
       if (!rating || rating < 1 || rating > 5) { alert('请输入1-5'); return; }
       try {
-        const res = await fetch('/api/rate-order', {
+        const res = await fetch('/api/v1/rate-order', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ orderId, rating, rater: currentAccount })
@@ -522,7 +522,7 @@
           const nameEl = document.getElementById('myAgentName'); if (nameEl) nameEl.textContent = '未连接钱包';
           return;
         }
-        const res = await fetch('/api/sellers');
+        const res = await fetch('/api/v1/sellers');
         const data = await res.json();
         const agents = data.sellers || data || [];
         // 只加载当前钱包的 agent
@@ -673,7 +673,7 @@
       const tabSnapshot = activeTab;
       try {
         await loadMyAgents();
-        const res = await fetch('/api/live-feed');
+        const res = await fetch('/api/v1/live-feed');
         const items = await res.json();
         if (tabSnapshot !== activeTab) return; // tab 已切走
 
@@ -754,7 +754,7 @@
       const pulseEl = document.getElementById('livePulse');
       if (statusEl) { statusEl.textContent = '● 连接中...'; statusEl.style.color = '#fbbf24'; }
 
-      liveEventSource = new EventSource('/api/live-stream');
+      liveEventSource = new EventSource('/api/v1/live-stream');
 
       liveEventSource.onmessage = function(e) {
         try {
@@ -852,7 +852,7 @@
 
     async function loadTxsFeed() {
       try {
-        const res = await fetch('/api/txs');
+        const res = await fetch('/api/v1/txs');
         const txs = await res.json();
         txs.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
         const el = document.getElementById('txList');
@@ -888,7 +888,7 @@
 
     function startTxsStream() {
       if (txsEventSource) txsEventSource.close();
-      txsEventSource = new EventSource('/api/live-stream');
+      txsEventSource = new EventSource('/api/v1/live-stream');
       txsEventSource.onmessage = function(e) {
         try {
           const item = JSON.parse(e.data);
@@ -915,7 +915,7 @@
       }
       try {
         // 使用 V2 API 检查是否是卖家
-        const res = await fetch('/api/sellers');
+        const res = await fetch('/api/v1/sellers');
         const data = await res.json();
         const sellers = data.sellers || [];
         const mySeller = sellers.find(s => s.wallet.toLowerCase() === wallet.toLowerCase());
@@ -1237,7 +1237,7 @@
       const weiValue = '0x' + BigInt(Math.round(bnbAmount * 1e18)).toString(16);
 
       // ===== Escrow 担保支付：BNB 锁入合约，卖家交付后释放 =====
-      const escrowInfo = await fetch('/api/escrow/info').then(r => r.json()).catch(() => null);
+      const escrowInfo = await fetch('/api/v1/escrow/info').then(r => r.json()).catch(() => null);
       const useEscrow = escrowInfo?.ok && escrowInfo.address;
 
       if (useEscrow) {
@@ -1282,7 +1282,7 @@
           { label: '提交订单', state: 'active' },
         ]);
 
-        const response = await fetch('/api/orders/create', {
+        const response = await fetch('/api/v1/orders/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1327,7 +1327,7 @@
           { label: '提交订单', state: 'active' },
         ]);
 
-        const response = await fetch('/api/orders/create', {
+        const response = await fetch('/api/v1/orders/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1476,7 +1476,7 @@
         tx_hash: usdcTxHash,
       }))}`;
 
-      const response = await fetch('/api/pay/x402', {
+      const response = await fetch('/api/v1/pay/x402', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1569,7 +1569,7 @@
         { label: '提交 split 聚合验证', state: 'active' },
       ], `<p style="color:#8b5cf6;">共 ${txHashes.length} 笔交易</p>`);
 
-      const response = await fetch('/api/pay/x402/split', {
+      const response = await fetch('/api/v1/pay/x402/split', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1683,7 +1683,7 @@
         tx_hash: txHash,
       }))}`;
 
-      const response = await fetch('/api/pay/x402', {
+      const response = await fetch('/api/v1/pay/x402', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1753,7 +1753,7 @@
     }
     async function submitX402VerificationWithRetry(payload, routeLabel, txHash, retryAction) {
       for (let attempt = 0; attempt < 6; attempt++) {
-        const response = await fetch('/api/pay/x402', {
+        const response = await fetch('/api/v1/pay/x402', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -1888,7 +1888,7 @@
 
         // 从服务端API获取余额
         try {
-          const res = await fetch('/api/balances');
+          const res = await fetch('/api/v1/balances');
           const data = await res.json();
           const agent = Object.values(data).find(a => a.addr.toLowerCase() === currentAccount);
           if (activeTab === 'myagent') {
@@ -2115,7 +2115,7 @@
       loadMyOrdersInNotif();
       // 标记通知已读，清除铃铛数字
       if (currentAccount) {
-        fetch('/api/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ wallet: currentAccount }) }).then(() => {
+        fetch('/api/v1/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ wallet: currentAccount }) }).then(() => {
           const el = document.getElementById('myUnread'); if (el) el.textContent = '0';
           const badge = document.getElementById('notifBadge'); if (badge) badge.style.display = 'none';
         });
@@ -2416,7 +2416,7 @@
     async function markAllRead() {
       if (!currentAccount) return;
       try {
-        await fetch('/api/notifications/read-all', {
+        await fetch('/api/v1/notifications/read-all', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ wallet: currentAccount })
@@ -2462,7 +2462,7 @@
       loadSellerNotif();
       // 标记已读
       if (currentAccount) {
-        fetch('/api/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ wallet: currentAccount }) }).then(() => {
+        fetch('/api/v1/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ wallet: currentAccount }) }).then(() => {
           const el = document.getElementById('sellerUnread'); if (el) el.textContent = '0';
         });
       }
@@ -2525,13 +2525,13 @@
       
       try {
         // 先查订单是否有 escrowOrderId（走合约托管）
-        const purchasesRes = await fetch('/api/purchases');
+        const purchasesRes = await fetch('/api/v1/purchases');
         const purchasesData = await purchasesRes.json();
         const purchase = (purchasesData.purchases || purchasesData).find(p => p.id === orderId);
         
         if (purchase?.escrowOrderId) {
           // ── 走合约交付 → 更新链上状态 ──
-          const escrowInfo = await fetch('/api/escrow/info').then(r => r.json());
+          const escrowInfo = await fetch('/api/v1/escrow/info').then(r => r.json());
           if (!escrowInfo.ok) throw new Error('合约不可用');
           
           const escrowContract = await loadEscrowContract(escrowInfo.address, escrowInfo.abi);
@@ -2614,7 +2614,7 @@
       if (!wallet) return;
       try {
         // 获取卖家信息（押金）
-        const sellerRes = await fetch('/api/sellers');
+        const sellerRes = await fetch('/api/v1/sellers');
         const sellerData = await sellerRes.json();
         const mySeller = (sellerData.sellers || []).find(s => s.wallet.toLowerCase() === wallet.toLowerCase());
         
@@ -2805,7 +2805,7 @@
           params: [{ from: currentAccount, to: '0x032Be6228a51Bd6DFAd7fbf84d09187D93749A8e', value: '0x' + (amount * 1e18).toString(16) }]
         });
         // 记录到后端
-        await fetch('/api/sellers/' + currentAccount + '/deposit', {
+        await fetch('/api/v1/sellers/' + currentAccount + '/deposit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount, txHash: tx })
@@ -2824,7 +2824,7 @@
         const wallet = currentAccount;
         if (!wallet) { showError('请先连接钱包'); return; }
 
-        const res = await fetch('/api/sellers/exit', {
+        const res = await fetch('/api/v1/sellers/exit', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ wallet })
@@ -2864,7 +2864,7 @@
       try {
         showNotice('<i data-lucide="loader" class="icon-inline spin"></i> 正在处理支付...');
         
-        const response = await fetch('/api/orders/create', {
+        const response = await fetch('/api/v1/orders/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2915,7 +2915,7 @@
       }
       
       // 调用 V2 API 退出
-      const res = await fetch('/api/sellers/exit', {
+      const res = await fetch('/api/v1/sellers/exit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ wallet: currentAccount })
@@ -2958,7 +2958,7 @@
 
     async function loadDepositConfig() {
       try {
-        const res = await fetch('/api/config/deposit');
+        const res = await fetch('/api/v1/config/deposit');
         depositConfig = await res.json();
         lucide.createIcons();
       } catch(e) { console.error('Load deposit config error:', e); }
@@ -3022,7 +3022,7 @@ async function payDeposit() {
     btn.textContent = '注册卖家中...';
     
     // 第二步：提交注册（带押金交易哈希）
-    const res = await fetch('/api/sellers/register', {
+    const res = await fetch('/api/v1/sellers/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, desc, feeRate, wallet, endpoint, depositTx: txHash })
@@ -3120,7 +3120,7 @@ async function confirmDepositModal() {
         console.log('Deposit response:', depositData);
         if (depositData.ok) {
           // 获取卖家名称
-          const servicesRes = await fetch('/api/sellers');
+          const servicesRes = await fetch('/api/v1/sellers');
           const services = await servicesRes.json();
           const svc = services.find(s => s.id === pendingServiceId);
           if (svc) {
@@ -3251,7 +3251,7 @@ async function confirmDepositModal() {
       const tabSnapshot = activeTab;
       try {
         // v2: 从 sellers API 加载
-        const res = await fetch('/api/sellers');
+        const res = await fetch('/api/v1/sellers');
         const data = await res.json();
         if (tabSnapshot !== activeTab) return;
         const sellers = data.sellers || [];
@@ -3280,7 +3280,7 @@ async function confirmDepositModal() {
       if (!name) { showError('请输入 Agent 名称'); return; }
       const endpoint = document.getElementById('regAgentEndpoint')?.value?.trim() || '';
       try {
-        const res = await fetch('/api/agents/register', {
+        const res = await fetch('/api/v1/agents/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, wallet: currentAccount, endpoint, framework: 'web' })
@@ -3306,7 +3306,7 @@ async function confirmDepositModal() {
     // 检查买家 Agent 是否已注册
     async function checkAgentRegistered(wallet) {
       try {
-        const res = await fetch('/api/agents');
+        const res = await fetch('/api/v1/agents');
         const agents = await res.json();
         return agents.find(a => (a.wallet || '').toLowerCase() === wallet.toLowerCase());
       } catch(e) { return null; }
@@ -3342,7 +3342,7 @@ async function confirmDepositModal() {
       document.getElementById('myAddr').textContent = wallet;
 
       try {
-        const res = await fetch('/api/balances');
+        const res = await fetch('/api/v1/balances');
         const data = await res.json();
         const agent = Object.values(data).find(a => a.addr.toLowerCase() === wallet);
         if (activeTab === 'myagent') {
@@ -3370,7 +3370,7 @@ async function confirmDepositModal() {
     window._txPollTimer = setInterval(() => {
       const w = getActiveWallet();
       if (w) {
-        fetch('/api/sync-chain?wallet=' + w).catch(() => {});
+        fetch('/api/v1/sync-chain?wallet=' + w).catch(() => {});
         autoLoadWalletData();
       }
       // 刷新 metrics 和市场数据（仅市场相关 tab 更新）
@@ -3383,7 +3383,7 @@ async function confirmDepositModal() {
     // 加载待确认订单
     async function loadPendingPurchases() {
       try {
-        const res = await fetch('/api/purchases/pending');
+        const res = await fetch('/api/v1/purchases/pending');
         const data = await res.json();
         const section = document.getElementById('pendingConfirmSection');
         const list = document.getElementById('pendingList');
@@ -3411,13 +3411,13 @@ async function confirmDepositModal() {
     async function confirmPurchase(purchaseId) {
       try {
         // 先查订单是否有 escrowOrderId（走合约托管）
-        const purchasesRes = await fetch('/api/purchases');
+        const purchasesRes = await fetch('/api/v1/purchases');
         const purchasesData = await purchasesRes.json();
         const purchase = (purchasesData.purchases || purchasesData).find(p => p.id === purchaseId);
 
         if (purchase?.escrowOrderId) {
           // ── 走合约确认 → 释放 BNB 给卖家 ──
-          const escrowInfo = await fetch('/api/escrow/info').then(r => r.json());
+          const escrowInfo = await fetch('/api/v1/escrow/info').then(r => r.json());
           if (!escrowInfo.ok) throw new Error('合约不可用');
 
           const escrowContract = await loadEscrowContract(escrowInfo.address, escrowInfo.abi);
@@ -3432,7 +3432,7 @@ async function confirmDepositModal() {
 
         // 后端确认（更新评分等）
         const buyerAuth = await signBuyerAction('confirm', purchaseId, getActiveWallet());
-        const res = await fetch('/api/purchases/confirm/' + purchaseId, {
+        const res = await fetch('/api/v1/purchases/confirm/' + purchaseId, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(buyerAuth)
@@ -3456,7 +3456,7 @@ async function confirmDepositModal() {
       try {
         if (!escrowOrderId) throw new Error('无合约订单ID');
         
-        const escrowInfo = await fetch('/api/escrow/info').then(r => r.json());
+        const escrowInfo = await fetch('/api/v1/escrow/info').then(r => r.json());
         if (!escrowInfo.ok) throw new Error('合约不可用');
 
         const escrowContract = await loadEscrowContract(escrowInfo.address, escrowInfo.abi);
@@ -3513,7 +3513,7 @@ async function confirmDepositModal() {
       }).length;
 
       // --- 从真实购买订单计算 ---
-      fetch('/api/purchases').then(r => r.json()).then(purchases => {
+      fetch('/api/v1/purchases').then(r => r.json()).then(purchases => {
         const allOrders = purchases.filter(p => p.status === 'completed' || p.status === 'delivered');
 
         // 24h 订单
@@ -3551,7 +3551,7 @@ async function confirmDepositModal() {
 
       // Agent 总数 — 从 sellers API 取最新
       try {
-        const sRes = await fetch('/api/sellers');
+        const sRes = await fetch('/api/v1/sellers');
         const sData = await sRes.json();
         m.totalAgents = (sData.sellers || []).length;
       } catch(e) {}
@@ -4179,7 +4179,7 @@ async function confirmDepositModal() {
         const sub = await reg.pushManager.getSubscription();
         if (sub) return; // 已订阅
 
-        const keyRes = await fetch('/api/push/vapidPublicKey');
+        const keyRes = await fetch('/api/v1/push/vapidPublicKey');
         const { publicKey } = await keyRes.json();
         const newSub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
@@ -4190,7 +4190,7 @@ async function confirmDepositModal() {
         const waitForWallet = setInterval(() => {
           if (currentAccount) {
             clearInterval(waitForWallet);
-            fetch('/api/push/subscribe', {
+            fetch('/api/v1/push/subscribe', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ wallet: currentAccount, subscription: newSub.toJSON() })

@@ -76,7 +76,7 @@ if receipt['status'] == 1:
         }).encode('utf-8')
         
         req = urllib.request.Request(
-            'http://localhost:3457/api/tx',
+            'http://localhost:3457/api/v1/tx',
             data=data,
             headers={'Content-Type': 'application/json'}
         )

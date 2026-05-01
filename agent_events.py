@@ -29,7 +29,7 @@ def _push(event_type, agent, message, **kwargs):
             "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
         }
         payload.update(kwargs)
-        requests.post(f"{MARKET_URL}/api/agent-events", json=payload, timeout=2)
+        requests.post(f"{MARKET_URL}/api/v1/agent-events", json=payload, timeout=2)
     except Exception:
         pass  # 静默失败，不影响主流程
 

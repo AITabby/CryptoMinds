@@ -45,6 +45,14 @@ logger = logging.getLogger(__name__)
 def log_request_start():
     g._start_time = time.time()
 
+
+@app.before_request
+def redirect_old_api():
+    """Redirect /api/* → /api/v1/* for backwards compatibility."""
+    if request.path.startswith("/api/") and not request.path.startswith("/api/v1/"):
+        from flask import redirect
+        return redirect(f"/api/v1{request.path[4:]}", code=301)
+
 @app.after_request
 def log_request_end(response):
     duration_ms = (time.time() - g.get('_start_time', time.time())) * 1000
@@ -81,19 +89,19 @@ def require_auth(f):
 
 # ── 协议信息 ────────────────────────────────────────
 
-@app.route("/api/info", methods=["GET"])
+@app.route("/api/v1/info", methods=["GET"])
 def api_info():
     """获取协议信息"""
     return jsonify(get_protocol_info())
 
 
-@app.route("/api/channels", methods=["GET"])
+@app.route("/api/v1/channels", methods=["GET"])
 def api_channels():
     """列出所有结算通道"""
     return jsonify(ChannelRegistry.list_all())
 
 
-@app.route("/api/gates", methods=["GET"])
+@app.route("/api/v1/gates", methods=["GET"])
 def api_gates():
     """列出所有验证门"""
     return jsonify(GateRegistry.list_all())
@@ -101,7 +109,7 @@ def api_gates():
 
 # ── Agent 管理 ──────────────────────────────────────
 
-@app.route("/api/agents/register", methods=["POST"])
+@app.route("/api/v1/agents/register", methods=["POST"])
 @require_auth
 def api_register_agent():
     """注册 Agent"""
@@ -151,7 +159,7 @@ def api_register_agent():
     return jsonify(result), 400
 
 
-@app.route("/api/agents", methods=["GET"])
+@app.route("/api/v1/agents", methods=["GET"])
 def api_list_agents():
     """列出所有 Agent"""
     task_type = request.args.get("task_type")
@@ -173,7 +181,7 @@ def api_list_agents():
     return jsonify({"agents": agents})
 
 
-@app.route("/api/agents/<agent_id>", methods=["GET"])
+@app.route("/api/v1/agents/<agent_id>", methods=["GET"])
 def api_get_agent(agent_id):
     """获取 Agent 信息"""
     agent = AgentRegistry.get(agent_id)
@@ -182,7 +190,7 @@ def api_get_agent(agent_id):
     return jsonify({"error": f"未知 Agent: {agent_id}"}), 404
 
 
-@app.route("/api/agents/<agent_id>/reputation", methods=["GET"])
+@app.route("/api/v1/agents/<agent_id>/reputation", methods=["GET"])
 def api_get_reputation(agent_id):
     """获取 Agent 信誉分"""
     agent = AgentRegistry.get(agent_id)
@@ -193,7 +201,7 @@ def api_get_reputation(agent_id):
     return jsonify(rep)
 
 
-@app.route("/api/agents/<agent_id>/reputation/update", methods=["POST"])
+@app.route("/api/v1/agents/<agent_id>/reputation/update", methods=["POST"])
 @require_auth
 def api_update_reputation(agent_id):
     """更新 Agent 信誉分"""
@@ -203,7 +211,7 @@ def api_update_reputation(agent_id):
     return jsonify(result), 400
 
 
-@app.route("/api/agents/<agent_id>/records", methods=["GET"])
+@app.route("/api/v1/agents/<agent_id>/records", methods=["GET"])
 def api_get_records(agent_id):
     """获取 Agent 履约记录"""
     agent = AgentRegistry.get(agent_id)
@@ -217,7 +225,7 @@ def api_get_records(agent_id):
 
 # ── 任务执行 ────────────────────────────────────────
 
-@app.route("/api/tasks/create", methods=["POST"])
+@app.route("/api/v1/tasks/create", methods=["POST"])
 @require_auth
 def api_create_task():
     """创建任务"""
@@ -250,7 +258,7 @@ def api_create_task():
     return jsonify(result), 400
 
 
-@app.route("/api/tasks/verify", methods=["POST"])
+@app.route("/api/v1/tasks/verify", methods=["POST"])
 @require_auth
 def api_verify_task():
     """验证任务"""
@@ -281,7 +289,7 @@ def api_verify_task():
     return jsonify(result.to_dict())
 
 
-@app.route("/api/tasks/complete", methods=["POST"])
+@app.route("/api/v1/tasks/complete", methods=["POST"])
 @require_auth
 def api_complete_task():
     """记录任务完成"""
@@ -316,14 +324,14 @@ def api_complete_task():
 
 # ── 市场任务 ────────────────────────────────────────
 
-@app.route("/api/market/tasks", methods=["GET"])
+@app.route("/api/v1/market/tasks", methods=["GET"])
 def api_market_tasks_get():
     """Agent 市场任务队列（读取）"""
     limit = int(request.args.get("limit", "100"))
     return jsonify({"tasks": MARKET_TASKS[:limit]})
 
 
-@app.route("/api/market/tasks", methods=["POST"])
+@app.route("/api/v1/market/tasks", methods=["POST"])
 @require_auth
 def api_market_tasks_post():
     """Agent 市场任务队列（发布）"""
@@ -352,7 +360,7 @@ def api_market_tasks_post():
 
 # ── Agent 自主下单 ──────────────────────────────────
 
-@app.route("/api/agent-buy", methods=["POST"])
+@app.route("/api/v1/agent-buy", methods=["POST"])
 @require_auth
 def api_agent_buy():
     """Agent 自主下单"""
@@ -374,7 +382,7 @@ def api_agent_buy():
     return jsonify(result), 400
 
 
-@app.route("/api/agents/best-match", methods=["GET"])
+@app.route("/api/v1/agents/best-match", methods=["GET"])
 def api_best_match():
     """找到最佳匹配的 Agent"""
     task_type = request.args.get("task_type")
@@ -399,7 +407,7 @@ def api_best_match():
 
 # ── 信用货币 ────────────────────────────────────────
 
-@app.route("/api/credit/issue", methods=["POST"])
+@app.route("/api/v1/credit/issue", methods=["POST"])
 @require_auth
 def api_issue_credit():
     """发行信用货币"""
@@ -422,13 +430,13 @@ def api_issue_credit():
     return jsonify(result), 400
 
 
-@app.route("/api/credit", methods=["GET"])
+@app.route("/api/v1/credit", methods=["GET"])
 def api_list_credit():
     """列出所有信用货币"""
     return jsonify({"currencies": list_credit_currencies()})
 
 
-@app.route("/api/credit/<currency_id>/accept", methods=["POST"])
+@app.route("/api/v1/credit/<currency_id>/accept", methods=["POST"])
 @require_auth
 def api_accept_credit(currency_id):
     """接受信用货币"""

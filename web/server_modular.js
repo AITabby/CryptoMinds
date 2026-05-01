@@ -252,7 +252,7 @@ async function setupRoutes() {
   app.locals.dataStore = store;
 
   // 市场路由
-  app.use('/api', createMarketRoutes({
+  app.use('/api/v1', createMarketRoutes({
     getSellers: () => store.getSellers(),
     getPurchases: () => store.getPurchases(),
     getTxs: () => store.getTxLogs(),
@@ -264,7 +264,7 @@ async function setupRoutes() {
   }));
 
   // 通知路由
-  app.use('/api', createNotificationRoutes({
+  app.use('/api/v1', createNotificationRoutes({
     getNotifications: (wallet, limit) => store.getNotifications(wallet, limit),
     markNotificationRead: (id) => store.markNotificationRead(id),
     markAllNotificationsRead: (wallet) => store.markAllNotificationsRead(wallet),
@@ -274,7 +274,7 @@ async function setupRoutes() {
   }));
 
   // Agent 路由
-  app.use('/api', createAgentRoutes({
+  app.use('/api/v1', createAgentRoutes({
     getAgents: () => store.getAgents(),
     saveAgent: (agent) => store.saveAgent(agent),
     getAgent: (id) => store.getAgent(id),
@@ -289,7 +289,7 @@ async function setupRoutes() {
   }));
 
   // 支付路由
-  app.use('/api', createPaymentRoutes({
+  app.use('/api/v1', createPaymentRoutes({
     PYTHON_BIN,
     SDK_DIR,
     MANAGED_X402_SCRIPT,
@@ -300,7 +300,7 @@ async function setupRoutes() {
   }));
 
   // 订单路由
-  app.use('/api', createOrderRoutes({
+  app.use('/api/v1', createOrderRoutes({
     getPurchases: () => store.getPurchases(),
     getPurchase: (id) => store.getPurchase(id),
     updatePurchase: (id, updates) => store.updatePurchase(id, updates),
@@ -312,7 +312,7 @@ async function setupRoutes() {
   }));
 
   // 管理路由
-  app.use('/api', createAdminRoutes({
+  app.use('/api/v1', createAdminRoutes({
     PYTHON_BIN,
     projectRoot,
     depositPoolAddress: DEPOSIT_POOL_ADDRESS,
@@ -326,7 +326,7 @@ async function setupRoutes() {
   }));
 
   // 协议路由（代理到 Python 服务）
-  app.use('/api', createProtocolRoutes());
+  app.use('/api/v1', createProtocolRoutes());
 
   // 卖家市场 handlers（直接挂载）
   const sellersStore = createSellersStore(projectRoot);
@@ -343,13 +343,13 @@ async function setupRoutes() {
     demoMode: DEMO_MODE,
   });
 
-  app.get('/api/sellers', sellersMarketHandlers.listSellers);
-  app.post('/api/sellers/register', sellersMarketHandlers.registerSeller);
-  app.post('/api/sellers/:wallet/deposit', sellersMarketHandlers.depositSeller);
-  app.post('/api/orders/create', sellersMarketHandlers.createOrder);
-  app.post('/api/sellers/exit', sellersMarketHandlers.exitSeller);
-  app.post('/api/orders/:id/execute', sellersMarketHandlers.executeOrder);
-  app.post('/api/rate-order', sellersMarketHandlers.rateOrder);
+  app.get('/api/v1/sellers', sellersMarketHandlers.listSellers);
+  app.post('/api/v1/sellers/register', sellersMarketHandlers.registerSeller);
+  app.post('/api/v1/sellers/:wallet/deposit', sellersMarketHandlers.depositSeller);
+  app.post('/api/v1/orders/create', sellersMarketHandlers.createOrder);
+  app.post('/api/v1/sellers/exit', sellersMarketHandlers.exitSeller);
+  app.post('/api/v1/orders/:id/execute', sellersMarketHandlers.executeOrder);
+  app.post('/api/v1/rate-order', sellersMarketHandlers.rateOrder);
 
   // Agent 自主下单（从 agent_buy.js）
   const { pickSellerHandler, agentBuyHandler } = createAgentBuyHandlers({
@@ -364,9 +364,18 @@ async function setupRoutes() {
     addPurchase: (p) => store.savePurchase(p),
     addTx: (tx) => store.saveTxLog(tx),
   });
-  app.post('/api/agents/:wallet/pick-seller', pickSellerHandler);
-  app.post('/api/agent-buy', agentBuyHandler);
+  app.post('/api/v1/agents/:wallet/pick-seller', pickSellerHandler);
+  app.post('/api/v1/agent-buy', agentBuyHandler);
 }
+
+// ── API versioning: redirect /api/* → /api/v1/* (back-compat) ──
+app.use('/api', (req, res, next) => {
+  if (!req.path.startsWith('/v1')) {
+    res.redirect(301, `/api/v1${req.path}`);
+  } else {
+    next();
+  }
+});
 
 // ── 基础路由 ─────────────────────────────────────
 
@@ -427,7 +436,13 @@ app.get('/metrics', (req, res) => {
   res.send(renderMetrics());
 });
 
-app.get('/api/config', (req, res) => {
+// ── OpenAPI spec endpoint ──
+app.get('/api-docs', (req, res) => {
+  const specPath = path.join(__dirname, '..', 'docs', 'openapi.json');
+  res.sendFile(specPath);
+});
+
+app.get('/api/v1/config', (req, res) => {
   res.json({
     demoMode: DEMO_MODE,
     escrowAddress: getEscrowAddress() || null,
