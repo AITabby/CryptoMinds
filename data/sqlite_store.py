@@ -36,7 +36,10 @@ def _ensure_tables(conn: sqlite3.Connection):
             response_time_ms INTEGER DEFAULT 0,
             payment_tx TEXT,
             payment_amount TEXT,
-            evidence TEXT
+            evidence TEXT,
+            disputed INTEGER DEFAULT 0,
+            dispute_reason TEXT DEFAULT '',
+            resolution TEXT DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS credit_currencies (
@@ -65,8 +68,56 @@ def _ensure_tables(conn: sqlite3.Connection):
             ON performance_records(buyer_wallet);
         CREATE INDEX IF NOT EXISTS idx_records_task
             ON performance_records(task_id);
+
+        CREATE TABLE IF NOT EXISTS escrow_orders (
+            escrow_id TEXT PRIMARY KEY,
+            task_id TEXT,
+            order_id TEXT,
+            buyer_wallet TEXT NOT NULL,
+            seller_wallet TEXT NOT NULL,
+            seller_agent_id TEXT,
+            amount TEXT NOT NULL,
+            channel_id TEXT,
+            chain TEXT DEFAULT 'bsc',
+            on_chain_order_id TEXT,
+            state TEXT DEFAULT 'created',
+            created_at INTEGER,
+            funded_at INTEGER,
+            delivered_at INTEGER,
+            verified_at INTEGER,
+            disputed_at INTEGER,
+            resolved_at INTEGER,
+            seller_timeout_at INTEGER,
+            buyer_timeout_at INTEGER,
+            dispute_reason TEXT DEFAULT '',
+            dispute_initiator TEXT DEFAULT '',
+            arbitration_weight_buyer REAL DEFAULT 0,
+            arbitration_weight_seller REAL DEFAULT 0,
+            resolution TEXT DEFAULT '',
+            resolution_reason TEXT DEFAULT '',
+            verification_score REAL DEFAULT 0,
+            verification_threshold REAL DEFAULT 0.7,
+            dispute_window_seconds INTEGER DEFAULT 172800,
+            evidence TEXT DEFAULT ''
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_escrow_task ON escrow_orders(task_id);
+        CREATE INDEX IF NOT EXISTS idx_escrow_seller ON escrow_orders(seller_wallet);
+        CREATE INDEX IF NOT EXISTS idx_escrow_state ON escrow_orders(state);
     """)
     conn.commit()
+
+
+def _migrate(conn: sqlite3.Connection):
+    """Add columns that may not exist in older databases."""
+    # Check if disputed column exists in performance_records
+    try:
+        conn.execute("SELECT disputed FROM performance_records LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE performance_records ADD COLUMN disputed INTEGER DEFAULT 0")
+        conn.execute("ALTER TABLE performance_records ADD COLUMN dispute_reason TEXT DEFAULT ''")
+        conn.execute("ALTER TABLE performance_records ADD COLUMN resolution TEXT DEFAULT ''")
+        conn.commit()
 
 
 class SqliteRecordStore:
@@ -75,6 +126,7 @@ class SqliteRecordStore:
     def __init__(self, db_path: str):
         self._conn = _connect(db_path)
         _ensure_tables(self._conn)
+        _migrate(self._conn)
         # In-memory cache for fast lookups
         self._records: Dict[str, object] = {}
         self._seller_index: Dict[str, List[str]] = {}
@@ -126,6 +178,9 @@ class SqliteRecordStore:
             payment_tx=row["payment_tx"] or "",
             payment_amount=Decimal(row["payment_amount"] or "0"),
             evidence=evidence,
+            disputed=bool(row["disputed"] if "disputed" in row.keys() else 0),
+            dispute_reason=row["dispute_reason"] if "dispute_reason" in row.keys() else "",
+            resolution=row["resolution"] if "resolution" in row.keys() else "",
         )
 
     def _record_to_row(self, record) -> dict:
@@ -147,6 +202,9 @@ class SqliteRecordStore:
             "payment_tx": record.payment_tx,
             "payment_amount": str(record.payment_amount),
             "evidence": json.dumps(record.evidence, ensure_ascii=False) if record.evidence else "",
+            "disputed": int(record.disputed),
+            "dispute_reason": record.dispute_reason or "",
+            "resolution": record.resolution or "",
         }
 
     def save(self, record) -> None:
@@ -194,6 +252,7 @@ class SqliteCreditStore:
     def __init__(self, db_path: str):
         self._conn = _connect(db_path)
         _ensure_tables(self._conn)
+        _migrate(self._conn)
         # In-memory state
         self._currencies: Dict[str, object] = {}
         self._balances: Dict[str, Dict[str, Decimal]] = {}
@@ -420,6 +479,7 @@ class SqliteAgentBridge:
     def __init__(self, db_path: str):
         self._conn = _connect(db_path)
         _ensure_tables(self._conn)
+        _migrate(self._conn)
 
     def save_agent(self, agent) -> None:
         """Write an agent to the SQLite agents table."""
@@ -447,3 +507,127 @@ class SqliteAgentBridge:
         """Remove an agent from SQLite."""
         self._conn.execute("DELETE FROM agents WHERE id = ? OR wallet = ?", (agent_id, wallet))
         self._conn.commit()
+
+
+class SqliteEscrowStore:
+    """SQLite-backed escrow order store."""
+
+    def __init__(self, db_path: str):
+        self._conn = _connect(db_path)
+        _ensure_tables(self._conn)
+        _migrate(self._conn)
+        self._orders: Dict[str, EscrowOrder] = {}
+        self._load_all()
+
+    def _load_all(self):
+        from escrow.models import EscrowOrder
+        from settlement.escrow_state import EscrowState
+        rows = self._conn.execute("SELECT * FROM escrow_orders").fetchall()
+        for row in rows:
+            order = self._row_to_order(row)
+            self._orders[order.escrow_id] = order
+
+    def _row_to_order(self, row) -> object:
+        from escrow.models import EscrowOrder
+        from settlement.escrow_state import EscrowState
+        evidence = row["evidence"] or ""
+        if evidence:
+            try:
+                evidence = json.loads(evidence)
+            except (json.JSONDecodeError, TypeError):
+                evidence = {}
+
+        return EscrowOrder(
+            escrow_id=row["escrow_id"],
+            task_id=row["task_id"] or "",
+            order_id=row["order_id"] or "",
+            buyer_wallet=row["buyer_wallet"] or "",
+            seller_wallet=row["seller_wallet"] or "",
+            seller_agent_id=row["seller_agent_id"] or "",
+            amount=Decimal(row["amount"] or "0"),
+            channel_id=row["channel_id"] or "",
+            chain=row["chain"] or "bsc",
+            on_chain_order_id=row["on_chain_order_id"] or None,
+            state=EscrowState(row["state"] or "created"),
+            created_at=row["created_at"] or 0,
+            funded_at=row["funded_at"] or 0,
+            delivered_at=row["delivered_at"] or 0,
+            verified_at=row["verified_at"] or 0,
+            disputed_at=row["disputed_at"] or 0,
+            resolved_at=row["resolved_at"] or 0,
+            seller_timeout_at=row["seller_timeout_at"] or 0,
+            buyer_timeout_at=row["buyer_timeout_at"] or 0,
+            dispute_reason=row["dispute_reason"] or "",
+            dispute_initiator=row["dispute_initiator"] or "",
+            arbitration_weight_buyer=float(row["arbitration_weight_buyer"] or 0),
+            arbitration_weight_seller=float(row["arbitration_weight_seller"] or 0),
+            resolution=row["resolution"] or "",
+            resolution_reason=row["resolution_reason"] or "",
+            verification_score=float(row["verification_score"] or 0),
+            verification_threshold=float(row["verification_threshold"] or 0.7),
+            dispute_window_seconds=int(row["dispute_window_seconds"] or 172800),
+            verification_evidence=evidence,
+        )
+
+    def _order_to_row(self, order) -> dict:
+        return {
+            "escrow_id": order.escrow_id,
+            "task_id": order.task_id,
+            "order_id": order.order_id,
+            "buyer_wallet": order.buyer_wallet,
+            "seller_wallet": order.seller_wallet,
+            "seller_agent_id": order.seller_agent_id,
+            "amount": str(order.amount),
+            "channel_id": order.channel_id,
+            "chain": order.chain,
+            "on_chain_order_id": order.on_chain_order_id or "",
+            "state": order.state.value,
+            "created_at": order.created_at,
+            "funded_at": order.funded_at,
+            "delivered_at": order.delivered_at,
+            "verified_at": order.verified_at,
+            "disputed_at": order.disputed_at,
+            "resolved_at": order.resolved_at,
+            "seller_timeout_at": order.seller_timeout_at,
+            "buyer_timeout_at": order.buyer_timeout_at,
+            "dispute_reason": order.dispute_reason,
+            "dispute_initiator": order.dispute_initiator,
+            "arbitration_weight_buyer": order.arbitration_weight_buyer,
+            "arbitration_weight_seller": order.arbitration_weight_seller,
+            "resolution": order.resolution,
+            "resolution_reason": order.resolution_reason,
+            "verification_score": order.verification_score,
+            "verification_threshold": order.verification_threshold,
+            "dispute_window_seconds": order.dispute_window_seconds,
+            "evidence": json.dumps(order.verification_evidence, ensure_ascii=False) if order.verification_evidence else "",
+        }
+
+    def save(self, order) -> None:
+        self._orders[order.escrow_id] = order
+        row = self._order_to_row(order)
+        cols = ", ".join(row.keys())
+        vals = ", ".join(["?"] * len(row))
+        updates = ", ".join([f"{k}=?" for k in row.keys() if k != "escrow_id"])
+        self._conn.execute(
+            f"INSERT INTO escrow_orders ({cols}) VALUES ({vals}) ON CONFLICT(escrow_id) DO UPDATE SET {updates}",
+            list(row.values()) + [v for k, v in row.items() if k != "escrow_id"],
+        )
+        self._conn.commit()
+
+    def get(self, escrow_id: str) -> Optional[object]:
+        return self._orders.get(escrow_id)
+
+    def get_by_task(self, task_id: str) -> Optional[object]:
+        for order in self._orders.values():
+            if order.task_id == task_id:
+                return order
+        return None
+
+    def get_by_state(self, state) -> List[object]:
+        return [o for o in self._orders.values() if o.state == state]
+
+    def get_by_seller(self, seller_wallet: str) -> List[object]:
+        return [o for o in self._orders.values() if o.seller_wallet == seller_wallet]
+
+    def count(self) -> int:
+        return len(self._orders)

@@ -24,27 +24,32 @@ function createAdminRoutes({
   getWallets,
   getManagedAgents,
 }) {
-  // 管理员认证中间件（双模式：共享密钥 or 链上签名）
+  // 管理员认证中间件
   function requireAdmin(req, res, next) {
-    // Mode 1: Shared secret (server-to-server)
     const adminSecret = process.env.ADMIN_SECRET;
+
+    // Mode 1: Shared secret (preferred, always checked first)
     if (adminSecret) {
       const supplied = req.headers['x-admin-secret'] || req.body.adminSecret;
       if (supplied) {
         const suppliedBuf = Buffer.from(supplied, 'utf8');
         const secretBuf = Buffer.from(adminSecret, 'utf8');
-        // timingSafeEqual requires equal-length buffers; pad shorter one
         if (suppliedBuf.length === secretBuf.length &&
             crypto.timingSafeEqual(suppliedBuf, secretBuf)) {
           return next();
         }
       }
+      // ADMIN_SECRET is configured — wallet-only auth is disabled
+      return res.json({ ok: false, error: '需要管理员权限 (ADMIN_SECRET 已配置，仅支持密钥认证)' });
     }
 
-    // Mode 2: Wallet address (legacy, less secure)
+    // Mode 2: Wallet address (fallback when ADMIN_SECRET not set)
     const adminWallets = (process.env.ADMIN_WALLETS || '').split(',').filter(Boolean);
-    const caller = req.body.caller || req.query.caller || req.headers['x-admin-wallet'];
+    if (adminWallets.length === 0) {
+      return res.json({ ok: false, error: '管理员认证未配置 (需设置 ADMIN_SECRET 或 ADMIN_WALLETS)' });
+    }
 
+    const caller = req.body.caller || req.query.caller || req.headers['x-admin-wallet'];
     if (caller && adminWallets.some(w => w.toLowerCase() === caller.toLowerCase())) {
       return next();
     }

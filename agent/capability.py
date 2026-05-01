@@ -88,6 +88,7 @@ class ReputationInfo:
     score: float = 0.0                      # 综合评分 0-5
     tasks_completed: int = 0                # 完成任务数
     tasks_failed: int = 0                   # 失败任务数
+    dispute_rate: float = 0.0               # 争议率 (争议任务/总任务)
     total_volume: Decimal = Decimal("0")    # 总交易量
     avg_response_time_ms: int = 0           # 平均响应时间（毫秒）
 
@@ -100,6 +101,7 @@ class ReputationInfo:
             "score": self.score,
             "tasks_completed": self.tasks_completed,
             "tasks_failed": self.tasks_failed,
+            "dispute_rate": self.dispute_rate,
             "total_volume": str(self.total_volume),
             "avg_response_time_ms": self.avg_response_time_ms,
             "last_24h_tasks": self.last_24h_tasks,
@@ -112,6 +114,7 @@ class ReputationInfo:
             score=data.get("score", 0.0),
             tasks_completed=data.get("tasks_completed", 0),
             tasks_failed=data.get("tasks_failed", 0),
+            dispute_rate=data.get("dispute_rate", 0.0),
             total_volume=Decimal(str(data.get("total_volume", 0))),
             avg_response_time_ms=data.get("avg_response_time_ms", 0),
             last_24h_tasks=data.get("last_24h_tasks", 0),

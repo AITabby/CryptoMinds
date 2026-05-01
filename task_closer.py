@@ -1,9 +1,12 @@
 """
 任务闭环处理器
 
-将验证层和结算层联动：
+将验证层、结算层、争议层联动：
 1. 任务执行完成 → 提交结果
-2. 验证门验证 → 自动判定
+2. 验证门验证 → 三分支判定:
+   - 通过 + score >= threshold → 自动结算放款
+   - 通过 + score < threshold → 进入争议窗口
+   - 失败 → 进入争议窗口
 3. 验证通过 → 结算放款
 4. 记录履约 → 更新信誉
 """
@@ -22,6 +25,12 @@ from protocol import (
 )
 from verification.base import TaskInput, TaskOutput
 from reputation.record import TaskStatus
+from settlement.escrow_state import EscrowState
+
+logger = logging.getLogger(__name__)
+
+# Default verification threshold — below this score triggers dispute
+DEFAULT_VERIFICATION_THRESHOLD = 0.7
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +42,12 @@ class TaskResult:
     success: bool
     verified: bool = False
     paid: bool = False
+    disputed: bool = False
     amount: Decimal = Decimal("0")
     tx_hash: str = ""
     error: str = ""
+    verification_score: float = 0.0
+    escrow_id: str = ""
 
 
 class TaskCloser:
@@ -43,14 +55,16 @@ class TaskCloser:
     任务闭环处理器
 
     负责：
-    1. 验证任务结果
-    2. 触发结算放款
+    1. 验证任务结果 (三分支: pass/dispute-low/dispute-fail)
+    2. 触发结算放款 or 进入争议
     3. 记录履约
     4. 更新信誉
     """
 
-    def __init__(self):
-        self.pending_escrows: Dict[str, Dict] = {}  # escrow_id -> escrow_info
+    def __init__(self, escrow_store=None, arbitration_engine=None):
+        self.pending_escrows: Dict[str, Dict] = {}
+        self._escrow_store = escrow_store
+        self._arbitration_engine = arbitration_engine
 
     # ── 完整闭环 ─────────────────────────────────────
 
@@ -67,13 +81,15 @@ class TaskCloser:
         task_output: TaskOutput,
         escrow_id: str = None,
         private_key: str = None,
+        verification_threshold: float = DEFAULT_VERIFICATION_THRESHOLD,
     ) -> TaskResult:
         """
-        完成任务闭环
+        完成任务闭环 (三分支逻辑)
 
-        流程：
         1. 验证结果
-        2. 结算放款
+        2a. 验证通过 + score >= threshold → 结算放款
+        2b. 验证通过 + score < threshold → 进入争议窗口
+        2c. 验证失败 → 进入争议窗口
         3. 记录履约
         4. 更新信誉
 
@@ -89,6 +105,7 @@ class TaskCloser:
             task_output: 任务输出
             escrow_id: 托管 ID（如果有）
             private_key: 卖家私钥（用于签名）
+            verification_threshold: 验证分数阈值，低于此进入争议
 
         Returns:
             TaskResult
@@ -111,13 +128,15 @@ class TaskCloser:
         # 2. 验证结果
         logger.info(f"[{task_id}] 开始验证...")
         verify_result = verify_task(task_type, task_input, task_output)
+        result.verification_score = verify_result.score
+
+        # ── 三分支判定 ──────────────────────────────────
 
         if not verify_result.success:
-            result.error = f"验证失败: {verify_result.error}"
-            logger.error(f"[{task_id}] {result.error}")
-
-            # 记录失败
-            self._record_task(
+            # 分支 2c: 验证失败 → 争议窗口
+            logger.warning(f"[{task_id}] 验证失败: {verify_result.error}")
+            return self._enter_dispute(
+                result=result,
                 task_id=task_id,
                 task_type=task_type,
                 buyer_wallet=buyer_wallet,
@@ -125,13 +144,36 @@ class TaskCloser:
                 seller_agent_id=seller_agent_id,
                 chain=chain,
                 amount=amount,
-                status=TaskStatus.FAILED,
-                score=verify_result.score,
+                escrow_id=escrow_id,
+                reason=f"验证失败: {verify_result.error}",
+                initiator="system",
+                verify_score=verify_result.score,
                 evidence=verify_result.evidence,
             )
 
-            return result
+        # 验证通过，但检查分数阈值
+        if verify_result.score < verification_threshold:
+            # 分支 2b: 分数过低 → 争议窗口
+            logger.warning(
+                f"[{task_id}] 验证分数过低: {verify_result.score:.2f} < {verification_threshold}"
+            )
+            return self._enter_dispute(
+                result=result,
+                task_id=task_id,
+                task_type=task_type,
+                buyer_wallet=buyer_wallet,
+                seller_wallet=seller_wallet,
+                seller_agent_id=seller_agent_id,
+                chain=chain,
+                amount=amount,
+                escrow_id=escrow_id,
+                reason=f"验证分数过低: {verify_result.score:.2f} < {verification_threshold}",
+                initiator="system",
+                verify_score=verify_result.score,
+                evidence=verify_result.evidence,
+            )
 
+        # 分支 2a: 验证通过 + 分数合格 → 自动结算
         result.verified = True
         logger.info(f"[{task_id}] 验证通过, 评分: {verify_result.score:.2f}")
 
@@ -192,6 +234,90 @@ class TaskCloser:
 
         result.success = True
         return result
+
+    # ── 争议入口 ────────────────────────────────────────
+
+    def _enter_dispute(
+        self,
+        result: TaskResult,
+        task_id: str,
+        task_type: str,
+        buyer_wallet: str,
+        seller_wallet: str,
+        seller_agent_id: str,
+        chain: str,
+        amount: Decimal,
+        escrow_id: str = None,
+        reason: str = "",
+        initiator: str = "system",
+        verify_score: float = 0.0,
+        evidence: Dict = None,
+    ) -> TaskResult:
+        """进入争议窗口"""
+        result.disputed = True
+        result.verification_score = verify_score
+        result.error = reason
+
+        # 记录争议状态
+        self._record_task(
+            task_id=task_id,
+            task_type=task_type,
+            buyer_wallet=buyer_wallet,
+            seller_wallet=seller_wallet,
+            seller_agent_id=seller_agent_id,
+            chain=chain,
+            amount=amount,
+            status=TaskStatus.DISPUTED,
+            score=verify_score,
+            evidence=evidence or {},
+            disputed=True,
+            dispute_reason=reason,
+        )
+
+        # 更新 EscrowOrder 状态 (如果 escrow_store 可用)
+        if self._escrow_store and escrow_id:
+            from escrow.models import EscrowOrder
+            order = self._escrow_store.get(escrow_id)
+            if order and order.state in (EscrowState.DELIVERED, EscrowState.VERIFIED):
+                now = int(time.time())
+                buyer_w, seller_w = self._calculate_arbitration_weights(
+                    buyer_wallet, seller_agent_id
+                )
+                order.state = EscrowState.DISPUTED
+                order.disputed_at = now
+                order.dispute_reason = reason
+                order.dispute_initiator = initiator
+                order.verification_score = verify_score
+                order.arbitration_weight_buyer = buyer_w
+                order.arbitration_weight_seller = seller_w
+                self._escrow_store.save(order)
+                result.escrow_id = escrow_id
+
+        # 更新信誉 (争议也影响评分)
+        update_agent_reputation(seller_agent_id)
+
+        logger.warning(f"[{task_id}] 进入争议窗口: {reason}")
+        return result
+
+    def _calculate_arbitration_weights(
+        self, buyer_wallet: str, seller_agent_id: str
+    ) -> Tuple[float, float]:
+        """计算仲裁信誉权重"""
+        buyer_rep = 0.0
+        seller_rep = 0.0
+
+        seller_agent = AgentRegistry.get(seller_agent_id)
+        if seller_agent:
+            seller_rep = seller_agent.reputation.score
+
+        # 买家可能不在 AgentRegistry, 给基础信誉
+        buyer_rep = 2.5  # 默认中等信誉
+
+        total = buyer_rep + seller_rep
+        if total == 0:
+            return (0.5, 0.5)
+
+        return (buyer_rep / total, seller_rep / total)
 
     # ── 结算 ─────────────────────────────────────────
 
@@ -259,6 +385,8 @@ class TaskCloser:
         payment_tx: str = "",
         payment_amount: Decimal = Decimal("0"),
         evidence: Dict = None,
+        disputed: bool = False,
+        dispute_reason: str = "",
     ) -> None:
         """记录履约"""
         record_task_completion(
@@ -274,6 +402,8 @@ class TaskCloser:
             payment_tx=payment_tx,
             payment_amount=payment_amount,
             evidence=evidence or {},
+            disputed=disputed,
+            dispute_reason=dispute_reason,
         )
 
 

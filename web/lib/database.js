@@ -379,6 +379,10 @@ class Database {
     return this._get('SELECT * FROM orders WHERE id = ?', [id]);
   }
 
+  async getOrderByTxHash(txHash) {
+    return this._get('SELECT * FROM orders WHERE tx_hash = ?', [txHash]);
+  }
+
   async getOrdersBySeller(wallet, limit = 100) {
     return this._all('SELECT * FROM orders WHERE seller_wallet = ? ORDER BY created_at DESC LIMIT ?', [wallet, limit]);
   }

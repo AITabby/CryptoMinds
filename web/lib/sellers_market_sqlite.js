@@ -86,7 +86,7 @@ function createSellersStore(baseDir) {
     console.warn('[sellers_market] saveSellers 同步调用已废弃，请使用 saveSellersAsync');
   }
 
-  return { getSellers, getSellersAsync, saveSellers, saveSellersAsync, sellersFile: null };
+  return { getDb, getSellers, getSellersAsync, saveSellers, saveSellersAsync, sellersFile: null };
 }
 
 // ── Market Handlers ─────────────────────────────
@@ -208,6 +208,39 @@ function createSellersMarketHandlers({
     }
 
     return { depositAmount, txHash };
+  }
+
+  async function verifyPaymentTx(txHash, expectedFrom, expectedTo, expectedAmount) {
+    if (demoMode) {
+      console.log('[DEMO_MODE] 跳过付款验证:', txHash);
+      return { verified: true, demo: true };
+    }
+
+    if (!txHash || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+      throw new Error('交易哈希格式无效');
+    }
+    if (!w3) throw new Error('Web3 未初始化');
+
+    const receipt = await w3.eth.getTransactionReceipt(txHash);
+    if (!receipt) throw new Error('交易未上链或未确认');
+    if (receipt.status !== true && receipt.status !== 1) throw new Error('交易执行失败');
+
+    const tx = await w3.eth.getTransaction(txHash);
+    if (!tx) throw new Error('交易未找到');
+
+    if (tx.from.toLowerCase() !== expectedFrom.toLowerCase()) {
+      throw new Error(`付款发送方不匹配: 期望 ${expectedFrom}, 实际 ${tx.from}`);
+    }
+    if (!tx.to || tx.to.toLowerCase() !== expectedTo.toLowerCase()) {
+      throw new Error(`付款接收方不匹配: 期望 ${expectedTo}, 实际 ${tx.to || 'null'}`);
+    }
+
+    const paidAmount = parseFloat(w3.utils.fromWei(tx.value, 'ether'));
+    if (paidAmount < expectedAmount) {
+      throw new Error(`付款金额不足: 期望 ${expectedAmount} BNB, 实际 ${paidAmount} BNB`);
+    }
+
+    return { verified: true, from: tx.from, to: tx.to, amount: paidAmount };
   }
 
   async function registerSeller(req, res) {
@@ -507,22 +540,36 @@ function createSellersMarketHandlers({
     if (!amount || amount <= 0) {
       return res.json({ ok: false, error: '无效金额' });
     }
-
-    // txHash 格式校验（必须 0x + 64 hex chars，或者 demo/模拟订单）
-    if (txHash && txHash !== 'direct_payment') {
-      if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
-        return res.json({ ok: false, error: '交易哈希格式无效，必须为 0x + 64位十六进制' });
-      }
-    }
     if (!txHash && !escrowOrderId) {
       return res.json({ ok: false, error: '缺少交易哈希或托管订单ID' });
     }
 
     try {
+      const database = await getSellers.getDb();
       const data = await getSellers.getSellersAsync();
       const seller = data.sellers.find(s => s.wallet.toLowerCase() === sellerWallet.toLowerCase());
       if (!seller) {
         return res.json({ ok: false, error: '卖家不存在' });
+      }
+
+      // 验证链上付款真实性（from/to/amount/确认状态）+ 防重复使用
+      if (txHash) {
+        if (txHash === 'direct_payment') {
+          if (!demoMode) {
+            return res.json({ ok: false, error: '生产环境不允许 direct_payment，请提供链上交易哈希或托管订单ID' });
+          }
+        } else {
+          try {
+            const existingOrder = await database.getOrderByTxHash(txHash);
+            if (existingOrder) {
+              return res.json({ ok: false, error: '交易哈希已被使用于其他订单' });
+            }
+
+            await verifyPaymentTx(txHash, buyerWallet, sellerWallet, parseFloat(amount));
+          } catch (verifyErr) {
+            return res.json({ ok: false, error: `付款验证失败: ${verifyErr.message}` });
+          }
+        }
       }
 
       const order = createUnifiedOrder({

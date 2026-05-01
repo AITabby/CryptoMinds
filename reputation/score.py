@@ -180,6 +180,7 @@ class ReputationCalculator:
             total_volume=total_volume,
             avg_response_time=avg_response_time,
             last_24h_success_rate=last_24h_success_rate,
+            dispute_rate=dispute_rate,
         )
 
         # 确定等级
@@ -214,6 +215,7 @@ class ReputationCalculator:
         total_volume: Decimal,
         avg_response_time: float,
         last_24h_success_rate: float,
+        dispute_rate: float = 0.0,
     ) -> float:
         """计算综合评分"""
 
@@ -221,15 +223,12 @@ class ReputationCalculator:
         volume_float = float(total_volume)
 
         # 1. 成功率分 (0-3)
-        # 成功率 95% = 2.85 分，100% = 3 分
         success_score = success_rate * 3
 
         # 2. 质量分 (0-1)
-        # 平均验证门评分 0.95 = 0.95 分
         quality_score = avg_score
 
         # 3. 交易量分 (0-0.5)
-        # log10(47.5) ≈ 1.67, 给 0.3 分左右
         volume_score = min(0.5, math.log10(max(1, volume_float + 1)) * 0.15)
 
         # 4. 响应时间分 (0-0.5)
@@ -244,8 +243,11 @@ class ReputationCalculator:
         elif last_24h_success_rate >= 0.90:
             recent_bonus = 0.1
 
+        # 6. 争议惩罚 (0-1, 每次争议最多扣 1 分)
+        dispute_penalty = dispute_rate * 1.0
+
         # 总分
-        total = success_score + quality_score + volume_score + response_score + recent_bonus
+        total = success_score + quality_score + volume_score + response_score + recent_bonus - dispute_penalty
 
         # 限制在 0-5
         return min(5.0, max(0.0, total))

@@ -7,6 +7,8 @@ CryptoMinds 协议入口
 from typing import Dict, List, Optional, Tuple
 from decimal import Decimal
 import os
+import sys
+import tempfile
 from pathlib import Path
 
 from settlement import ChannelRegistry, init_default_channels
@@ -26,27 +28,41 @@ def init_protocol():
     init_default_gates()
 
 
-# SQLite 数据库路径（可通过 env var 注入，方便测试和生产隔离）
-_DB_PATH = os.getenv("CRYPTOMINDS_DB_PATH", str(Path(__file__).parent / "web" / "cryptominds.db"))
+def _default_db_path() -> str:
+    if "PYTEST_CURRENT_TEST" in os.environ or "pytest" in sys.modules:
+        return str(Path(tempfile.gettempdir()) / "cryptominds-test.db")
+    return str(Path(__file__).parent / "web" / "cryptominds.db")
 
-# 全局实例 — 使用 SQLite 替代 JSON/内存存储
-_record_store = SqliteRecordStore(_DB_PATH)
-_reputation_calculator = ReputationCalculator(_record_store)
-_credit_registry = SqliteCreditStore(_DB_PATH)
-_agent_bridge = SqliteAgentBridge(_DB_PATH)
 
-# AgentRegistry 仍使用内存+JSON 作为主存储，但通过 bridge 同步到 SQLite
-AgentRegistry.set_persistence(os.path.join(os.path.dirname(__file__), 'agents_registry.json'))
-AgentRegistry.set_sqlite_bridge(_agent_bridge)
+# Lazy initialization — avoids opening SQLite at import time
+_DB_PATH = os.getenv("CRYPTOMINDS_DB_PATH", _default_db_path())
+_record_store = None
+_reputation_calculator = None
+_credit_registry = None
+_agent_bridge = None
 
-# 自动初始化
-init_protocol()
+
+def _ensure_initialized():
+    """Initialize SQLite stores and registries on first use."""
+    global _record_store, _reputation_calculator, _credit_registry, _agent_bridge
+    if _record_store is not None:
+        return
+
+    _record_store = SqliteRecordStore(_DB_PATH)
+    _reputation_calculator = ReputationCalculator(_record_store)
+    _credit_registry = SqliteCreditStore(_DB_PATH)
+    _agent_bridge = SqliteAgentBridge(_DB_PATH)
+
+    AgentRegistry.set_persistence(os.path.join(os.path.dirname(__file__), 'agents_registry.json'))
+    AgentRegistry.set_sqlite_bridge(_agent_bridge)
+    init_protocol()
 
 
 # ── 协议信息 ────────────────────────────────────────
 
 def get_protocol_info() -> Dict:
     """获取协议信息"""
+    _ensure_initialized()
     return {
         "channels": ChannelRegistry.list_all(),
         "gates": GateRegistry.list_all(),
@@ -83,6 +99,7 @@ def create_task(
     Returns:
         任务信息
     """
+    _ensure_initialized()
     # 获取验证门
     gate = GateRegistry.get(task_type)
     if not gate:
@@ -146,6 +163,7 @@ def verify_task(
     Returns:
         VerificationResult
     """
+    _ensure_initialized()
     gate = GateRegistry.get(task_type)
     if not gate:
         return VerificationResult(
@@ -184,6 +202,7 @@ def settle_payment(
     Returns:
         PaymentResult
     """
+    _ensure_initialized()
     channel = ChannelRegistry.get(channel_id)
     if not channel:
         return PaymentResult(
@@ -240,6 +259,7 @@ def execute_task(
     Returns:
         执行结果
     """
+    _ensure_initialized()
     # 1. 创建任务
     task = create_task(
         task_type=task_type,
@@ -303,6 +323,7 @@ def register_agent(agent: AgentCapability) -> Dict:
     Returns:
         注册结果
     """
+    _ensure_initialized()
     # 验证能力
     for cap in agent.capabilities:
         gate = GateRegistry.get(cap.verification_gate)
@@ -347,6 +368,7 @@ def search_agents(
     Returns:
         Agent 列表
     """
+    _ensure_initialized()
     agents = AgentRegistry.search(
         task_type=task_type,
         chain=chain,
@@ -377,6 +399,7 @@ def find_best_agent(
     Returns:
         最佳 Agent 信息
     """
+    _ensure_initialized()
     agent = AgentRegistry.find_best_match(
         task_type=task_type,
         chain=chain,
@@ -416,6 +439,7 @@ def agent_buy(
     Returns:
         任务信息
     """
+    _ensure_initialized()
     # 1. 搜索卖家
     seller = AgentRegistry.find_best_match(
         task_type=task_type,
@@ -473,6 +497,8 @@ def record_task_completion(
     payment_tx: str = "",
     payment_amount: Decimal = Decimal("0"),
     evidence: Dict = None,
+    disputed: bool = False,
+    dispute_reason: str = "",
 ) -> Dict:
     """
     记录任务完成
@@ -495,6 +521,7 @@ def record_task_completion(
     Returns:
         记录结果
     """
+    _ensure_initialized()
     record = PerformanceRecord.create(
         task_id=task_id,
         task_type=task_type,
@@ -513,6 +540,10 @@ def record_task_completion(
     )
 
     record.completed_at = int(__import__('time').time())
+
+    # Dispute fields (new)
+    record.disputed = disputed
+    record.dispute_reason = dispute_reason
 
     _record_store.save(record)
 
@@ -534,6 +565,7 @@ def get_agent_reputation(agent_id: str, wallet: str) -> Dict:
     Returns:
         信誉分信息
     """
+    _ensure_initialized()
     score = _reputation_calculator.calculate(agent_id, wallet)
     return score.to_dict()
 
@@ -550,6 +582,7 @@ def update_agent_reputation(agent_id: str) -> Dict:
     Returns:
         更新结果
     """
+    _ensure_initialized()
     agent = AgentRegistry.get(agent_id)
     if not agent:
         return {"error": f"未知 Agent: {agent_id}"}
@@ -561,6 +594,7 @@ def update_agent_reputation(agent_id: str) -> Dict:
     agent.reputation.score = score.score
     agent.reputation.tasks_completed = score.completed_tasks
     agent.reputation.tasks_failed = score.failed_tasks
+    agent.reputation.dispute_rate = score.dispute_rate
     agent.reputation.total_volume = score.total_volume
     agent.reputation.avg_response_time_ms = score.avg_response_time_ms
     agent.reputation.last_24h_tasks = score.last_24h_tasks
@@ -586,6 +620,7 @@ def get_seller_records(seller_wallet: str, limit: int = 100) -> List[Dict]:
     Returns:
         记录列表
     """
+    _ensure_initialized()
     records = _record_store.get_by_seller(seller_wallet, limit=limit)
     return [r.to_dict() for r in records]
 
@@ -616,6 +651,7 @@ def issue_credit_currency(
     Returns:
         发行结果
     """
+    _ensure_initialized()
     # 检查信誉分
     agent = AgentRegistry.get(issuer_agent_id)
     if not agent:
@@ -636,6 +672,7 @@ def issue_credit_currency(
 
 def list_credit_currencies() -> List[Dict]:
     """列出所有信用货币"""
+    _ensure_initialized()
     return _credit_registry.list_all()
 
 
@@ -650,6 +687,7 @@ def accept_credit_currency(currency_id: str, agent_id: str) -> Dict:
     Returns:
         结果
     """
+    _ensure_initialized()
     success = _credit_registry.accept_currency(currency_id, agent_id)
     if success:
         return {"ok": True, "message": f"已接受货币 {currency_id}"}
@@ -676,6 +714,7 @@ def pay_with_credit_currency(
     Returns:
         支付结果
     """
+    _ensure_initialized()
     return _credit_registry.pay_with_credit(
         currency_id=currency_id,
         from_wallet=from_wallet,
@@ -696,6 +735,7 @@ def get_acceptable_currencies(agent_id: str, min_trust_score: float = 0.5) -> Li
     Returns:
         货币列表
     """
+    _ensure_initialized()
     return _credit_registry.get_acceptable_currencies(agent_id, min_trust_score)
 
 
@@ -710,6 +750,7 @@ def check_currency_acceptance(currency_id: str, agent_id: str) -> Dict:
     Returns:
         接受状态
     """
+    _ensure_initialized()
     return _credit_registry.check_acceptance(currency_id, agent_id)
 
 

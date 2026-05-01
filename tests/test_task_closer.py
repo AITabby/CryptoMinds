@@ -83,6 +83,92 @@ class TestCloseTask:
         assert result.paid is True
         assert result.tx_hash == "direct_payment"
 
+    def test_verify_fail_enters_dispute(self):
+        """验证失败 → 进入争议窗口 (不再简单标记 FAILED)"""
+        closer = TaskCloser()
+        output = TaskOutput(task_type="token_delivery", seller_wallet="0xs",
+                            tx_hash="0xabc", token_address="0xt", token_amount="1")
+        with patch("task_closer.verify_task", return_value=_mock_verify_failure()), \
+             patch("task_closer.record_task_completion") as mock_record, \
+             patch("task_closer.update_agent_reputation"):
+            result = closer.close_task(
+                "t1", "token_delivery", "0xb", "0xs", "agent-1",
+                "bsc", Decimal("0.01"), "mock", output,
+            )
+        assert result.disputed is True
+        assert result.success is False
+        assert result.verified is False
+        # Verify the record was called with DISPUTED status
+        from reputation.record import TaskStatus
+        call_args = mock_record.call_args
+        assert call_args[1].get("status") == TaskStatus.DISPUTED or \
+               "disputed" in str(call_args)
+
+    def test_low_score_enters_dispute(self):
+        """验证通过但分数低于阈值 → 进入争议窗口"""
+        closer = TaskCloser()
+        low_score_result = VerificationResult(
+            success=True, gate_id="token_delivery",
+            task_type="token_delivery", score=0.3,
+            evidence={"partial": True},
+        )
+        output = TaskOutput(task_type="token_delivery", seller_wallet="0xs",
+                            tx_hash="0xabc", token_address="0xt", token_amount="1")
+        with patch("task_closer.verify_task", return_value=low_score_result), \
+             patch("task_closer.record_task_completion"), \
+             patch("task_closer.update_agent_reputation"):
+            result = closer.close_task(
+                "t1", "token_delivery", "0xb", "0xs", "agent-1",
+                "bsc", Decimal("0.01"), "mock", output,
+                verification_threshold=0.7,
+            )
+        assert result.disputed is True
+        assert result.verification_score == 0.3
+        assert result.success is False
+
+    def test_high_score_passes_threshold(self):
+        """验证通过且分数高于阈值 → 正常结算"""
+        closer = TaskCloser()
+        output = TaskOutput(task_type="token_delivery", seller_wallet="0xs",
+                            tx_hash="0xabc", token_address="0xt", token_amount="1")
+        with patch("task_closer.verify_task", return_value=_mock_verify_success()), \
+             patch("task_closer.record_task_completion"), \
+             patch("task_closer.update_agent_reputation"), \
+             patch("task_closer.ChannelRegistry.get") as mock_channel:
+            mock_channel_obj = MagicMock()
+            mock_channel.return_value = mock_channel_obj
+
+            result = closer.close_task(
+                "t1", "token_delivery", "0xb", "0xs", "agent-1",
+                "bsc", Decimal("0.01"), "mock", output,
+                verification_threshold=0.7,
+            )
+        assert result.verified is True
+        assert result.success is True
+        assert result.disputed is False
+
+    def test_custom_threshold(self):
+        """自定义阈值: 默认 0.7, 但可以设为 0.9"""
+        closer = TaskCloser()
+        # Score 0.85 passes threshold 0.7 but fails 0.9
+        mid_result = VerificationResult(
+            success=True, gate_id="token_delivery",
+            task_type="token_delivery", score=0.85,
+            evidence={"good": True},
+        )
+        output = TaskOutput(task_type="token_delivery", seller_wallet="0xs",
+                            tx_hash="0xabc", token_address="0xt", token_amount="1")
+        # With threshold 0.9 → dispute
+        with patch("task_closer.verify_task", return_value=mid_result), \
+             patch("task_closer.record_task_completion"), \
+             patch("task_closer.update_agent_reputation"):
+            result = closer.close_task(
+                "t1", "token_delivery", "0xb", "0xs", "agent-1",
+                "bsc", Decimal("0.01"), "mock", output,
+                verification_threshold=0.9,
+            )
+        assert result.disputed is True
+
 
 class TestEscrowManager:
 
