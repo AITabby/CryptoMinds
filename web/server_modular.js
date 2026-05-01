@@ -7,6 +7,10 @@
  * - 服务层：lib/
  */
 
+// 环境配置（最先加载，确保其他模块读到正确 env）
+const { loadEnvironment } = require('./lib/env_loader');
+const envConfig = loadEnvironment();
+
 const express = require('express');
 const { Web3 } = require('web3');
 const path = require('path');

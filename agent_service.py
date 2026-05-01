@@ -21,6 +21,9 @@ from logging_config import setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
+from scripts.env_loader import load_env
+_env_config = load_env()
+
 from agent_daemon import AgentDaemon, AgentConfig, Task, AgentState
 from market_listener import MarketListener, TaskMatcher, MarketTask
 from task_closer import TaskCloser, EscrowManager

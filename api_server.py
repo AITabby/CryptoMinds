@@ -10,6 +10,12 @@ import json
 import os
 import time
 
+from logging_config import setup_logging
+setup_logging()
+
+from scripts.env_loader import load_env
+_env_config = load_env()
+
 from protocol import (
     get_protocol_info,
     register_agent, search_agents, find_best_agent, agent_buy,
@@ -26,10 +32,10 @@ from reputation.record import TaskStatus
 # 创建 Flask 应用
 app = Flask(__name__)
 
-# 配置
-API_PORT = int(os.getenv("CRYPTOMINDS_API_PORT", "3458"))
-DEBUG_MODE = os.getenv("CRYPTOMINDS_DEBUG", "false").lower() == "true"
-INTERNAL_TOKEN = os.getenv("CRYPTOMINDS_INTERNAL_TOKEN", "")
+# 配置（from env_loader）
+API_PORT = _env_config["API_PORT"]
+DEBUG_MODE = _env_config["DEBUG"]
+INTERNAL_TOKEN = _env_config["INTERNAL_TOKEN"]
 MARKET_TASKS = []
 
 
