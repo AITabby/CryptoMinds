@@ -104,6 +104,27 @@ def _ensure_tables(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_escrow_task ON escrow_orders(task_id);
         CREATE INDEX IF NOT EXISTS idx_escrow_seller ON escrow_orders(seller_wallet);
         CREATE INDEX IF NOT EXISTS idx_escrow_state ON escrow_orders(state);
+
+        CREATE TABLE IF NOT EXISTS session_keys (
+            session_key_id TEXT PRIMARY KEY,
+            main_wallet TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            available_chains TEXT,
+            per_tx_limit TEXT,
+            total_quota TEXT,
+            total_used TEXT DEFAULT '0',
+            callable_actions TEXT,
+            created_at INTEGER,
+            expires_at INTEGER,
+            nonce INTEGER DEFAULT 0,
+            revoked INTEGER DEFAULT 0,
+            revoked_at INTEGER DEFAULT 0,
+            session_address TEXT NOT NULL,
+            authorization_signature TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_session_agent ON session_keys(agent_id);
+        CREATE INDEX IF NOT EXISTS idx_session_wallet ON session_keys(main_wallet);
     """)
     conn.commit()
 
@@ -631,3 +652,117 @@ class SqliteEscrowStore:
 
     def count(self) -> int:
         return len(self._orders)
+
+
+class SqliteSessionKeyStore:
+    """SQLite-backed session key store."""
+
+    def __init__(self, db_path: str):
+        self._conn = _connect(db_path)
+        _ensure_tables(self._conn)
+        _migrate(self._conn)
+        self._keys: Dict[str, object] = {}
+        self._load_all()
+
+    def _load_all(self):
+        from auth.session_key import SessionKey
+        rows = self._conn.execute("SELECT * FROM session_keys").fetchall()
+        for row in rows:
+            key = self._row_to_key(row)
+            self._keys[key.session_key_id] = key
+
+    def _row_to_key(self, row) -> object:
+        from auth.session_key import SessionKey
+        chains = row["available_chains"] or "[]"
+        try:
+            chains = json.loads(chains)
+        except (json.JSONDecodeError, TypeError):
+            chains = []
+        actions = row["callable_actions"] or "[]"
+        try:
+            actions = json.loads(actions)
+        except (json.JSONDecodeError, TypeError):
+            actions = []
+
+        return SessionKey(
+            session_key_id=row["session_key_id"],
+            main_wallet=row["main_wallet"] or "",
+            agent_id=row["agent_id"] or "",
+            available_chains=chains,
+            per_tx_limit=Decimal(row["per_tx_limit"] or "0"),
+            total_quota=Decimal(row["total_quota"] or "0"),
+            total_used=Decimal(row["total_used"] or "0"),
+            callable_actions=actions,
+            created_at=row["created_at"] or 0,
+            expires_at=row["expires_at"] or 0,
+            nonce=row["nonce"] or 0,
+            revoked=bool(row["revoked"] or 0),
+            revoked_at=row["revoked_at"] or 0,
+            session_address=row["session_address"] or "",
+            authorization_signature=row["authorization_signature"] or "",
+        )
+
+    def _key_to_row(self, key) -> dict:
+        return {
+            "session_key_id": key.session_key_id,
+            "main_wallet": key.main_wallet,
+            "agent_id": key.agent_id,
+            "available_chains": json.dumps(key.available_chains),
+            "per_tx_limit": str(key.per_tx_limit),
+            "total_quota": str(key.total_quota),
+            "total_used": str(key.total_used),
+            "callable_actions": json.dumps(key.callable_actions),
+            "created_at": key.created_at,
+            "expires_at": key.expires_at,
+            "nonce": key.nonce,
+            "revoked": int(key.revoked),
+            "revoked_at": key.revoked_at,
+            "session_address": key.session_address,
+            "authorization_signature": key.authorization_signature,
+        }
+
+    def save(self, key) -> None:
+        self._keys[key.session_key_id] = key
+        row = self._key_to_row(key)
+        cols = ", ".join(row.keys())
+        vals = ", ".join(["?"] * len(row))
+        updates = ", ".join([f"{k}=?" for k in row.keys() if k != "session_key_id"])
+        self._conn.execute(
+            f"INSERT INTO session_keys ({cols}) VALUES ({vals}) ON CONFLICT(session_key_id) DO UPDATE SET {updates}",
+            list(row.values()) + [v for k, v in row.items() if k != "session_key_id"],
+        )
+        self._conn.commit()
+
+    def get(self, session_key_id: str) -> Optional[object]:
+        return self._keys.get(session_key_id)
+
+    def get_by_agent(self, agent_id: str) -> List[object]:
+        return [k for k in self._keys.values() if k.agent_id == agent_id and not k.revoked]
+
+    def revoke(self, session_key_id: str) -> bool:
+        key = self._keys.get(session_key_id)
+        if not key:
+            return False
+        key.nonce += 1
+        key.revoked = True
+        key.revoked_at = int(time.time()) if 'time' in dir() else 0
+        self.save(key)
+        return True
+
+    def increase_quota(self, session_key_id: str, additional: Decimal) -> bool:
+        key = self._keys.get(session_key_id)
+        if not key:
+            return False
+        key.total_quota += additional
+        self.save(key)
+        return True
+
+    def update_usage(self, session_key_id: str, amount: Decimal) -> None:
+        key = self._keys.get(session_key_id)
+        if not key:
+            return
+        key.total_used += amount
+        self.save(key)
+
+    def count(self) -> int:
+        return len(self._keys)
