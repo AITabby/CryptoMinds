@@ -457,7 +457,234 @@ def api_accept_credit(currency_id):
     return jsonify(result), 400
 
 
-# ── 健康检查 ────────────────────────────────────────
+# ── Escrow 托管 ────────────────────────────────────────────
+
+@app.route("/api/v1/escrow/create", methods=["POST"])
+@require_auth
+def api_escrow_create():
+    """创建 Escrow 托管订单"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "缺少请求体"}), 400
+
+    from settlement.escrow_state import EscrowState
+    from escrow.models import EscrowOrder
+
+    escrow_id = f"esc-{data.get('buyer_wallet', '')[:8]}-{int(time.time())}"
+    order = EscrowOrder(
+        escrow_id=escrow_id,
+        task_id=data.get("task_id", ""),
+        order_id=data.get("order_id", ""),
+        buyer_wallet=data.get("buyer_wallet", ""),
+        seller_wallet=data.get("seller_wallet", ""),
+        seller_agent_id=data.get("seller_agent_id", ""),
+        amount=Decimal(str(data.get("amount", "0"))),
+        channel_id=data.get("channel_id", "bsc-native"),
+        chain=data.get("chain", "bsc"),
+        verification_threshold=float(data.get("verification_threshold", 0.7)),
+        created_at=int(time.time()),
+    )
+
+    # Save to SQLite
+    from data.sqlite_store import SqliteEscrowStore
+    _ensure_initialized()
+    _escrow_store = SqliteEscrowStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    _escrow_store.save(order)
+
+    return jsonify({
+        "ok": True,
+        "escrow_id": escrow_id,
+        "state": order.state.value,
+        "verification_threshold": order.verification_threshold,
+    }), 200
+
+
+@app.route("/api/v1/escrow/<escrow_id>", methods=["GET"])
+def api_escrow_get(escrow_id):
+    """获取 Escrow 状态"""
+    from data.sqlite_store import SqliteEscrowStore
+    _ensure_initialized()
+    _escrow_store = SqliteEscrowStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    order = _escrow_store.get(escrow_id)
+    if not order:
+        return jsonify({"error": f"未知 Escrow: {escrow_id}"}), 404
+    return jsonify(order.to_dict()), 200
+
+
+@app.route("/api/v1/escrow/<escrow_id>/dispute", methods=["POST"])
+@require_auth
+def api_escrow_dispute(escrow_id):
+    """进入争议"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "缺少请求体"}), 400
+
+    from settlement.escrow_state import EscrowState, EscrowStateMachine, InvalidTransitionError
+    from data.sqlite_store import SqliteEscrowStore
+    _ensure_initialized()
+    _escrow_store = SqliteEscrowStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    order = _escrow_store.get(escrow_id)
+    if not order:
+        return jsonify({"error": f"未知 Escrow: {escrow_id}"}), 404
+
+    sm = EscrowStateMachine(order.state)
+    try:
+        sm.transition("dispute", timestamp=int(time.time()),
+                      actor=data.get("initiator", "buyer"),
+                      reason=data.get("reason", ""))
+    except InvalidTransitionError as e:
+        return jsonify({"error": str(e)}), 400
+
+    order.state = sm.state
+    order.disputed_at = int(time.time())
+    order.dispute_reason = data.get("reason", "")
+    order.dispute_initiator = data.get("initiator", "buyer")
+
+    # 计算仲裁权重
+    from escrow.arbitration import ArbitrationEngine
+    engine = ArbitrationEngine(_escrow_store, _record_store, AgentRegistry)
+    buyer_w, seller_w = engine.calculate_arbitration_weights(
+        order.buyer_wallet, order.seller_agent_id
+    )
+    order.arbitration_weight_buyer = buyer_w
+    order.arbitration_weight_seller = seller_w
+
+    _escrow_store.save(order)
+    return jsonify({"ok": True, "state": order.state.value, "escrow_id": escrow_id}), 200
+
+
+@app.route("/api/v1/escrow/<escrow_id>/resolve", methods=["POST"])
+@require_auth
+def api_escrow_resolve(escrow_id):
+    """管理员仲裁争议"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "缺少请求体"}), 400
+
+    from data.sqlite_store import SqliteEscrowStore
+    _ensure_initialized()
+    _escrow_store = SqliteEscrowStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    engine = ArbitrationEngine(_escrow_store, _record_store, AgentRegistry)
+    result = engine.resolve_dispute(
+        escrow_id=escrow_id,
+        arbiter=data.get("arbiter", "admin"),
+        decision=data.get("decision", ""),
+        reason=data.get("reason", ""),
+    )
+    if result.get("ok"):
+        return jsonify(result), 200
+    return jsonify(result), 400
+
+
+@app.route("/api/v1/escrow/disputed", methods=["GET"])
+def api_escrow_list_disputed():
+    """列出所有争议中的 Escrow"""
+    from settlement.escrow_state import EscrowState
+    from data.sqlite_store import SqliteEscrowStore
+    _ensure_initialized()
+    _escrow_store = SqliteEscrowStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    orders = _escrow_store.get_by_state(EscrowState.DISPUTED)
+    return jsonify({"disputed": [o.to_dict() for o in orders]}), 200
+
+
+# ── Session Key ─────────────────────────────────────────────
+
+@app.route("/api/v1/session-keys/create", methods=["POST"])
+@require_auth
+def api_session_key_create():
+    """创建 Session Key"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "缺少请求体"}), 400
+
+    from auth.session_signer import SessionSigner
+    from data.sqlite_store import SqliteSessionKeyStore
+
+    _sk_store = SqliteSessionKeyStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    signer = SessionSigner(_sk_store)
+
+    try:
+        sk = signer.create_session_key(
+            main_wallet=data.get("main_wallet", ""),
+            main_private_key=data.get("main_private_key", ""),
+            agent_id=data.get("agent_id", ""),
+            chains=data.get("chains", ["bsc"]),
+            per_tx_limit=Decimal(str(data.get("per_tx_limit", "1.0"))),
+            total_quota=Decimal(str(data.get("total_quota", "10.0"))),
+            actions=data.get("actions", ["pay"]),
+            validity_seconds=int(data.get("validity_seconds", 86400)),
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify(sk.to_dict(include_private=True)), 200
+
+
+@app.route("/api/v1/session-keys/<key_id>", methods=["GET"])
+def api_session_key_get(key_id):
+    """获取 Session Key 信息"""
+    from data.sqlite_store import SqliteSessionKeyStore
+    _sk_store = SqliteSessionKeyStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    sk = _sk_store.get(key_id)
+    if not sk:
+        return jsonify({"error": f"未知 Session Key: {key_id}"}), 404
+    return jsonify(sk.to_dict()), 200
+
+
+@app.route("/api/v1/session-keys/<key_id>/revoke", methods=["POST"])
+@require_auth
+def api_session_key_revoke(key_id):
+    """撤销 Session Key"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "缺少请求体"}), 400
+
+    from auth.session_signer import SessionSigner
+    from data.sqlite_store import SqliteSessionKeyStore
+    _sk_store = SqliteSessionKeyStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    signer = SessionSigner(_sk_store)
+
+    result = signer.revoke_session_key(
+        session_key_id=key_id,
+        main_wallet=data.get("main_wallet", ""),
+        main_private_key=data.get("main_private_key", ""),
+    )
+    if result.get("ok"):
+        return jsonify(result), 200
+    return jsonify(result), 400
+
+
+@app.route("/api/v1/session-keys/<key_id>/increase-quota", methods=["POST"])
+@require_auth
+def api_session_key_increase_quota(key_id):
+    """增加 Session Key 总额度"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "缺少请求体"}), 400
+
+    from auth.session_signer import SessionSigner
+    from data.sqlite_store import SqliteSessionKeyStore
+    _sk_store = SqliteSessionKeyStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    signer = SessionSigner(_sk_store)
+
+    result = signer.increase_quota(
+        session_key_id=key_id,
+        additional_quota=Decimal(str(data.get("additional_quota", "0"))),
+        main_wallet=data.get("main_wallet", ""),
+        main_private_key=data.get("main_private_key", ""),
+    )
+    if result.get("ok"):
+        return jsonify(result), 200
+    return jsonify(result), 400
+
+
+@app.route("/api/v1/session-keys/agent/<agent_id>", methods=["GET"])
+def api_session_keys_by_agent(agent_id):
+    """获取 Agent 的活跃 Session Keys"""
+    from data.sqlite_store import SqliteSessionKeyStore
+    _sk_store = SqliteSessionKeyStore(os.getenv("CRYPTOMINDS_DB_PATH", str(os.path.join(os.path.dirname(__file__), "web", "cryptominds.db"))))
+    keys = _sk_store.get_by_agent(agent_id)
+    return jsonify({"session_keys": [k.to_dict() for k in keys]}), 200
 
 @app.route("/healthz", methods=["GET"])
 def health_check():
