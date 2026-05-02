@@ -4,6 +4,7 @@
 ArbitrationEngine — 争议解决、信誉加权仲裁、卖家 slashing。
 """
 
+import os
 import time
 from decimal import Decimal
 from typing import Optional
@@ -11,6 +12,8 @@ from typing import Optional
 from settlement.escrow_state import EscrowState, EscrowStateMachine
 from escrow.models import EscrowOrder
 
+
+MINIMUM_ARBITRATION_WAIT_SECONDS = int(os.getenv("MINIMUM_ARBITRATION_WAIT_SECONDS", "300"))  # 5 minutes default
 
 class ArbitrationEngine:
     """争议仲裁引擎"""
@@ -40,6 +43,13 @@ class ArbitrationEngine:
 
         if order.state != EscrowState.DISPUTED:
             return {"error": f"Escrow 状态非 DISPUTED: {order.state.value}"}
+
+        # Enforce minimum wait period before admin can arbitrate
+        now = int(time.time())
+        elapsed = now - order.disputed_at
+        if elapsed < MINIMUM_ARBITRATION_WAIT_SECONDS:
+            remaining = MINIMUM_ARBITRATION_WAIT_SECONDS - elapsed
+            return {"error": f"仲裁等待期未满: 还需 {remaining} 秒 ({remaining/60:.1f} 分钟)"}
 
         sm = EscrowStateMachine(order.state)
         now = int(time.time())

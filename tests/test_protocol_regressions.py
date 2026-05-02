@@ -10,8 +10,9 @@ from decimal import Decimal
 DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, DIR)
 
-# Set internal token before importing api_server (module reads env at import)
+# Set internal token and debug mode before importing api_server (module reads env at import)
 os.environ["CRYPTOMINDS_INTERNAL_TOKEN"] = "test-token"
+os.environ["CRYPTOMINDS_DEBUG"] = "true"
 
 from agent_daemon import AgentConfig, Executor, Task
 from reputation.record import TaskStatus
@@ -111,6 +112,73 @@ class ProtocolRegressionTests(unittest.TestCase):
         self.assertEqual(create_resp.status_code, 201)
         self.assertEqual(list_resp.status_code, 200)
         self.assertEqual(list_resp.get_json()["tasks"][0]["task_id"], "market-task-1")
+
+    def test_pg_table_init_does_not_require_sqlite_executescript(self):
+        import sys
+        import types
+
+        if "psycopg2" not in sys.modules:
+            fake_psycopg2 = types.ModuleType("psycopg2")
+            fake_pool = types.ModuleType("psycopg2.pool")
+            fake_pool.SimpleConnectionPool = object
+            fake_psycopg2.pool = fake_pool
+            sys.modules["psycopg2"] = fake_psycopg2
+            sys.modules["psycopg2.pool"] = fake_pool
+
+        from data.pg_store import _ensure_tables
+
+        class FakeCursor:
+            def __init__(self):
+                self.sql = ""
+
+            def execute(self, sql):
+                self.sql = sql
+
+            def close(self):
+                pass
+
+        class FakePgConnection:
+            def __init__(self):
+                self.cursor_obj = FakeCursor()
+                self.committed = False
+
+            def cursor(self):
+                return self.cursor_obj
+
+            def commit(self):
+                self.committed = True
+
+        conn = FakePgConnection()
+        _ensure_tables(conn)
+
+        self.assertTrue(conn.committed)
+        self.assertIn("CREATE TABLE IF NOT EXISTS performance_records", conn.cursor_obj.sql)
+
+    def test_demo_session_key_placeholder_rejected_in_protected_env(self):
+        import api_server
+
+        old_debug = api_server.DEBUG_MODE
+        old_env = dict(api_server._env_config)
+        old_debug_env = os.environ.get("CRYPTOMINDS_DEBUG")
+        try:
+            api_server.DEBUG_MODE = False
+            api_server._env_config["env"] = "staging"
+            api_server._env_config["DEMO_MODE"] = False
+            os.environ["CRYPTOMINDS_DEBUG"] = "false"
+
+            with api_server.app.test_request_context("/"):
+                response, status = api_server._reject_demo_private_key("DEMO")
+
+            self.assertEqual(status, 400)
+            self.assertIn("DEMO", response.get_json()["error"])
+        finally:
+            api_server.DEBUG_MODE = old_debug
+            api_server._env_config.clear()
+            api_server._env_config.update(old_env)
+            if old_debug_env is None:
+                os.environ.pop("CRYPTOMINDS_DEBUG", None)
+            else:
+                os.environ["CRYPTOMINDS_DEBUG"] = old_debug_env
 
 
 if __name__ == "__main__":

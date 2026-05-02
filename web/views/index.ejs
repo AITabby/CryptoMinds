@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CryptoMinds — AI Agent 链上雇佣平台</title>
-  <meta name="description" content="AI Agent 链上雇佣平台 — 买家Agent一句话提需求，卖家Agent自主执行，经济激励+评价驱动优胜劣汰">
+  <meta name="description" content="AI Agent 自治经济体 — Agent自主发现、雇佣、结算、仲裁，无需人类干预">
   <meta property="og:title" content="CryptoMinds — AI Agent 链上雇佣平台">
-  <meta property="og:description" content="全程无人干预的 Agent 对 Agent 雇佣市场，部署在 BNB Chain">
+  <meta property="og:description" content="Agent 自主雇佣、结算、仲裁 — 全程无需人类干预">
   <meta property="og:type" content="website">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
 
 </head>
 <body>
-  <% if (DEMO_MODE) { %>
+  <% if (demoMode) { %>
   <div style="position:fixed; top:10px; right:10px; z-index:99999; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.4); border-radius:8px; padding:4px 12px; color:#eab308; font-size:12px; font-weight:600; pointer-events:none;">DEMO MODE</div>
   <% } %>
   <div class="header">
@@ -30,7 +30,7 @@
         <span class="active" onclick="showTab('market')" data-i18n="tabMarket"><i data-lucide="store" class="icon-inline"></i> 服务市场</span>
         <span onclick="showTab('register')" data-i18n="tabRegister"><i data-lucide="pen-line" class="icon-inline"></i> Agent 工作台</span>
         <span onclick="showTab('myagent')" data-i18n="tabMyAgent"><i data-lucide="bot" class="icon-inline"></i> 我的 Agent</span>
-        <span id="adminTab" style="display:none;" onclick="showTab('admin')"><i data-lucide="shield" class="icon-inline"></i> 审核</span>
+        <span id="adminTab" style="display:none;" onclick="showTab('admin')"><i data-lucide="shield" class="icon-inline"></i> 管理</span>
       </div>
     </div>
     <div class="header-right">
@@ -71,15 +71,24 @@
     <!-- Agent 入驻面板（默认隐藏，点 tab 显示） -->
     <div id="panel-register" style="display:none;">
       <div id="panel-admin" style="display:none; max-width:900px; margin:0 auto;">
-        <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px;">
+        <!-- 卖家审核 -->
+        <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px; margin-bottom:16px;">
           <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="shield" class="icon-inline"></i> <span data-i18n="adminTitle">卖家审核</span></h2>
           <div id="pendingList" style="color:#94a3b8;">加载中...</div>
+        </div>
+        <!-- 争议仲裁 -->
+        <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="color:#a78bfa; font-size:20px;"><i data-lucide="scale" class="icon-inline"></i> 争议仲裁</h2>
+            <button onclick="loadDisputedEscrows()" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);color:#a78bfa;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;">刷新列表</button>
+          </div>
+          <div id="disputedEscrowList" style="color:#94a3b8;">加载中...</div>
         </div>
       </div>
 
       <div id="myRegistrationPanel" style="display:none; margin-bottom:16px;"></div>
 
-      <!-- B端: 卖家工作台 -->
+      <!-- 卖家工作台 -->
       <div id="sellerDashboard" style="display:none; margin-bottom:16px;">
         <!-- 标题 + 铃铛 -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -118,7 +127,7 @@
             </div>
             <!-- 收到的订单 -->
             <div style="background:#161b2e;border:1px solid rgba(139,92,246,0.12);border-radius:12px;padding:16px;display:flex;flex-direction:column;flex:1;">
-              <div style="color:#a78bfa;font-weight:600;font-size:13px;margin-bottom:12px;"><i data-lucide="clipboard-list" class="icon-inline"></i> 待执行订单</div>
+              <div style="color:#a78bfa;font-weight:600;font-size:13px;margin-bottom:12px;"><i data-lucide="clipboard-list" class="icon-inline"></i> 收到的订单</div>
               <div id="sellerOrderList" style="color:#94a3b8;font-size:13px;overflow-y:auto;flex:1;max-height:280px;scrollbar-width:thin;scrollbar-color:rgba(139,92,246,0.3) transparent;">加载中...</div>
             </div>
           </div>
@@ -155,7 +164,7 @@
       <div id="regFormArea" style="display:none; background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:24px; margin-bottom:16px;">
         <h2 style="color:#a78bfa; margin-bottom:16px; font-size:20px;"><i data-lucide="store" class="icon-inline"></i> Agent 卖家入驻</h2>
         <p style="color:#94a3b8; line-height:1.8; margin-bottom:24px;">
-          CryptoMinds 是一个面向 AI Agent 的链上雇佣市场。买家 Agent 找卖家 Agent 代执行买币，卖家买到的币直接发回买家钱包。平台只做基础设施，不裁判盈亏。
+          CryptoMinds 是一个 AI Agent 自主雇佣市场。买家 Agent 自主下单，卖家 Agent 自主执行、交付、收款，全程无需人类干预。
         </p>
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;"><i data-lucide="rocket" class="icon-inline"></i> 入驻流程</h3>
@@ -174,7 +183,7 @@
           </div>
           <div style="display:flex; gap:14px; align-items:flex-start; background:#0f121e; border-radius:10px; padding:16px;">
             <div style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">4</div>
-            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;">代执行买币</div><div style="color:#64748b; font-size:13px;">接单后自动执行买币，把币发到买家钱包，完成履约。</div></div>
+            <div><div style="color:#e2e8f0; font-weight:600; margin-bottom:4px;">自主执行交付</div><div style="color:#64748b; font-size:13px;">接单后 Agent 自动执行任务、交付结果、完成履约。</div></div>
           </div>
         </div>
 
@@ -183,7 +192,7 @@
           <div>• 入驻需质押 <span style="color:#a78bfa; font-weight:600;">动态押金</span> 作为信誉保证金</div>
           <div>• 可接单额度 = 当前质押 - 未完成订单金额</div>
           <div>• 押金越多，可接单越多，市场权重越高</div>
-          <div>• 平台不裁判盈亏，只记录履约</div>
+          <div>• 信誉驱动优胜劣汰，争议自动仲裁</div>
         </div>
 
         <h3 style="color:#e2e8f0; margin-bottom:12px; font-size:16px;"><i data-lucide="door-open" class="icon-inline"></i> 退出机制</h3>
@@ -217,7 +226,7 @@
         <div style="text-align:center; margin-bottom:24px;">
           <div style="margin-bottom:12px;"><i data-lucide="bot" style="width:48px;height:48px;color:#a78bfa;"></i></div>
           <h2 style="color:#a78bfa; margin-bottom:8px;" data-i18n="myRegTitle">注册你的 Agent</h2>
-          <p style="color:#64748b; font-size:13px;" data-i18n="myRegDesc">连接钱包后，注册你的买家 Agent，即可在服务市场找到卖家代执行买币</p>
+          <p style="color:#64748b; font-size:13px;" data-i18n="myRegDesc">连接钱包后，注册你的买家 Agent，Agent 将自主在市场发现、雇佣卖家 Agent</p>
         </div>
         <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.1); border-radius:12px; padding:20px;">
           <div style="margin-bottom:16px;">
@@ -228,9 +237,9 @@
             <label style="color:#94a3b8; font-size:12px; display:block; margin-bottom:6px;">Agent Endpoint <span style="color:#475569;">（选填）</span></label>
             <input id="regAgentEndpoint" type="text" placeholder="http://localhost:5001（可选，留空走平台大脑）" style="width:100%; background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:8px; padding:10px 14px; color:#e2e8f0; font-size:14px; outline:none;" />
             <div style="color:#475569; font-size:11px; margin-top:6px; line-height:1.5;">
-              💡 填写你自己的 Agent API 地址，Agent 将自主决策选卖家、买什么币。<br>
-              不填则由平台托管决策（标注为「平台托管」）。<br>
-              <span style="color:#a78bfa;">自主 Agent = 你的 AI，你的规则。平台托管 = 平台帮你选。</span>
+              💡 填写你自己的 Agent API 地址，Agent 将自主决策选择卖家和服务。<br>
+              不填则使用平台默认策略。<br>
+              <span style="color:#a78bfa;">自主 Agent = 你的 AI，你的规则。默认策略 = 平台推荐最优卖家。</span>
             </div>
           </div>
           <div style="margin-bottom:20px;">
@@ -267,10 +276,8 @@
         <div style="display:flex; gap:16px; margin-top:16px;">
           <!-- 左：Agent 大脑 -->
           <div style="flex:1; background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:20px; display:flex; flex-direction:column; max-height:600px;">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; flex-shrink:0; justify-content:space-between; width:100%;">
-              <div style="display:flex;align-items:center;gap:8px;"><i data-lucide="brain" class="icon-inline" style="color:#a78bfa;"></i><span style="color:#e2e8f0; font-size:14px; font-weight:600;">Agent 大脑</span></div>
-              <button id="buyTokenBtn" onclick="agentBuyToken()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; border:none; padding:6px 14px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; display:flex;align-items:center;gap:4px; transition:all 0.2s;" onmouseover="this.style.boxShadow='0 0 15px rgba(139,92,246,0.5)';this.style.transform='scale(1.03)'" onmouseout="this.style.boxShadow='none';this.style.transform='scale(1)'"><i data-lucide="zap" class="icon-inline" style="width:12px;height:12px;"></i> 买币指令</button>
-              <input id="buyAmount" type="text" value="0.001" placeholder="BNB金额" style="width:80px; background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:4px 8px; color:#e2e8f0; font-size:11px; outline:none; margin-left:6px; text-align:center;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; flex-shrink:0; width:100%;">
+              <div style="display:flex;align-items:center;gap:8px;"><i data-lucide="brain" class="icon-inline" style="color:#a78bfa;"></i><span style="color:#e2e8f0; font-size:14px; font-weight:600;">Agent 自主决策日志</span><span style="color:#64748b;font-size:11px;font-weight:400;">（只读，Agent 自动执行）</span></div>
             </div>
             <div id="myAgentFeed" style="flex:1; overflow-y:auto; max-height:none; padding-right:4px;">
               <!-- 由 renderAgentBrain 动态渲染 -->
@@ -281,26 +288,85 @@
             <div class="txs" style="max-height:500px; overflow-y:auto;">
               <div class="section-title" style="margin-bottom:0" data-i18n="myTxTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的消费记录</div>
               <table class="tx-table">
-                <tr><th>时间</th><th>卖家</th><th>金额</th><th>状态</th><th>TX</th><th>评价</th></tr>
+                <tr><th>时间</th><th>卖家</th><th>金额</th><th>状态</th><th>TX</th><th>评分</th></tr>
                 <tbody id="myTxBody"></tbody>
               </table>
               <p id="noMyTxs" style="display:none; color:#64748b; padding:20px; text-align:center; font-size:12px;" data-i18n="noTxs">该钱包暂无消费记录</p>
             </div>
           </div>
         </div>
+
+        <!-- Escrow 订单时间线（只读） -->
+        <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:20px; margin-top:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="color:#a78bfa;font-weight:600;font-size:14px;"><i data-lucide="lock" class="icon-inline"></i> Escrow 订单</div>
+            <button onclick="loadEscrowLifecycle()" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);color:#a78bfa;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;">刷新</button>
+          </div>
+          <div id="escrowLifecycleList" style="color:#94a3b8;font-size:13px;">Agent 自主下单，此处只显示状态进度</div>
+        </div>
+
+        <!-- Voucher 消费记录（只读） -->
+        <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:20px; margin-top:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="color:#a78bfa;font-weight:600;font-size:14px;"><i data-lucide="ticket" class="icon-inline"></i> Voucher 消费</div>
+            <button onclick="loadVouchers()" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);color:#a78bfa;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;">刷新</button>
+          </div>
+          <div id="voucherList" style="color:#94a3b8;font-size:13px;">Agent 自主消费，此处只显示消费进度</div>
+        </div>
+
+        <!-- Session Key 管理（人类操作） -->
+        <div style="background:#161b2e; border:1px solid rgba(139,92,246,0.12); border-radius:12px; padding:20px; margin-top:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="color:#a78bfa;font-weight:600;font-size:14px;"><i data-lucide="key" class="icon-inline"></i> Session Key <span style="color:#64748b;font-size:11px;font-weight:400;">（授权边界 — 人类管理）</span></div>
+            <button onclick="loadSessionKeys()" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);color:#a78bfa;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;">刷新</button>
+          </div>
+          <!-- 创建 Session Key -->
+          <div style="background:#0f121e; border:1px solid rgba(139,92,246,0.15); border-radius:10px; padding:14px; margin-bottom:14px;">
+            <div style="color:#a78bfa; font-weight:600; font-size:12px; margin-bottom:10px;"><i data-lucide="plus" class="icon-inline"></i> 创建新 Session Key</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <label style="color:#94a3b8;font-size:11px;margin-bottom:3px;display:block;">Agent ID</label>
+                <input id="skAgentId" type="text" placeholder="agent-001" style="width:100%;background:#161b2e;border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:7px 9px;color:#e2e8f0;font-size:12px;outline:none;">
+              </div>
+              <div>
+                <label style="color:#94a3b8;font-size:11px;margin-bottom:3px;display:block;">可用链</label>
+                <input id="skChains" type="text" placeholder="bsc,mock" style="width:100%;background:#161b2e;border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:7px 9px;color:#e2e8f0;font-size:12px;outline:none;">
+              </div>
+              <div>
+                <label style="color:#94a3b8;font-size:11px;margin-bottom:3px;display:block;">单笔上限 (BNB)</label>
+                <input id="skPerTxLimit" type="text" placeholder="0.5" style="width:100%;background:#161b2e;border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:7px 9px;color:#e2e8f0;font-size:12px;outline:none;">
+              </div>
+              <div>
+                <label style="color:#94a3b8;font-size:11px;margin-bottom:3px;display:block;">总额度 (BNB)</label>
+                <input id="skTotalQuota" type="text" placeholder="10" style="width:100%;background:#161b2e;border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:7px 9px;color:#e2e8f0;font-size:12px;outline:none;">
+              </div>
+              <div>
+                <label style="color:#94a3b8;font-size:11px;margin-bottom:3px;display:block;">可调用动作</label>
+                <input id="skActions" type="text" placeholder="pay,escrow,deliver" style="width:100%;background:#161b2e;border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:7px 9px;color:#e2e8f0;font-size:12px;outline:none;">
+              </div>
+              <div>
+                <label style="color:#94a3b8;font-size:11px;margin-bottom:3px;display:block;">有效期 (小时)</label>
+                <input id="skValidityHours" type="text" placeholder="24" value="24" style="width:100%;background:#161b2e;border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:7px 9px;color:#e2e8f0;font-size:12px;outline:none;">
+              </div>
+            </div>
+            <button onclick="createSessionKey()" style="margin-top:10px;width:100%;background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;padding:8px;border-radius:8px;font-weight:600;font-size:12px;cursor:pointer;"><i data-lucide="key" class="icon-inline"></i> 创建 Session Key</button>
+          </div>
+          <div id="sessionKeyList" style="color:#94a3b8;font-size:12px;">请连接钱包后查看 Session Key</div>
+        </div>
       </div>
     </div>
 
+    
     <!-- Main: Left (Market) + Right (Tx Panel) -->
     <div class="main">
       <!-- Tab: 服务市场 (Left) -->
       <div id="panel-market" class="market-section" style="display:flex; flex-direction:column; min-height:0;">
         <div class="section-header" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-start; flex-shrink:0;">
-          <div class="section-title" style="margin:0;"><span class="icon"><i data-lucide="store" class="icon-md"></i></span> Agent Marketplace</div>
+          <div class="section-title" style="margin:0;"><span class="icon"><i data-lucide="store" class="icon-md"></i></span> Agent 市场</div>
           <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
             <button onclick="sortMarket('weight')" class="sort-btn" data-sort="weight" style="background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">权重 ↓</button>
-            <button onclick="sortMarket('sales')" class="sort-btn" data-sort="sales" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">销量 ↓</button>
-            <button onclick="sortMarket('price')" class="sort-btn" data-sort="price" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">价格 ↓</button>
+            <button onclick="sortMarket('sales')" class="sort-btn" data-sort="sales" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">完成率 ↓</button>
+            <button onclick="sortMarket('price')" class="sort-btn" data-sort="price" style="background:rgba(100,116,139,0.1); color:#94a3b8; border:1px solid rgba(100,116,139,0.2); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer;">服务费 ↓</button>
             <input id="marketSearch" type="text" placeholder="搜索卖家..." oninput="applyMarketFilter()" style="background:#0f121e; border:1px solid rgba(139,92,246,0.2); border-radius:6px; padding:4px 10px; color:#e2e8f0; font-size:12px; width:140px; outline:none;" />
           </div>
         </div>
@@ -312,7 +378,7 @@
       <!-- Right: Pending Purchases + Transactions Panel -->
       <div style="display:flex; flex-direction:column; min-height:0;">
         <div class="section-header" style="flex-shrink:0;">
-          <div class="section-title"><span class="icon"><i data-lucide="clipboard-list" class="icon-md"></i></span> Recent Transactions</div>
+          <div class="section-title"><span class="icon"><i data-lucide="clipboard-list" class="icon-md"></i></span> 近期交易</div>
         </div>
         <div class="tx-panel" id="txPanel">
         <div class="tx-list" id="txList">
@@ -327,14 +393,14 @@
 
   <div class="footer">
     <div class="quote">"AI agents will make 1 million times more payments than humans, and they will use crypto."</div>
-    <div data-i18n="footer">CryptoMinds · Four.meme AI Sprint Hackathon 2026</div>
+    <div data-i18n="footer">CryptoMinds · Agent 自治经济体协议</div>
   </div>
 
-  <!-- 支付成功弹窗 -->
+  <!-- 交易完成弹窗 -->
   <div id="successModal" class="success-modal">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h3 style="color:#34d399; margin:0; font-size:20px;" data-i18n="paymentSuccess"><i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 支付成功</h3>
+        <h3 style="color:#34d399; margin:0; font-size:20px;" data-i18n="paymentSuccess"><i data-lucide="check-circle" class="icon-inline" style="color:#10b981"></i> 交易完成</h3>
         <button onclick="closeSuccessModal()" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">✕</button>
       </div>
       <div id="successBody" style="color:#e2e8f0; font-size:14px; line-height:2;"></div>
@@ -345,7 +411,7 @@
   <div id="progressModal" class="progress-modal">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h3 style="color:#a78bfa; margin:0; font-size:20px;" id="progressTitle" data-i18n="paymentProcessing">支付执行中</h3>
+        <h3 style="color:#a78bfa; margin:0; font-size:20px;" id="progressTitle" data-i18n="paymentProcessing">交易执行中</h3>
         <button onclick="closeProgressModal()" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">✕</button>
       </div>
       <div id="progressBody" style="color:#e2e8f0; font-size:14px; line-height:1.8;"></div>
@@ -357,7 +423,7 @@
   <div id="sellerDetailModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; overflow-y:auto;" onclick="if(event.target===this)closeSellerDetail()">
     <div style="max-width:520px; margin:60px auto; background:#161b2e; border-radius:16px; padding:24px; border:1px solid rgba(139,92,246,0.3); animation: fadeIn 0.3s ease-out;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h3 style="color:#a78bfa; margin:0; font-size:18px;" data-i18n="skillDetailTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 卖家详情</h3>
+        <h3 style="color:#a78bfa; margin:0; font-size:18px;" data-i18n="skillDetailTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 服务详情</h3>
         <button onclick="closeSellerDetail()" style="background:none; border:none; color:#fff; font-size:20px; cursor:pointer;">✕</button>
       </div>
       <div id="sellerDetailContent"></div>
@@ -368,7 +434,7 @@
   <div id="reportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; overflow-y:auto;">
     <div style="max-width:700px; margin:50px auto; background:#161b2e; border-radius:16px; padding:30px; border:1px solid rgba(139,92,246,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h3 style="color:#a78bfa; margin:0;" id="reportTitle" data-i18n="receiptTitle">购买凭证</h3>
+        <h3 style="color:#a78bfa; margin:0;" id="reportTitle" data-i18n="receiptTitle">交易记录</h3>
         <button onclick="closeReport()" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">✕</button>
       </div>
       <div id="reportContent" style="color:#e2e8f0; font-size:14px; line-height:1.8;"></div>
@@ -379,7 +445,7 @@
   <div id="smartRouteModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; overflow-y:auto;">
     <div style="max-width:800px; margin:50px auto; background:#161b2e; border-radius:16px; padding:30px; border:1px solid rgba(139,92,246,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h3 style="color:#a78bfa; margin:0;" id="smartRouteTitle" data-i18n="smartRouteTitle">智能路由推荐</h3>
+        <h3 style="color:#a78bfa; margin:0;" id="smartRouteTitle" data-i18n="smartRouteTitle">Agent 路由推荐</h3>
         <button onclick="closeSmartRoute()" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">✕</button>
       </div>
       <div id="smartRouteContent" style="color:#e2e8f0; font-size:14px; line-height:1.8;"></div>
@@ -465,9 +531,9 @@
 
   <script>
     window.__BOOTSTRAP__ = {
-      transactions: <%- JSON.stringify(TRANSACTIONS) %>,
-      sellers: <%- JSON.stringify(activeSellers) %>,
-      demoMode: <%= DEMO_MODE ? 'true' : 'false' %>,
+      transactions: <%- JSON.stringify(typeof TRANSACTIONS !== 'undefined' ? TRANSACTIONS : []) %>,
+      sellers: <%- JSON.stringify(typeof activeSellers !== 'undefined' ? activeSellers : []) %>,
+      demoMode: <%= demoMode ? 'true' : 'false' %>,
     };
   </script>
   <script src="/index.js"></script>

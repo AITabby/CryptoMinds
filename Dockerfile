@@ -51,4 +51,13 @@ ENV CRYPTOMINDS_API_PORT=3458
 ENV PYTHON_API_URL=http://localhost:3458
 ENV CRYPTOMINDS_DEMO=0
 
-CMD ["sh", "-c", "python3 api_server.py & sleep 2 && node web/server_modular.js"]
+# Install supervisord for proper multi-process management
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends supervisor && \
+    rm -rf /var/lib/apt/lists/*
+
+# Supervisord config: foreground process management with auto-restart
+COPY supervisor.conf /etc/supervisor/conf.d/cryptominds.conf
+
+# Default: start both services via supervisord (foreground, auto-restart)
+CMD ["supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]

@@ -323,6 +323,219 @@ pending → delivered → confirmed
 
 ---
 
+## Escrow 争议仲裁 API
+
+通过 Node.js 代理访问：`/api/protocol/escrow/*`
+
+### 创建 Escrow 托管订单 (需 ADMIN_SECRET)
+```
+POST /api/protocol/escrow/create
+```
+```json
+{
+  "task_id": "task-001",
+  "buyer_wallet": "0x...",
+  "seller_wallet": "0x...",
+  "seller_agent_id": "agent-001",
+  "amount": "0.5",
+  "chain": "bsc",
+  "verification_threshold": 0.7,
+  "dispute_window_seconds": 172800
+}
+```
+Headers: `X-Admin-Secret: <secret>`
+
+### 获取 Escrow 状态
+```
+GET /api/protocol/escrow/:escrowId
+```
+
+### 发起争议
+```
+POST /api/protocol/escrow/:escrowId/dispute
+```
+```json
+{
+  "reason": "交付质量不达标",
+  "initiator": "buyer"
+}
+```
+
+### 管理员仲裁 (需 ADMIN_SECRET)
+```
+POST /api/protocol/escrow/:escrowId/resolve
+```
+```json
+{
+  "decision": "buyer_win"
+}
+```
+Headers: `X-Admin-Secret: <secret>`
+decision 可选: `buyer_win`, `seller_win`, `split`
+
+### 列出争议中的 Escrow
+```
+GET /api/protocol/escrow/disputed
+```
+
+### Escrow 正向路径 (生命周期端点)
+
+#### 准备链上锁定 (返回 MetaMask 参数)
+```
+POST /api/protocol/escrow/:escrowId/fund/prepare
+```
+```json
+{
+  "buyer_timeout_seconds": 86400,
+  "seller_timeout_seconds": 1800
+}
+```
+Response 包含 `metamask_params`: contract_address, method, args, value, abi
+
+#### 确认链上锁定 (CREATED → FUNDED)
+```
+POST /api/protocol/escrow/:escrowId/fund/confirm
+```
+```json
+{
+  "on_chain_order_id": "0x...",
+  "reason": "链上锁定确认"
+}
+```
+
+#### 卖家接单 (FUNDED → EXECUTING)
+```
+POST /api/protocol/escrow/:escrowId/seller-accept
+```
+```json
+{
+  "seller_wallet": "0x...",
+  "reason": "接单"
+}
+```
+需 seller_wallet 与订单匹配
+
+#### 卖家交付 (EXECUTING → DELIVERED)
+```
+POST /api/protocol/escrow/:escrowId/deliver
+```
+```json
+{
+  "seller_wallet": "0x...",
+  "result": "交付内容",
+  "evidence": {"key": "value"}
+}
+```
+
+#### 验证门 (DELIVERED → VERIFIED 或 DISPUTED)
+```
+POST /api/protocol/escrow/:escrowId/verify
+```
+```json
+{
+  "task_type": "token_delivery",
+  "tx_hash": "0x...",
+  "token_address": "0x..."
+}
+```
+三分支逻辑:
+- score >= threshold → VERIFIED
+- score < threshold → DISPUTED (low_score)
+- verification fail → DISPUTED (verify_fail)
+
+#### 释放资金 (VERIFIED → RELEASED)
+```
+POST /api/protocol/escrow/:escrowId/release
+```
+```json
+{
+  "actor": "buyer",
+  "reason": "验证通过, 释放资金"
+}
+```
+mock channel: 直接释放, 返回 tx_hash
+BSC channel: 返回 MetaMask confirm() 参数
+
+### Escrow 状态机
+```
+created → funded → executing → delivered → verified → released
+                        → disputed → resolved_refund / resolved_release
+                        → expired → (auto-release)
+            → seller_timeout → refunded_timeout
+```
+
+| 状态 | 说明 |
+|------|------|
+| created | 已创建，等待买家锁资金 |
+| funded | 买家已锁资金，等待卖家接单 |
+| executing | 卖家正在执行 |
+| delivered | 卖家已提交交付 |
+| verified | 验证门通过 (off-chain) |
+| released | 资金已释放给卖家 (终态) |
+| disputed | 进入争议窗口 |
+| resolved_refund | 仲裁退款给买家 (终态) |
+| resolved_release | 仲裁释放给卖家 (终态) |
+| expired | 验收超时，自动释放 (终态) |
+| refunded_timeout | 卖家超时，退款 (终态) |
+
+---
+
+## Session Key 授权 API
+
+通过 Node.js 代理访问：`/api/protocol/session-keys/*`
+
+### 创建 Session Key
+```
+POST /api/protocol/session-keys/create
+```
+```json
+{
+  "main_wallet": "0x...",
+  "main_private_key": "0x... (或 DEMO 占位符)",
+  "agent_id": "agent-001",
+  "chains": ["bsc", "mock"],
+  "per_tx_limit": "0.5",
+  "total_quota": "10",
+  "actions": ["pay", "escrow", "deliver"],
+  "validity_seconds": 86400
+}
+```
+
+### 获取 Session Key 信息 (不含私钥)
+```
+GET /api/protocol/session-keys/:keyId
+```
+
+### 撤销 Session Key
+```
+POST /api/protocol/session-keys/:keyId/revoke
+```
+```json
+{
+  "main_wallet": "0x...",
+  "main_private_key": "0x... (或 DEMO)"
+}
+```
+
+### 增加总额度
+```
+POST /api/protocol/session-keys/:keyId/increase-quota
+```
+```json
+{
+  "additional_quota": "5.0",
+  "main_wallet": "0x...",
+  "main_private_key": "0x... (或 DEMO)"
+}
+```
+
+### 获取 Agent 的 Session Keys
+```
+GET /api/protocol/session-keys/agent/:agentId
+```
+
+---
+
 ## Demo 模式
 
 设置 `DEMO_MODE=true` 可跳过：

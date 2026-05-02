@@ -55,6 +55,7 @@ class SessionKey:
         }
         if include_private:
             d["session_private_key"] = self.session_private_key
+            d["authorization_signature"] = self.authorization_signature
         return d
 
     def is_valid(self, now: int = 0) -> bool:

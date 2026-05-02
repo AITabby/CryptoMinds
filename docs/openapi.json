@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "CryptoMinds API",
-    "version": "2.2.0",
-    "description": "Agent自治经济体协议 API — 结算层、验证层、Agent层、信誉层"
+    "version": "3.0.0",
+    "description": "Agent自治经济体协议 API — 结算层、验证层、Agent层、信誉层、Escrow争议、Session Key授权"
   },
   "servers": [
     { "url": "http://localhost:3457/api/v1", "description": "Express Gateway" },
@@ -54,6 +54,17 @@
     },
     "/agents/{agentId}/reputation/update": {
       "post": { "summary": "更新信誉分", "operationId": "updateReputation", "security": [{ "internal_token": [] }], "parameters": [{ "name": "agentId", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" }, "403": { "description": "Forbidden" } } }
+    },
+    "/agents/{agentId}/records": {
+      "get": {
+        "summary": "获取 Agent 任务记录",
+        "operationId": "getAgentRecords",
+        "parameters": [
+          { "name": "agentId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
     },
     "/agents/best-match": {
       "get": {
@@ -111,6 +122,335 @@
     "/pay/x402/split": {
       "post": { "summary": "x402 分账支付", "operationId": "x402SplitPay", "responses": { "200": { "description": "OK" } } }
     },
+
+    "/escrow/create": {
+      "post": {
+        "summary": "创建 Escrow 托管订单",
+        "operationId": "createEscrow",
+        "security": [{ "internal_token": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["task_id", "buyer_wallet", "seller_wallet", "amount"],
+                "properties": {
+                  "task_id": { "type": "string", "description": "关联任务 ID" },
+                  "buyer_wallet": { "type": "string", "description": "买家钱包地址" },
+                  "seller_wallet": { "type": "string", "description": "卖家钱包地址" },
+                  "amount": { "type": "string", "description": "托管金额 (BNB)" },
+                  "channel": { "type": "string", "default": "bsc_native", "description": "结算通道" },
+                  "verification_threshold": { "type": "number", "default": 0.7, "description": "验证分数阈值" },
+                  "dispute_window_seconds": { "type": "integer", "default": 172800, "description": "争议窗口时长 (秒, 默认48h)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Escrow 创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "escrow_id": { "type": "string" },
+                    "state": { "type": "string", "enum": ["created"] }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "参数错误" }
+        }
+      }
+    },
+    "/escrow/{escrowId}": {
+      "get": {
+        "summary": "获取 Escrow 状态",
+        "operationId": "getEscrow",
+        "parameters": [{ "name": "escrowId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "Escrow 详情",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EscrowOrder" }
+              }
+            }
+          },
+          "404": { "description": "Escrow 不存在" }
+        }
+      }
+    },
+    "/escrow/{escrowId}/dispute": {
+      "post": {
+        "summary": "发起争议",
+        "operationId": "disputeEscrow",
+        "security": [{ "internal_token": [] }],
+        "parameters": [{ "name": "escrowId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["reason"],
+                "properties": {
+                  "reason": { "type": "string", "description": "争议原因" },
+                  "initiator": { "type": "string", "description": "争议发起方 (buyer/seller)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "争议已发起",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "state": { "type": "string", "enum": ["disputed"] },
+                    "escrow_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Escrow 不存在" }
+        }
+      }
+    },
+    "/escrow/{escrowId}/resolve": {
+      "post": {
+        "summary": "管理员仲裁解决争议",
+        "operationId": "resolveEscrow",
+        "security": [{ "admin_secret": [] }],
+        "parameters": [{ "name": "escrowId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["decision"],
+                "properties": {
+                  "decision": { "type": "string", "enum": ["buyer_win", "seller_win", "split"], "description": "仲裁决定" },
+                  "evidence": { "type": "string", "description": "仲裁证据说明" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "争议已解决",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "resolution": { "type": "string", "enum": ["resolved_refund", "resolved_release", "resolved_split"] },
+                    "escrow_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "403": { "description": "需要管理员权限" },
+          "404": { "description": "Escrow 不存在" }
+        }
+      }
+    },
+    "/escrow/disputed": {
+      "get": {
+        "summary": "列出所有争议中的 Escrow",
+        "operationId": "listDisputedEscrows",
+        "responses": {
+          "200": {
+            "description": "争议 Escrow 列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "orders": { "type": "array", "items": { "$ref": "#/components/schemas/EscrowOrder" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/session-keys/create": {
+      "post": {
+        "summary": "创建 Session Key",
+        "operationId": "createSessionKey",
+        "security": [{ "internal_token": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["main_wallet", "main_private_key", "agent_id", "chains", "per_tx_limit", "total_quota", "actions"],
+                "properties": {
+                  "main_wallet": { "type": "string", "description": "主钱包地址" },
+                  "main_private_key": { "type": "string", "description": "主钱包私钥 (仅创建时使用)" },
+                  "agent_id": { "type": "string", "description": "Agent ID" },
+                  "chains": { "type": "array", "items": { "type": "string" }, "description": "可用链 (e.g. ['bsc', 'mock'])" },
+                  "per_tx_limit": { "type": "string", "description": "单笔上限 (e.g. '0.5')" },
+                  "total_quota": { "type": "string", "description": "总额度 (e.g. '10')" },
+                  "actions": { "type": "array", "items": { "type": "string" }, "description": "可调用动作 (e.g. ['pay', 'escrow', 'deliver'])" },
+                  "validity_seconds": { "type": "integer", "default": 86400, "description": "有效期 (秒)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session Key 创建成功",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionKeyCreateResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/session-keys/{keyId}": {
+      "get": {
+        "summary": "获取 Session Key 信息",
+        "operationId": "getSessionKey",
+        "parameters": [{ "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "Session Key 详情",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionKeyPublic" }
+              }
+            }
+          },
+          "404": { "description": "Session Key 不存在" }
+        }
+      }
+    },
+    "/session-keys/{keyId}/revoke": {
+      "post": {
+        "summary": "撤销 Session Key",
+        "operationId": "revokeSessionKey",
+        "security": [{ "internal_token": [] }],
+        "parameters": [{ "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["main_wallet", "main_private_key"],
+                "properties": {
+                  "main_wallet": { "type": "string", "description": "主钱包地址" },
+                  "main_private_key": { "type": "string", "description": "主钱包私钥" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "撤销成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "nonce": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/session-keys/{keyId}/increase-quota": {
+      "post": {
+        "summary": "增加 Session Key 总额度",
+        "operationId": "increaseSessionKeyQuota",
+        "security": [{ "internal_token": [] }],
+        "parameters": [{ "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["additional_quota", "main_wallet", "main_private_key"],
+                "properties": {
+                  "additional_quota": { "type": "string", "description": "增加额度 (e.g. '5.0')" },
+                  "main_wallet": { "type": "string", "description": "主钱包地址" },
+                  "main_private_key": { "type": "string", "description": "主钱包私钥" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "提额成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "total_quota": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/session-keys/agent/{agentId}": {
+      "get": {
+        "summary": "获取 Agent 的 Session Key 列表",
+        "operationId": "getAgentSessionKeys",
+        "parameters": [{ "name": "agentId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "Session Key 列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "keys": { "type": "array", "items": { "$ref": "#/components/schemas/SessionKeyPublic" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
     "/healthz": {
       "get": { "summary": "健康检查", "operationId": "healthz", "responses": { "200": { "description": "OK" } } }
     },
@@ -124,6 +464,77 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-CryptoMinds-Internal-Token"
+      },
+      "admin_secret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Admin-Secret",
+        "description": "管理员密钥认证 (ADMIN_SECRET 环境变量)"
+      }
+    },
+    "schemas": {
+      "EscrowOrder": {
+        "type": "object",
+        "properties": {
+          "escrow_id": { "type": "string" },
+          "task_id": { "type": "string" },
+          "order_id": { "type": "string" },
+          "buyer_wallet": { "type": "string" },
+          "seller_wallet": { "type": "string" },
+          "amount": { "type": "string" },
+          "channel": { "type": "string" },
+          "state": { "type": "string", "enum": ["created", "funded", "executing", "delivered", "verified", "released", "disputed", "resolved_refund", "resolved_release", "expired", "refunded_timeout"] },
+          "created_at": { "type": "integer" },
+          "funded_at": { "type": "integer" },
+          "executing_at": { "type": "integer" },
+          "delivered_at": { "type": "integer" },
+          "verified_at": { "type": "integer" },
+          "released_at": { "type": "integer" },
+          "dispute_reason": { "type": "string" },
+          "dispute_initiator": { "type": "string" },
+          "disputed_at": { "type": "integer" },
+          "dispute_window_seconds": { "type": "integer", "default": 172800 },
+          "arbitration_weight_buyer": { "type": "number" },
+          "arbitration_weight_seller": { "type": "number" },
+          "resolution": { "type": "string" },
+          "resolved_at": { "type": "integer" },
+          "verification_score": { "type": "number" },
+          "verification_threshold": { "type": "number", "default": 0.7 },
+          "verification_evidence": { "type": "string" }
+        }
+      },
+      "SessionKeyPublic": {
+        "type": "object",
+        "description": "Session Key 公开信息 (不含私钥)",
+        "properties": {
+          "session_key_id": { "type": "string" },
+          "main_wallet": { "type": "string" },
+          "agent_id": { "type": "string" },
+          "available_chains": { "type": "array", "items": { "type": "string" } },
+          "per_tx_limit": { "type": "string" },
+          "total_quota": { "type": "string" },
+          "total_used": { "type": "string" },
+          "callable_actions": { "type": "array", "items": { "type": "string" } },
+          "created_at": { "type": "integer" },
+          "expires_at": { "type": "integer" },
+          "nonce": { "type": "integer" },
+          "revoked": { "type": "boolean" },
+          "session_address": { "type": "string" }
+        }
+      },
+      "SessionKeyCreateResponse": {
+        "type": "object",
+        "description": "创建 Session Key 返回 (含私钥，仅此一次)",
+        "allOf": [
+          { "$ref": "#/components/schemas/SessionKeyPublic" },
+          {
+            "type": "object",
+            "properties": {
+              "session_private_key": { "type": "string", "description": "派生私钥 (仅创建时返回，后续不可获取)" },
+              "authorization_signature": { "type": "string", "description": "主钱包 ECDSA 授权签名" }
+            }
+          }
+        ]
       }
     }
   }

@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-05-01 — Escrow 争议 + Session Key 授权 + 安全加固
+
+- **Escrow 状态机**：11 状态完整生命周期 (created → funded → executing → delivered → verified → released, 含争议/仲裁/超时分支)
+- **验证门三分支**：pass+阈值 → 自动 release, pass+低分 → DISPUTED, fail → DISPUTED
+- **信誉加权仲裁**：buyer_weight = buyer_rep/(buyer_rep+seller_rep), 自动超时高信誉方胜出
+- **Seller slashing**：1 buyer_win → -0.3 rep, 3 次/7天 → -1.0 + 50% stake slash, 5+ → 禁用
+- **Session Key 授权**：派生 ECDSA 密钥对 + 主钱包 ECDSA 签名授权, 权限约束 (chain/per_tx_limit/total_quota/callable_actions/expiry/nonce)
+- **API 端点**：Escrow 5 个 + Session Key 5 个 (Flask + Express 双端口)
+- **Express 安全加固**：GET 注入 internal token, POST 不注入需用户认证, admin 操作 requireAdmin + 转发 X-Admin-Secret
+- **Demo 模式**：Session Key 创建/撤销/提额 支持 DEMO 占位符私钥
+- **OpenAPI 3.0.0**：新增 Escrow/Session Key schema 和 admin_secret security scheme
+- **前端新增两个 tab**：争议仲裁 + Session Key 管理
+- **Node.js 数据层**：新增 escrow_orders/session_keys 表 + _migrate() 自动补列
+- **268 tests passing** (含 33 escrow + 26 session key + 22 integration + 4 task_closer dispute)
+
 ## 2026-04-18 — 智能合约上线 + 清理优化
 
 - **部署 ServiceEscrow 合约** (`0x47e19043...`) — BSC 主网担保交易

@@ -69,3 +69,21 @@ node security/scanner.js <seller-config>
 - 使用自定义弹窗确认（非浏览器原生 confirm）
 - 退出后服务下架
 - 押金退还由质押方处理，平台不碰钱
+
+## API 代理安全
+
+Express Gateway (`3457`) 到 Python Flask (`3458`) 的代理遵循以下安全策略：
+
+- **GET (只读)** 端点注入 `X-CryptoMinds-Internal-Token`，浏览器可直接调用
+- **POST (写入)** 端点**不注入** internal token，需用户认证：
+  - Escrow create/resolve: 需要 `X-Admin-Secret`
+  - Session Key revoke/increase-quota: 需要 main_wallet 匹配验证
+  - 其他写入: 需要 buyer 签名或 internal token（由客户端显式提供）
+- 浏览器不能通过前端代理绕过 Python 的 `@require_auth`
+
+## Escrow 争议仲裁安全
+
+- 仲裁端点 (`/escrow/:id>/resolve`) 需要 `X-Admin-Secret` header
+- Admin secret 通过 timing-safe 比较，防止时序攻击
+- Demo 模式下 Session Key 操作跳过 ECDSA 签名，用钱包地址匹配验证
+- 主私钥不应从浏览器/HTTP 请求体传递（仅 Demo 模式允许占位符）

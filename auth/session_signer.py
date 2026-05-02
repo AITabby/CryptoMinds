@@ -2,15 +2,38 @@
 Session Key 签名和验证
 
 SessionSigner: 创建 session key, 验证授权, 用 session key 签名支付请求。
+
+⚠️ Security requirement: eth_account MUST be available in production.
+If eth_account is missing, Session Key ECDSA signing is impossible —
+HMAC "fallback" provides no real security (anyone can forge signatures).
+Production startup will crash if eth_account is not installed.
 """
 
 import hashlib
 import json
+import os
 import time
 from decimal import Decimal
 from typing import Dict, Optional
 
 from auth.session_key import SessionKey
+
+# Security gate: crash in production if eth_account is missing
+_ETH_ACCOUNT_AVAILABLE = False
+try:
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+    _ETH_ACCOUNT_AVAILABLE = True
+except ImportError:
+    _ETH_ACCOUNT_AVAILABLE = False
+
+_DEBUG = os.getenv("CRYPTOMINDS_DEBUG", "false").lower() in ("1", "true", "yes")
+if not _ETH_ACCOUNT_AVAILABLE and not _DEBUG:
+    raise ImportError(
+        "eth_account is not installed — Session Key ECDSA signing is impossible. "
+        "Install with: pip install eth-account. "
+        "HMAC fallback is NOT secure and is only allowed in debug/demo mode."
+    )
 
 
 class SessionKeyError(Exception):
@@ -224,18 +247,16 @@ class SessionSigner:
     def _derive_key_pair(self, main_wallet: str, agent_id: str,
                          main_private_key: str) -> tuple:
         """派生 ECDSA 密钥对"""
-        try:
-            from eth_account import Account
-            # 派生: 用主私钥 + agent_id 作为种子
+        if _ETH_ACCOUNT_AVAILABLE:
             seed = hashlib.sha256(
                 f"{main_private_key}:{agent_id}:{main_wallet}".encode()
             ).hexdigest()
             acct = Account.create(seed)
             return acct.key.hex(), acct.address
-        except ImportError:
-            # Fallback: HMAC-based derivation (no eth_account)
-            import hmac
-            seed = hmac.new(
+        else:
+            # Debug/demo mode HMAC fallback — NOT secure for production
+            import hmac as _hmac
+            seed = _hmac.new(
                 main_private_key.encode(),
                 f"{agent_id}:{main_wallet}".encode(),
                 hashlib.sha256,
@@ -244,16 +265,14 @@ class SessionSigner:
 
     def _sign_with_main_wallet(self, message: str, private_key: str) -> str:
         """主钱包 ECDSA 签名"""
-        try:
-            from eth_account import Account
-            from eth_account.messages import encode_defunct
+        if _ETH_ACCOUNT_AVAILABLE:
             msg = encode_defunct(text=message)
             signed = Account.sign_message(msg, private_key=private_key)
             return signed.signature.hex()
-        except ImportError:
-            # HMAC fallback
-            import hmac
-            return hmac.new(
+        else:
+            # Debug/demo HMAC fallback — NOT secure for production
+            import hmac as _hmac
+            return _hmac.new(
                 private_key.encode(),
                 message.encode(),
                 hashlib.sha256,
@@ -265,9 +284,7 @@ class SessionSigner:
 
     def _recover_signer(self, message: str, signature: str) -> str:
         """恢复签名者地址"""
-        try:
-            from eth_account import Account
-            from eth_account.messages import encode_defunct
+        if _ETH_ACCOUNT_AVAILABLE:
             msg = encode_defunct(text=message)
             if signature.startswith("0x"):
                 signature_bytes = bytes.fromhex(signature[2:])
@@ -275,7 +292,6 @@ class SessionSigner:
                 signature_bytes = bytes.fromhex(signature)
             recovered = Account.recover_message(msg, signature=signature_bytes)
             return recovered
-        except (ImportError, Exception):
-            # HMAC fallback: return main_wallet from the signature itself
-            # (In HMAC mode, we can't recover — we rely on store verification)
+        else:
+            # Debug/demo: can't recover signer in HMAC mode
             return ""

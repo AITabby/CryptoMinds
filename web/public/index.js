@@ -200,7 +200,7 @@
       if (!el) return;
       if (_brainAnimTimer) { clearTimeout(_brainAnimTimer); _brainAnimTimer = null; }
       if (!orders.length) {
-        el.innerHTML = '<div style="color:#475569; text-align:center; padding:40px 0;"><i data-lucide="brain" style="width:32px;height:32px;color:#475569;display:block;margin:0 auto 12px;"></i>Agent 决策链路<br><span style="font-size:11px;margin-top:6px;display:block;">点击「买币指令」开始<br>Agent 将实时展示搜索卖家、选择下单、代执行买币全过程</span></div>';
+        el.innerHTML = '<div style="color:#475569; text-align:center; padding:40px 0;"><i data-lucide="brain" style="width:32px;height:32px;color:#475569;display:block;margin:0 auto 12px;"></i>Agent 自主决策日志<br><span style="font-size:11px;margin-top:6px;display:block;">Agent 自主搜索、选择、执行<br>此处实时展示 Agent 的决策过程</span></div>';
         lucide.createIcons();
         return;
       }
@@ -235,9 +235,9 @@
           { icon: '🔍', color: '#a78bfa', label: '搜索卖家', detail: `扫描服务市场 ${15} 个卖家，按权重/评分/额度筛选...`, tags: `<span style="background:rgba(139,92,246,0.1);color:#a78bfa;padding:2px 6px;border-radius:4px;font-size:10px;">${expert} ★</span>` },
           { icon: '🎯', color: '#34d399', label: '选择最优', detail: `选中 <b style="color:#34d399;">${expert}</b> — 评分最高、押金充足` },
           { icon: '💰', color: '#fbbf24', label: '付款', detail: `${price} BNB → ${expert} ${isDone ? '<span style="color:#34d399;">✅ 链上确认</span>' : '<span style="color:#fbbf24;">⏳ 待确认</span>'}`, extra: txHash ? `TX: ${txLink}` : '' },
-          { icon: '🤖', color: '#8b5cf6', label: '卖家代执行', detail: `${expert} 收到指令，为你买入代币...` },
+          { icon: '🤖', color: '#8b5cf6', label: '卖家 Agent 自主执行', detail: `${expert} 收到指令，自主完成任务...` },
           { icon: '📦', color: '#60a5fa', label: '代币转回', detail: `${expert} 将 <b style="color:#60a5fa;">${tokenAmt} TOKEN</b> 转入你的钱包` },
-          { icon: '✅', color: '#34d399', label: '交易完成', detail: `💰 花费 <b style="color:#fbbf24;">${price} BNB</b> → 📦 收到 <b style="color:#60a5fa;">${tokenAmt} TOKEN</b>`, sub: `卖家 ${expert} 代为执行`, isFinal: true },
+          { icon: '✅', color: '#34d399', label: '交易完成', detail: `💰 花费 <b style="color:#fbbf24;">${price} BNB</b> → 📦 收到 <b style="color:#60a5fa;">${tokenAmt} TOKEN</b>`, sub: `卖家 Agent ${expert} 自主执行`, isFinal: true },
         ];
 
         let html = `<div style="margin-bottom:4px;color:#64748b;font-size:10px;">${time}</div>`;
@@ -302,8 +302,8 @@
         </div>`;
         if (isDone) {
           html += `<div style="padding:6px 0; border-bottom:1px solid rgba(139,92,246,0.06);">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="color:#8b5cf6;font-size:12px;">🤖 卖家代执行</span></div>
-            <div style="color:#94a3b8;font-size:11px;">${expert} 收到指令，为你买入代币...</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="color:#8b5cf6;font-size:12px;">🤖 卖家 Agent 自主执行</span></div>
+            <div style="color:#94a3b8;font-size:11px;">${expert} 收到指令，自主完成任务...</div>
           </div>`;
           html += `<div style="padding:6px 0; border-bottom:1px solid rgba(139,92,246,0.06);">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span style="color:#60a5fa;font-size:12px;">📦 代币转回</span></div>
@@ -312,7 +312,7 @@
           html += `<div style="padding:8px; background:rgba(34,211,153,0.08);border-radius:8px;margin-top:4px;border:1px solid rgba(34,211,153,0.15);">
             <div style="color:#34d399;font-size:12px;font-weight:600;">✅ 交易完成</div>
             <div style="color:#94a3b8;font-size:11px;margin-top:4px;">💰 花费 <b style="color:#fbbf24;">${price} BNB</b> → 📦 收到 <b style="color:#60a5fa;">${tokenAmt} TOKEN</b></div>
-            <div style="color:#64748b;font-size:10px;margin-top:2px;">卖家 ${expert} 代为执行</div>
+            <div style="color:#64748b;font-size:10px;margin-top:2px;">卖家 Agent ${expert} 自主执行</div>
           </div>`;
         }
       });
@@ -320,7 +320,7 @@
       lucide.createIcons();
     }
 
-    // 买币指令按钮
+    // Agent 自主下单（内部调用，UI 不触发）
     let _buyingActive = false;
     async function agentBuyToken() {
       if (_buyingActive) return;
@@ -349,7 +349,7 @@
           renderAgentBrain(orders, true);
           renderBuyerTxTable(orders, true);
         } else {
-          alert('买币失败: ' + (data.error || '未知错误'));
+          alert('下单失败: ' + (data.error || '未知错误'));
         }
       } catch(e) {
         if (e.name === 'AbortError') {
@@ -359,7 +359,7 @@
         }
       }
       _buyingActive = false;
-      if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = '<i data-lucide="zap" class="icon-inline" style="width:12px;height:12px;"></i> 买币指令'; lucide.createIcons(); }
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     }
 
     let _lastRenderedTxHash = '';
@@ -490,11 +490,16 @@
         }
         loadLiveFeed();
         loadBuyerStats();
+        loadEscrowLifecycle();
+        loadVouchers();
+        loadSessionKeys();
       } else if (tab === 'admin') {
         document.querySelector('#adminTab').classList.add('active');
         document.getElementById('panel-admin').style.display = 'block';
         document.querySelector('.main').style.display = 'none';
+        if (metricsDiv) metricsDiv.style.display = 'none';
         loadPendingServices();
+        loadDisputedEscrows();
       }
       // 保存当前tab到URL hash
       window.location.hash = tab;
@@ -567,7 +572,7 @@
       
       let agent, icon, color, reason, direction;
       if (isMyTo && !isMyFrom) {
-        // B端视角：我收到订单
+        // 卖家视角：我收到订单
         agent = tx.to;
         icon = AGENT_ICONS[agent] || '🤖';
         color = AGENT_COLORS[agent] || '#a78bfa';
@@ -595,7 +600,7 @@
       html += '</div>';
       html += '<div class="live-event-body">';
       if (isMyTo && !isMyFrom) {
-        // B端：显示买家付了多少钱给我
+        // 卖家：显示买家付了多少钱给我
         html += direction + ' ' + reason;
         if (tx.from) html += ' ← <strong style="color:#e2e8f0">' + tx.from + '</strong>';
       } else {
@@ -2500,7 +2505,7 @@
               </div>
               <div style="text-align:right;">
                 <div style="color:${statusColor};font-size:12px;font-weight:600;">${statusText}</div>
-                ${needDeliver ? '<div style="color:#64748b;font-size:10px;margin-top:4px;"><i data-lucide="bot" class="icon-inline"></i> 等待 Agent 执行</div>' : ''}
+                ${needDeliver ? '<div style="color:#64748b;font-size:10px;margin-top:4px;"><i data-lucide="bot" class="icon-inline"></i> Agent 自主执行中</div>' : ''}
                 ${o.result ? '<div style="color:#34d399;font-size:10px;margin-top:4px;"><i data-lucide="check-circle" class="icon-inline"></i> 已履约</div>' : ''}
               </div>
             </div>
@@ -2509,60 +2514,7 @@
       } catch(e) { console.error('卖家订单加载失败', e); }
     }
 
-    function deliverResult(orderId) {
-      const modal = document.createElement('div');
-      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100000;display:flex;justify-content:center;align-items:center;';
-      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-      modal.innerHTML = `<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid rgba(139,92,246,0.4);border-radius:16px;padding:28px;width:500px;max-width:90vw;"><div style="color:#a78bfa;font-weight:600;font-size:16px;margin-bottom:16px;"><i data-lucide="package" class="icon-inline"></i> 提交交付结果</div><div style="color:#94a3b8;font-size:12px;margin-bottom:8px;">订单执行结果（如自主选择的 meme、买入数量、策略说明等）</div><textarea id="deliverOutput" rows="6" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;resize:vertical;" placeholder="例如：已自主选定一个 meme 并完成买入，代币已转入买家钱包..."></textarea><div style="color:#94a3b8;font-size:12px;margin:12px 0 8px 0;">转账交易哈希（可选，用于链上验证）</div><input id="deliverTxHash" type="text" style="width:100%;background:#0f121e;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:12px;color:#e2e8f0;font-size:13px;" placeholder="0x..."/><div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;"><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1px solid rgba(139,92,246,0.3);color:#a78bfa;border-radius:8px;padding:8px 20px;cursor:pointer;">取消</button><button onclick="submitDeliverResult('${orderId}')" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);color:#fff;border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-weight:600;">提交交付</button></div></div>`;
-      document.body.appendChild(modal);
-      lucide.createIcons();
-    }
-
-    async function submitDeliverResult(orderId) {
-      const output = document.getElementById('deliverOutput')?.value?.trim();
-      const txHash = document.getElementById('deliverTxHash')?.value?.trim() || '';
-      if (!output) { showError('请输入结果'); return; }
-      
-      try {
-        // 先查订单是否有 escrowOrderId（走合约托管）
-        const purchasesRes = await fetch('/api/v1/purchases');
-        const purchasesData = await purchasesRes.json();
-        const purchase = (purchasesData.purchases || purchasesData).find(p => p.id === orderId);
-        
-        if (purchase?.escrowOrderId) {
-          // ── 走合约交付 → 更新链上状态 ──
-          const escrowInfo = await fetch('/api/v1/escrow/info').then(r => r.json());
-          if (!escrowInfo.ok) throw new Error('合约不可用');
-          
-          const escrowContract = await loadEscrowContract(escrowInfo.address, escrowInfo.abi);
-          const wallet = getActiveWallet();
-          
-          showNotice('<i data-lucide="loader" class="icon-inline spin"></i> 正在提交交付，请在 MetaMask 确认...');
-          
-          // 调合约 deliver(orderId, result)
-          const deliverTx = await escrowContract.methods.deliver(purchase.escrowOrderId, output).send({
-            from: wallet,
-          });
-          console.log('[escrow] deliver tx:', deliverTx.transactionHash);
-        }
-        
-        // 后端提交结果
-        const res = await fetch(`/api/orders/${orderId}/result`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ output, sellerWallet: currentAccount, deliveryTxHash: txHash })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          // 卖家交付已完成
-          showNotice('结果已提交！买家将收到通知');
-          document.querySelector('div[style*="z-index:100000"]')?.remove();
-          if (sellerOrdersOpen) { toggleSellerOrders(); toggleSellerOrders(); } // 刷新
-        } else {
-          showError(data.error || '提交失败');
-        }
-      } catch(e) { showError('提交失败: ' + e.message); }
-    }
+    // deliverResult and submitDeliverResult removed — Seller Agent delivers autonomously
 
     async function loadSellerNotif() {
       if (!currentAccount) return;
@@ -4200,4 +4152,352 @@ async function confirmDepositModal() {
       } catch (e) { console.warn('Web Push init failed:', e); }
     }
     initWebPush();
+
+  // ===== Escrow 争议仲裁 =====
+
+  const ESCROW_STATE_LABELS = {
+    'CREATED': '已创建', 'FUNDED': '已锁资', 'EXECUTING': '执行中',
+    'DELIVERED': '已交付', 'VERIFIED': '已验证', 'RELEASED': '已释放',
+    'DISPUTED': '争议中', 'RESOLVED_REFUND': '退款', 'RESOLVED_RELEASE': '仲裁释放',
+    'EXPIRED': '已过期', 'REFUNDED_TIMEOUT': '超时退款'
+  };
+
+  async function loadDisputedEscrows() {
+    const listEl = document.getElementById('disputedEscrowList');
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">加载中...</div>';
+    try {
+      const res = await fetch('/api/v1/protocol/escrow/disputed');
+      const data = await res.json();
+      if (!data.ok && !data.orders) {
+        listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">暂无争议订单</div>';
+        return;
+      }
+      const orders = data.orders || [];
+      if (orders.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">暂无争议订单</div>';
+        return;
+      }
+      listEl.innerHTML = orders.map(o => {
+        const escrowId = o.escrow_id || o.escrowId || '--';
+        const stateLabel = ESCROW_STATE_LABELS[o.state] || o.state;
+        const disputeTime = o.disputed_at ? new Date(o.disputed_at * 1000).toLocaleString('zh-CN') : '--';
+        const disputeWindow = o.dispute_window_seconds ? Math.round(o.dispute_window_seconds / 3600) + 'h' : '48h';
+        return `<div style="background:#0f121e;border:1px solid rgba(234,179,8,0.2);border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div style="color:#fbbf24;font-weight:600;font-size:13px;">${escrowId}</div>
+            <div style="background:rgba(234,179,8,0.15);color:#fbbf24;font-size:11px;padding:3px 8px;border-radius:4px;font-weight:600;">${stateLabel}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:#94a3b8;">
+            <div>买家: <span style="color:#e2e8f0;font-family:monospace;">${(o.buyer_wallet || '').slice(0,10)}...</span></div>
+            <div>卖家: <span style="color:#e2e8f0;font-family:monospace;">${(o.seller_wallet || '').slice(0,10)}...</span></div>
+            <div>金额: <span style="color:#fbbf24;">${o.amount || '--'} BNB</span></div>
+            <div>争议时间: ${disputeTime}</div>
+            <div>争议窗口: ${disputeWindow}</div>
+            <div>原因: ${o.dispute_reason || '--'}</div>
+            <div>买家权重: ${o.arbitration_weight_buyer || 0}</div>
+            <div>卖家权重: ${o.arbitration_weight_seller || 0}</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button onclick="resolveEscrow('${escrowId}','buyer_win')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;">买家胜</button>
+            <button onclick="resolveEscrow('${escrowId}','seller_win')" style="background:rgba(34,211,153,0.1);border:1px solid rgba(34,211,153,0.3);color:#34d399;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;">卖家胜</button>
+            <button onclick="resolveEscrow('${escrowId}','split')" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);color:#a78bfa;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;">分账</button>
+          </div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#f87171;">加载失败: ' + e.message + '</div>';
+    }
+  }
+
+  async function resolveEscrow(escrowId, decision) {
+    const adminSecret = prompt('输入管理员密钥 (ADMIN_SECRET):');
+    if (!adminSecret) return;
+    try {
+      const res = await fetch(`/api/v1/protocol/escrow/${escrowId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret },
+        body: JSON.stringify({ decision })
+      });
+      const data = await res.json();
+      if (data.ok || data.resolution) {
+        alert('仲裁完成: ' + (data.resolution || decision));
+        loadDisputedEscrows();
+      } else {
+        alert('仲裁失败: ' + (data.error || '未知错误'));
+      }
+    } catch (e) {
+      alert('仲裁请求失败: ' + e.message);
+    }
+  }
+
+  // ===== Session Key 管理 =====
+
+  async function loadSessionKeys() {
+    const listEl = document.getElementById('sessionKeyList');
+    const wallet = currentAccount || getActiveWallet();
+    if (!wallet) {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">请先连接钱包</div>';
+      return;
+    }
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">加载中...</div>';
+    try {
+      // 查询所有 session keys — 用 internal token 请求代理
+      const res = await fetch('/api/v1/protocol/session-keys/agent/' + encodeURIComponent(wallet));
+      const data = await res.json();
+      const keys = data.keys || [];
+      if (keys.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">当前钱包无 Session Key</div>';
+        return;
+      }
+      listEl.innerHTML = keys.map(k => {
+        const expired = k.expires_at && Date.now() / 1000 > k.expires_at;
+        const statusColor = k.revoked ? '#f87171' : expired ? '#64748b' : '#34d399';
+        const statusLabel = k.revoked ? '已撤销' : expired ? '已过期' : '有效';
+        const expiresAt = k.expires_at ? new Date(k.expires_at * 1000).toLocaleString('zh-CN') : '--';
+        const usedPercent = k.total_quota ? (parseFloat(k.total_used) / parseFloat(k.total_quota) * 100).toFixed(1) : 0;
+        return `<div style="background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div style="color:#a78bfa;font-weight:600;font-size:13px;font-family:monospace;">${k.session_key_id}</div>
+            <div style="background:rgba(${k.revoked ? '239,68,68' : expired ? '100,116,139' : '34,211,153'},0.15);color:${statusColor};font-size:11px;padding:3px 8px;border-radius:4px;font-weight:600;">${statusLabel}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:#94a3b8;">
+            <div>Agent: <span style="color:#e2e8f0;">${k.agent_id}</span></div>
+            <div>地址: <span style="color:#e2e8f0;font-family:monospace;">${(k.session_address || '').slice(0,10)}...</span></div>
+            <div>链: <span style="color:#e2e8f0;">${(k.available_chains || []).join(', ')}</span></div>
+            <div>动作: <span style="color:#e2e8f0;">${(k.callable_actions || []).join(', ')}</span></div>
+            <div>单笔上限: <span style="color:#fbbf24;">${k.per_tx_limit} BNB</span></div>
+            <div>额度: <span style="color:#fbbf24;">${k.total_used}/${k.total_quota} BNB (${usedPercent}%)</span></div>
+            <div>有效期至: ${expiresAt}</div>
+            <div>Nonce: ${k.nonce || 0}</div>
+          </div>
+          ${!k.revoked && !expired ? `<div style="display:flex;gap:8px;margin-top:12px;">
+            <button onclick="revokeSessionKeyUI('${k.session_key_id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;">撤销</button>
+            <button onclick="increaseQuotaUI('${k.session_key_id}')" style="background:rgba(34,211,153,0.1);border:1px solid rgba(34,211,153,0.3);color:#34d399;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;">提额</button>
+          </div>` : ''}
+        </div>`;
+      }).join('');
+    } catch (e) {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#f87171;">加载失败: ' + e.message + '</div>';
+    }
+  }
+
+  async function createSessionKey() {
+    const wallet = currentAccount || getActiveWallet();
+    if (!wallet) { alert('请先连接钱包'); return; }
+    const agentId = document.getElementById('skAgentId').value.trim();
+    const chains = document.getElementById('skChains').value.trim().split(',');
+    const perTxLimit = document.getElementById('skPerTxLimit').value.trim();
+    const totalQuota = document.getElementById('skTotalQuota').value.trim();
+    const actions = document.getElementById('skActions').value.trim().split(',');
+    const validityHours = parseInt(document.getElementById('skValidityHours').value || '24');
+    if (!agentId || !perTxLimit || !totalQuota) { alert('请填写 Agent ID、单笔上限、总额度'); return; }
+    try {
+      const res = await fetch('/api/v1/protocol/session-keys/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          main_wallet: wallet,
+          main_private_key: 'DEMO', // Demo mode: placeholder key
+          agent_id: agentId,
+          chains: chains,
+          per_tx_limit: perTxLimit,
+          total_quota: totalQuota,
+          actions: actions,
+          validity_seconds: validityHours * 3600,
+        })
+      });
+      const data = await res.json();
+      if (data.ok || data.session_key_id) {
+        alert('Session Key 创建成功!\nID: ' + (data.session_key_id || '--') + '\n请保存私钥: ' + (data.session_private_key || '未返回'));
+        loadSessionKeys();
+      } else {
+        alert('创建失败: ' + (data.error || '未知错误'));
+      }
+    } catch (e) {
+      alert('创建请求失败: ' + e.message);
+    }
+  }
+
+  async function revokeSessionKeyUI(keyId) {
+    const wallet = currentAccount || getActiveWallet();
+    if (!wallet) return;
+    if (!confirm('确认撤销 Session Key ' + keyId + '?')) return;
+    try {
+      const res = await fetch(`/api/v1/protocol/session-keys/${keyId}/revoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ main_wallet: wallet, main_private_key: 'DEMO' })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        alert('已撤销');
+        loadSessionKeys();
+      } else {
+        alert('撤销失败: ' + (data.error || '未知错误'));
+      }
+    } catch (e) {
+      alert('撤销请求失败: ' + e.message);
+    }
+  }
+
+  const VOUCHER_STATE_LABELS = {
+    'ISSUED': '已发行', 'ACTIVE': '已激活', 'USED': '使用中',
+    'EXHAUSTED': '已耗尽', 'EXPIRED': '已过期', 'DISPUTED': '争议中',
+    'RESOLVED': '已仲裁'
+  };
+
+  const ESCROW_LIFECYCLE_STATES = ['CREATED','FUNDED','EXECUTING','DELIVERED','VERIFIED','RELEASED'];
+
+  // ===== Escrow 生命周期 =====
+
+  // ===== Escrow 生命周期 (只读) =====
+
+  async function loadEscrowLifecycle() {
+    const listEl = document.getElementById('escrowLifecycleList');
+    const wallet = currentAccount || getActiveWallet();
+    if (!wallet) {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">请先连接钱包</div>';
+      return;
+    }
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">加载中...</div>';
+    try {
+      const res = await fetch('/api/v1/protocol/market/tasks');
+      const data = await res.json();
+      const tasks = data.tasks || [];
+      if (tasks.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">暂无 Escrow 订单</div>';
+        return;
+      }
+      listEl.innerHTML = tasks.map(t => {
+        const escrowId = t.escrow_id || t.escrowId || '--';
+        const state = t.state || 'CREATED';
+        const stateLabel = ESCROW_STATE_LABELS[state] || state;
+        const isLifecycle = ESCROW_LIFECYCLE_STATES.includes(state);
+        const stateColor = state === 'RELEASED' ? '#34d399' : state === 'DISPUTED' ? '#fbbf24' : isLifecycle ? '#a78bfa' : '#64748b';
+        const buyerShort = (t.buyer_wallet || '').slice(0,10) + '...';
+        const sellerShort = (t.seller_wallet || '').slice(0,10) + '...';
+        const createdAt = t.created_at ? new Date(t.created_at * 1000).toLocaleString('zh-CN') : '--';
+
+        // State progression bar (read-only — no manual buttons)
+        const stateIdx = ESCROW_LIFECYCLE_STATES.indexOf(state);
+        const progressHtml = ESCROW_LIFECYCLE_STATES.map((s, i) => {
+          const done = i <= stateIdx && stateIdx >= 0;
+          const current = i === stateIdx;
+          const color = done ? '#34d399' : '#334155';
+          const label = ESCROW_STATE_LABELS[s];
+          return `<div style="display:flex;align-items:center;gap:2px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:${current ? '#fbbf24' : color};border:${current ? '2px solid #fbbf24' : done ? 'none' : '1px solid #475569'};"></div>
+            <span style="font-size:10px;color:${done ? '#e2e8f0' : '#475569'};">${label}</span>
+            ${i < 5 ? '<div style="width:12px;height:1px;background:' + (done ? '#34d399' : '#334155') + ';"></div>' : ''}
+          </div>`;
+        }).join('');
+
+        return `<div style="background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div style="color:#a78bfa;font-weight:600;font-size:13px;font-family:monospace;">${escrowId}</div>
+            <div style="background:rgba(${state === 'RELEASED' ? '34,211,153' : state === 'DISPUTED' ? '234,179,8' : '139,92,246'},0.15);color:${stateColor};font-size:11px;padding:3px 8px;border-radius:4px;font-weight:600;">${stateLabel}</div>
+          </div>
+          <div style="display:flex;gap:2px;margin-bottom:10px;overflow:hidden;">${progressHtml}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;color:#94a3b8;">
+            <div>买家: <span style="color:#e2e8f0;font-family:monospace;">${buyerShort}</span></div>
+            <div>卖家: <span style="color:#e2e8f0;font-family:monospace;">${sellerShort}</span></div>
+            <div>金额: <span style="color:#fbbf24;">${t.amount || '--'} BNB</span></div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#f87171;">加载失败: ' + e.message + '</div>';
+    }
+  }
+
+  // ===== Voucher 按量计费 =====
+
+  // ===== Voucher 消费 (只读) =====
+
+  async function loadVouchers() {
+    const listEl = document.getElementById('voucherList');
+    const wallet = currentAccount || getActiveWallet();
+    if (!wallet) {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">请先连接钱包</div>';
+      return;
+    }
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">加载中...</div>';
+    try {
+      const res = await fetch('/api/v1/protocol/voucher/agent/' + encodeURIComponent(wallet));
+      const data = await res.json();
+      const vouchers = data.vouchers || [];
+      if (vouchers.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#64748b;">暂无 Voucher</div>';
+        return;
+      }
+      listEl.innerHTML = vouchers.map(v => {
+        const vchId = v.voucher_id || v.voucherId || '--';
+        const state = v.state || 'ISSUED';
+        const stateLabel = VOUCHER_STATE_LABELS[state] || state;
+        const isFinal = ['EXHAUSTED','EXPIRED','RESOLVED'].includes(state);
+        const stateColor = state === 'EXHAUSTED' ? '#34d399' : state === 'ACTIVE' ? '#a78bfa' : state === 'DISPUTED' ? '#fbbf24' : '#64748b';
+        const usedPercent = v.total_units ? ((v.units_used || 0) / v.total_units * 100).toFixed(1) : 0;
+
+        // Voucher state progression
+        const VCH_STATES = ['ISSUED','ACTIVE','USED','EXHAUSTED'];
+        const vchStateIdx = VCH_STATES.indexOf(state);
+        const progressHtml = VCH_STATES.map((s, i) => {
+          const done = i <= vchStateIdx && vchStateIdx >= 0;
+          const current = i === vchStateIdx;
+          const color = done ? '#34d399' : '#334155';
+          const label = VOUCHER_STATE_LABELS[s];
+          return `<div style="display:flex;align-items:center;gap:2px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:${current ? '#fbbf24' : color};border:${current ? '2px solid #fbbf24' : done ? 'none' : '1px solid #475569'};"></div>
+            <span style="font-size:10px;color:${done ? '#e2e8f0' : '#475569'};">${label}</span>
+            ${i < 3 ? '<div style="width:12px;height:1px;background:' + (done ? '#34d399' : '#334155') + ';"></div>' : ''}
+          </div>`;
+        }).join('');
+
+        // Read-only: no manual action buttons, Agent operates autonomously
+
+        return `<div style="background:#0f121e;border:1px solid rgba(139,92,246,0.15);border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div style="color:#a78bfa;font-weight:600;font-size:13px;font-family:monospace;">${vchId}</div>
+            <div style="background:rgba(${state === 'EXHAUSTED' ? '34,211,153' : state === 'ACTIVE' ? '139,92,246' : '100,116,139'},0.15);color:${stateColor};font-size:11px;padding:3px 8px;border-radius:4px;font-weight:600;">${stateLabel}</div>
+          </div>
+          <div style="display:flex;gap:2px;margin-bottom:10px;overflow:hidden;">${progressHtml}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;color:#94a3b8;">
+            <div>服务: <span style="color:#e2e8f0;">${v.service_type || '--'}</span></div>
+            <div>卖家: <span style="color:#e2e8f0;">${v.seller_agent_id || '--'}</span></div>
+            <div>单价: <span style="color:#fbbf24;">${v.price_per_unit || '--'} BNB</span></div>
+            <div>已用: <span style="color:#e2e8f0;">${v.units_used || 0}/${v.total_units || 0} (${usedPercent}%)</span></div>
+            <div>链: <span style="color:#e2e8f0;">${v.chain || '--'}</span></div>
+            <div>总价: <span style="color:#fbbf24;">${((v.total_units || 0) * parseFloat(v.price_per_unit || 0)).toFixed(4)} BNB</span></div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#f87171;">加载失败: ' + e.message + '</div>';
+    }
+  }
+
+  // voucherUseUI removed — Agent uses Voucher autonomously
+
+  async function increaseQuotaUI(keyId) {
+    const additional = prompt('输入增加额度 (BNB):');
+    if (!additional) return;
+    const wallet = currentAccount || getActiveWallet();
+    if (!wallet) return;
+    try {
+      const res = await fetch(`/api/v1/protocol/session-keys/${keyId}/increase-quota`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ additional_quota: additional, main_wallet: wallet, main_private_key: 'DEMO' })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        alert('提额成功! 新额度: ' + (data.total_quota || '--'));
+        loadSessionKeys();
+      } else {
+        alert('提额失败: ' + (data.error || '未知错误'));
+      }
+    } catch (e) {
+      alert('提额请求失败: ' + e.message);
+    }
+  }
   

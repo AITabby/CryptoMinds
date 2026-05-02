@@ -2,18 +2,85 @@
 import json
 import sqlite3
 import os
+import shutil
+import time
+import threading
+import atexit
 from decimal import Decimal
 from typing import Dict, List, Optional
 from pathlib import Path
 
 
+DB_BACKUP_INTERVAL = int(os.getenv("DB_BACKUP_INTERVAL_SECONDS", "3600"))  # 1 hour default
+DB_BACKUP_DIR = os.getenv("DB_BACKUP_DIR", "")
+
+
 def _connect(db_path: str) -> sqlite3.Connection:
-    """Connect to SQLite with WAL mode for concurrent read/write safety."""
+    """Connect to SQLite with WAL mode and busy_timeout for cross-process safety."""
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")  # wait up to 5s on lock contention
     conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def backup_db(db_path: str, backup_dir: str = None) -> str:
+    """Create a timestamped backup of the SQLite database with WAL checkpoint.
+
+    Returns the backup file path.
+    """
+    backup_dir = backup_dir or DB_BACKUP_DIR or str(Path(db_path).parent / "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.join(backup_dir, f"cryptominds_{timestamp}.db")
+
+    # WAL checkpoint before copy to ensure all data is in the main file
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    conn.close()
+
+    shutil.copy2(db_path, backup_path)
+
+    # Rotate: keep last 10 backups
+    backups = sorted(Path(backup_dir).glob("cryptominds_*.db"), reverse=True)
+    for old in backups[10:]:
+        old.unlink(missing_ok=True)
+
+    return backup_path
+
+
+def start_backup_thread(db_path: str, interval: int = None):
+    """Start a background thread that periodically backs up the database."""
+    interval = interval or DB_BACKUP_INTERVAL
+    if interval <= 0:
+        return  # disabled
+
+    def _loop():
+        while True:
+            time.sleep(interval)
+            try:
+                path = backup_db(db_path)
+                print(f"[backup] SQLite backup created: {path}")
+            except Exception as e:
+                print(f"[backup] Backup failed: {e}")
+
+    t = threading.Thread(target=_loop, daemon=True, name="sqlite-backup")
+    t.start()
+    return t
+
+
+def register_shutdown_checkpoint(db_path: str):
+    """Register an atexit handler to WAL checkpoint on process shutdown."""
+    def _checkpoint():
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            conn.close()
+        except Exception:
+            pass
+    atexit.register(_checkpoint)
 
 
 def _ensure_tables(conn: sqlite3.Connection):
@@ -125,6 +192,37 @@ def _ensure_tables(conn: sqlite3.Connection):
 
         CREATE INDEX IF NOT EXISTS idx_session_agent ON session_keys(agent_id);
         CREATE INDEX IF NOT EXISTS idx_session_wallet ON session_keys(main_wallet);
+
+        CREATE TABLE IF NOT EXISTS vouchers (
+            voucher_id TEXT PRIMARY KEY,
+            issuer_wallet TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            capability_task_type TEXT NOT NULL,
+            unit_price TEXT NOT NULL,
+            unit_type TEXT NOT NULL,
+            total_units INTEGER NOT NULL,
+            units_used INTEGER DEFAULT 0,
+            total_deposit TEXT NOT NULL,
+            channel_id TEXT DEFAULT 'mock',
+            chain TEXT DEFAULT 'mock',
+            escrow_id TEXT,
+            state TEXT DEFAULT 'issued',
+            created_at INTEGER,
+            activated_at INTEGER DEFAULT 0,
+            exhausted_at INTEGER DEFAULT 0,
+            cancelled_at INTEGER DEFAULT 0,
+            disputed_at INTEGER DEFAULT 0,
+            resolved_at INTEGER DEFAULT 0,
+            expires_at INTEGER DEFAULT 0,
+            dispute_reason TEXT DEFAULT '',
+            dispute_initiator TEXT DEFAULT '',
+            resolution TEXT DEFAULT '',
+            resolution_reason TEXT DEFAULT ''
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_voucher_agent ON vouchers(agent_id);
+        CREATE INDEX IF NOT EXISTS idx_voucher_issuer ON vouchers(issuer_wallet);
+        CREATE INDEX IF NOT EXISTS idx_voucher_state ON vouchers(state);
     """)
     conn.commit()
 
@@ -766,3 +864,83 @@ class SqliteSessionKeyStore:
 
     def count(self) -> int:
         return len(self._keys)
+
+
+class SqliteVoucherStore:
+    """SQLite-backed voucher store."""
+
+    def __init__(self, db_path: str):
+        self._db_path = db_path
+        self._conn = sqlite3.connect(db_path)
+        _ensure_tables(self._conn)
+        self._vouchers: Dict[str, Voucher] = {}
+        self._load_all()
+
+    def _load_all(self):
+        from voucher.state import VoucherState
+        rows = self._conn.execute("SELECT * FROM vouchers").fetchall()
+        for row in rows:
+            v = self._row_to_voucher(row, VoucherState)
+            self._vouchers[v.voucher_id] = v
+
+    def _row_to_voucher(self, row, VoucherState) -> Voucher:
+        from voucher.models import Voucher
+        return Voucher(
+            voucher_id=row[0],
+            issuer_wallet=row[1],
+            agent_id=row[2],
+            capability_task_type=row[3],
+            unit_price=Decimal(str(row[4])),
+            unit_type=row[5],
+            total_units=row[6],
+            units_used=row[7],
+            total_deposit=Decimal(str(row[8])),
+            channel_id=row[9],
+            chain=row[10],
+            escrow_id=row[11],
+            state=VoucherState(row[12]),
+            created_at=row[13],
+            activated_at=row[14],
+            exhausted_at=row[15],
+            cancelled_at=row[16],
+            disputed_at=row[17],
+            resolved_at=row[18],
+            expires_at=row[19],
+            dispute_reason=row[20],
+            dispute_initiator=row[21],
+            resolution=row[22],
+            resolution_reason=row[23],
+        )
+
+    def save(self, voucher: Voucher) -> None:
+        self._vouchers[voucher.voucher_id] = voucher
+        self._conn.execute("""
+            INSERT OR REPLACE INTO vouchers VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+        """, (
+            voucher.voucher_id, voucher.issuer_wallet, voucher.agent_id,
+            voucher.capability_task_type, str(voucher.unit_price), voucher.unit_type,
+            voucher.total_units, voucher.units_used, str(voucher.total_deposit),
+            voucher.channel_id, voucher.chain, voucher.escrow_id,
+            voucher.state.value, voucher.created_at, voucher.activated_at,
+            voucher.exhausted_at, voucher.cancelled_at, voucher.disputed_at,
+            voucher.resolved_at, voucher.expires_at, voucher.dispute_reason,
+            voucher.dispute_initiator, voucher.resolution, voucher.resolution_reason,
+        ))
+        self._conn.commit()
+
+    def get(self, voucher_id: str) -> Optional[Voucher]:
+        return self._vouchers.get(voucher_id)
+
+    def get_by_agent(self, agent_id: str) -> List[Voucher]:
+        return [v for v in self._vouchers.values() if v.agent_id == agent_id]
+
+    def get_by_issuer(self, issuer_wallet: str) -> List[Voucher]:
+        return [v for v in self._vouchers.values() if v.issuer_wallet == issuer_wallet]
+
+    def get_by_state(self, state) -> List[Voucher]:
+        return [v for v in self._vouchers.values() if v.state == state]
+
+    def count(self) -> int:
+        return len(self._vouchers)

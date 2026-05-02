@@ -30,6 +30,8 @@ htmlcov/
 
 # SQLite runtime data
 *.db
+*.db-shm
+*.db-wal
 agents_registry.json
 
 # OS

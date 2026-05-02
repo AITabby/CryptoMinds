@@ -1,0 +1,65 @@
+groups:
+  - name: cryptominds_api
+    rules:
+      - alert: CryptoMindsHighErrorRate
+        expr: rate(cryptominds_python_http_requests_total{status=~"5.."}[5m]) / rate(cryptominds_python_http_requests_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CryptoMinds API error rate > 10%"
+          description: "Python API 5xx error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+
+      - alert: CryptoMindsHighLatency
+        expr: histogram_quantile(0.95, rate(cryptominds_python_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CryptoMinds API P95 latency > 2s"
+          description: "95th percentile request latency is {{ $value }}s"
+
+      - alert: CryptoMindsEscrowDisputed
+        expr: cryptominds_python_escrow_disputed > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 5 escrow orders in disputed state"
+          description: "{{ $value }} escrow orders currently disputed — may need admin arbitration"
+
+      - alert: CryptoMindsServiceDown
+        expr: up{job="cryptominds_python"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CryptoMinds Python API is down"
+          description: "Python API service on port 3458 has been down for more than 1 minute"
+
+      - alert: CryptoMindsExpressDown
+        expr: up{job="cryptominds_express"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CryptoMinds Express API is down"
+          description: "Express API service on port 3457 has been down for more than 1 minute"
+
+      - alert: CryptoMindsPostgresDown
+        expr: up{job="cryptominds_postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been unreachable for more than 2 minutes"
+
+      - alert: CryptoMindsNoAgentsOnline
+        expr: cryptominds_python_agents_online == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No agents online"
+          description: "Zero agents are currently online — marketplace is empty"

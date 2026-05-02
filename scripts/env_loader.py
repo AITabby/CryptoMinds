@@ -17,12 +17,14 @@ ENVIRONMENTS_DIR = PROJECT_ROOT / "environments"
 
 REQUIRED_PROD_VARS = [
     "CRYPTOMINDS_INTERNAL_TOKEN",
+    "ADMIN_SECRET",
     "BSC_RPC",
     "DEPOSIT_POOL_ADDRESS",
 ]
 
 REQUIRED_STAGING_VARS = [
     "CRYPTOMINDS_INTERNAL_TOKEN",
+    "ADMIN_SECRET",
     "BSC_RPC",
 ]
 
@@ -128,6 +130,19 @@ def _validate(env_name: str, config: dict) -> list:
     # Prod requires JSON logging
     if env_name == "prod" and not config["LOG_JSON"]:
         errors.append("CRYPTOMINDS_LOG_JSON must be true in production")
+
+    # INTERNAL_TOKEN must not be weak
+    weak_tokens = {"", "dev-internal-token", "test-token", "secret", "password", "admin"}
+    if config["INTERNAL_TOKEN"].lower() in weak_tokens:
+        if env_name in ("prod", "staging"):
+            errors.append(f"CRYPTOMINDS_INTERNAL_TOKEN is too weak ('{config['INTERNAL_TOKEN'][:8]}...') — use a strong random value")
+
+    # ADMIN_SECRET must not be weak
+    admin_secret = os.getenv("ADMIN_SECRET", "")
+    weak_admin = {"", "admin", "secret", "password", "test"}
+    if admin_secret.lower() in weak_admin:
+        if env_name in ("prod", "staging"):
+            errors.append(f"ADMIN_SECRET is too weak ('{admin_secret[:8]}...') — use a strong random value")
 
     return errors
 

@@ -1,0 +1,103 @@
+{
+  "dashboard": {
+    "title": "CryptoMinds Protocol Monitor",
+    "description": "Real-time monitoring of CryptoMinds Agent economy protocol",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Request Rate",
+        "type": "timeseries",
+        "targets": [
+          { "expr": "rate(cryptominds_python_http_requests_total[5m])", "legendFormat": "total" },
+          { "expr": "rate(cryptominds_python_http_requests_total{status=~\"5..\"}[5m])", "legendFormat": "5xx" }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+      },
+      {
+        "id": 2,
+        "title": "API Latency P50/P95",
+        "type": "timeseries",
+        "targets": [
+          { "expr": "histogram_quantile(0.5, rate(cryptominds_python_request_duration_seconds_bucket[5m]))", "legendFormat": "P50" },
+          { "expr": "histogram_quantile(0.95, rate(cryptominds_python_request_duration_seconds_bucket[5m]))", "legendFormat": "P95" }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+      },
+      {
+        "id": 3,
+        "title": "Escrow Order States",
+        "type": "stat",
+        "targets": [
+          { "expr": "cryptominds_python_escrow_created", "legendFormat": "Created" },
+          { "expr": "cryptominds_python_escrow_funded", "legendFormat": "Funded" },
+          { "expr": "cryptominds_python_escrow_executing", "legendFormat": "Executing" },
+          { "expr": "cryptominds_python_escrow_delivered", "legendFormat": "Delivered" },
+          { "expr": "cryptominds_python_escrow_verified", "legendFormat": "Verified" },
+          { "expr": "cryptominds_python_escrow_disputed", "legendFormat": "Disputed" },
+          { "expr": "cryptominds_python_escrow_released", "legendFormat": "Released" }
+        ],
+        "gridPos": { "h": 4, "w": 24, "x": 0, "y": 8 }
+      },
+      {
+        "id": 4,
+        "title": "Agents Online",
+        "type": "stat",
+        "targets": [
+          { "expr": "cryptominds_python_agents_online", "legendFormat": "Online" }
+        ],
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 12 }
+      },
+      {
+        "id": 5,
+        "title": "Market Tasks",
+        "type": "stat",
+        "targets": [
+          { "expr": "cryptominds_python_market_tasks", "legendFormat": "Tasks" }
+        ],
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 12 }
+      },
+      {
+        "id": 6,
+        "title": "Task Verifications",
+        "type": "timeseries",
+        "targets": [
+          { "expr": "rate(cryptominds_python_tasks_verified_total[5m])", "legendFormat": "verified" },
+          { "expr": "rate(cryptominds_python_tasks_failed_total[5m])", "legendFormat": "failed" }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+      },
+      {
+        "id": 7,
+        "title": "Session Keys Active",
+        "type": "stat",
+        "targets": [
+          { "expr": "cryptominds_python_session_keys_created", "legendFormat": "Created" },
+          { "expr": "cryptominds_python_session_keys_revoked", "legendFormat": "Revoked" }
+        ],
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 16 }
+      },
+      {
+        "id": 8,
+        "title": "Voucher Usage",
+        "type": "timeseries",
+        "targets": [
+          { "expr": "rate(cryptominds_python_vouchers_created_total[5m])", "legendFormat": "created" },
+          { "expr": "rate(cryptominds_python_vouchers_activated_total[5m])", "legendFormat": "activated" },
+          { "expr": "rate(cryptominds_python_vouchers_exhausted_total[5m])", "legendFormat": "exhausted" }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "interval",
+          "type": "interval",
+          "options": ["1m", "5m", "15m", "1h"],
+          "current": { "text": "5m", "value": "5m" }
+        }
+      ]
+    },
+    "refresh": "30s"
+  }
+}

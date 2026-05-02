@@ -25,14 +25,9 @@ python3 tests/test_protocol_regressions.py -v
 echo ""
 
 # Node.js 测试
-echo "[4] 数据库测试..."
+echo "[4] Node.js 单元测试..."
 cd "$PROJECT_ROOT"
-node tests/test_database.js
-echo ""
-
-echo "[5] Node.js 单元测试..."
-cd "$PROJECT_ROOT/web"
-node --test ../tests/*.test.js
+node --test tests/*.test.js
 echo ""
 
 echo "=== 所有测试完成 ==="

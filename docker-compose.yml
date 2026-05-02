@@ -1,6 +1,23 @@
 version: "3.8"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cryptominds-postgres
+    environment:
+      POSTGRES_DB: cryptominds
+      POSTGRES_USER: cryptominds
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cryptominds_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cryptominds"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   web-api:
     build: .
     container_name: cryptominds-web
@@ -9,6 +26,7 @@ services:
     environment:
       - PORT=3457
       - PYTHON_API_URL=http://python-api:3458
+      - CRYPTOMINDS_INTERNAL_TOKEN=${CRYPTOMINDS_INTERNAL_TOKEN:-}
       - CRYPTOMINDS_DEMO=${CRYPTOMINDS_DEMO:-0}
       - DEMO_MODE=${DEMO_MODE:-false}
       - ADMIN_SECRET=${ADMIN_SECRET:-}
@@ -39,9 +57,14 @@ services:
       - CRYPTOMINDS_INTERNAL_TOKEN=${CRYPTOMINDS_INTERNAL_TOKEN:-}
       - CRYPTOMINDS_DEBUG=${CRYPTOMINDS_DEBUG:-false}
       - BSC_RPC=${BSC_RPC:-https://bsc-dataseed1.binance.org/}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://cryptominds:${POSTGRES_PASSWORD:-cryptominds_dev}@postgres:5432/cryptominds}
+      - DB_BACKUP_INTERVAL_SECONDS=0
     volumes:
       - ./wallets.json:/app/wallets.json:ro
       - ./.env:/app/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
     command: ["python3", "api_server.py"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3458/healthz"]
@@ -92,3 +115,6 @@ services:
     volumes:
       - ./wallets.json:/app/wallets.json:ro
     command: ["python3", "agents/agent_server.py", "--agent", "four_meme", "--port", "5004"]
+
+volumes:
+  pgdata:

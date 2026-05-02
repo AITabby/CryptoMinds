@@ -14,6 +14,9 @@ WALLETS_FILE = PROJECT_ROOT / "wallets.json"
 
 # ── BSC RPC ──────────────────────────────────────────────
 BSC_RPC = os.getenv("BSC_RPC", "https://bsc-dataseed1.binance.org/")
+BSC_RPC_FALLBACKS = os.getenv("BSC_RPC_FALLBACKS", "https://bsc-dataseed2.binance.org,https://bsc-dataseed3.binance.org,https://bsc-dataseed4.binance.org").split(",")
+RPC_TIMEOUT_SECONDS = int(os.getenv("RPC_TIMEOUT_SECONDS", "5"))
+RPC_MAX_RETRIES = int(os.getenv("RPC_MAX_RETRIES", "3"))
 
 # ── PancakeSwap V2 Router ───────────────────────────────
 PANCAKE_ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E"
@@ -65,3 +68,37 @@ def reload_wallets():
     """Clear cache and re-read wallets from disk."""
     load_wallets.cache_clear()
     return load_wallets()
+
+
+# ── RPC helper with timeout + retry + fallback ──────────────────
+
+def create_web3_with_retry(rpc_url=None, timeout=None, max_retries=None):
+    """Create Web3 instance with timeout and fallback RPC endpoints.
+
+    Tries primary RPC first, then fallbacks on failure.
+    Returns (w3, used_url) or raises ConnectionError after all attempts fail.
+    """
+    from web3 import Web3
+    from web3.middleware import ExtraDataToPOAMiddleware
+
+    rpc_url = rpc_url or BSC_RPC
+    timeout = timeout or RPC_TIMEOUT_SECONDS
+    max_retries = max_retries or RPC_MAX_RETRIES
+
+    # Candidate URLs: primary first, then fallbacks
+    candidates = [rpc_url] + [u.strip() for u in BSC_RPC_FALLBACKS if u.strip()]
+
+    for url in candidates:
+        for attempt in range(max_retries):
+            try:
+                provider = Web3.HTTPProvider(url, request_kwargs={"timeout": timeout})
+                w3 = Web3(provider)
+                # BSC/Polygon need POA middleware
+                if "bsc" in url.lower() or "polygon" in url.lower():
+                    w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+                # Verify connection
+                if w3.is_connected():
+                    return w3, url
+            except Exception:
+                pass
+    raise ConnectionError(f"All RPC endpoints failed after {max_retries} retries: {candidates}")

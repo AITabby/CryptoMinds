@@ -1,348 +1,152 @@
 # CryptoMinds
 
-**Agent 自治经济体协议**
+Agent 自治经济体协议 — Agent 自主发现、雇佣、结算、仲裁，无需人类介入。
 
-让 Agent 之间可以自主地：发现彼此、雇佣彼此、结算支付、积累信誉。
-
----
-
-## 核心理念
-
-CryptoMinds 不是"帮买币的平台"，不是"AI 交易工具"，甚至不是"Agent 市场"——
-
-**是 Agent 自己运行的经济系统。**
-
-### 三条公理
-
-1. **参与者全是 Agent** — 没有人类在下单、确认、仲裁
-2. **结算用加密货币** — 但不限于链上，闪电网络、交易所内部账本、任何可编程的价值传输通道
-3. **任何可量化的事** — 不限于链上操作，任何 Agent 能做、结果能量化的事
-
-### Agent 经济的节奏
-
-| 人类经济 | Agent 经济 |
-|----------|-----------|
-| 下单到成交：分钟级 | 下单到成交：毫秒级 |
-| 确认交付：小时/天 | 确认交付：秒级 |
-| 谈价格：来回协商 | 谈价格：一秒匹配 |
-| 一天：几笔交易 | 一天：几万笔交易 |
-
----
-
-## 协议架构
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      CryptoMinds Protocol                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐       │
-│  │ Agent Service │  │  Task Closer  │  │    Credit     │       │
-│  │               │  │               │  │    Payment    │       │
-│  │ ┌───────────┐ │  │ 验证→结算    │  │ 发行→流通    │       │
-│  │ │  Daemon   │ │  │ 履约记录     │  │ 接受度       │       │
-│  │ │  Listener │ │  │ 信誉更新     │  │ 信任分       │       │
-│  │ └───────────┘ │  │               │  │               │       │
-│  └───────────────┘  └───────────────┘  └───────────────┘       │
-│                                                                  │
-│  结算通道: BSC, ETH, SOL, Mock                                   │
-│  验证门: token, data, compute, signal, content                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 四层协议
-
-| 层 | 职责 | 实现 |
-|----|------|------|
-| **结算层** | 多链、多代币支付 | `settlement/` |
-| **验证层** | 任务完成自动判定 | `verification/` |
-| **Agent层** | 能力描述、发现匹配 | `agent/` |
-| **信誉层** | 履约记录、信用货币 | `reputation/` |
-
----
-
-## 支持的任务类型
-
-| 任务类型 | 验证门 | 场景 |
-|----------|--------|------|
-| `token_delivery` | 代币交付验证 | 链上代币买入并转账 |
-| `data_delivery` | 数据交付验证 | 数据分析、爬虫、翻译 |
-| `compute_result` | 计算结果验证 | GPU 推理、模型训练 |
-| `signal_stream` | 信号订阅验证 | 交易信号、监控告警 |
-| `content_delivery` | 内容交付验证 | 文章、图片、音频生成 |
-
----
-
-## 支持的结算通道
-
-| 通道 | 链 | 代币 | 托管支持 |
-|------|-----|------|----------|
-| `bsc-native` | BSC | BNB | ✅ |
-| `eth-native` | ETH | ETH | ✅ |
-| `sol-native` | Solana | SOL | ✅ |
-| `mock` | Mock | Mock | ✅ (测试用) |
+> 投资人/合作伙伴版白皮书见 [docs/WHITEPAPER.md](docs/WHITEPAPER.md)
 
 ---
 
 ## 快速开始
 
-### 1. 启动 Agent 服务
+```bash
+# 一键演示 (Escrow + Session Key + Voucher + 争议仲裁)
+bash demo.sh
+
+# 或手动启动两个服务
+python3 api_server.py               # Python API (3458)
+cd web && node server_modular.js    # Express + Web UI (3457)
+```
+
+浏览器打开 http://localhost:3457 访问 Web Dashboard。
+
+### 环境配置
+
+复制 `.env.example` 为 `.env`，开发环境默认配置即可运行：
 
 ```bash
-# 命令行启动
-python3 agent_service.py \
-  --agent-id my-agent \
-  --wallet 0xYourWallet \
-  --task-types token_delivery,data_delivery \
-  --chains mock,bsc \
-  --market-url http://localhost:3458
+cp .env.example .env
 ```
 
-### 2. Python 代码
-
-```python
-from agent_service import create_service
-
-# 创建 Agent 服务
-service = create_service(
-    agent_id="my-agent",
-    wallet="0x...",
-    task_types=["token_delivery", "data_delivery"],
-    supported_chains=["mock", "bsc"],
-)
-
-# 注册自定义执行器
-def my_executor(task):
-    # 执行任务逻辑
-    return {"result": "success"}
-
-service.register_executor("token_delivery", my_executor)
-
-# 启动服务
-service.start()
-```
-
-### 3. 使用 SDK
-
-```python
-from cryptominds_sdk import CryptoMinds
-
-cm = CryptoMinds("http://localhost:3458", wallet="0x...")
-
-# 搜索卖家
-sellers = cm.search_sellers("meme")
-
-# 创建订单
-order = cm.create_order(seller_wallet, amount_bnb=0.001)
-
-# 自动匹配并下单
-result = cm.auto_buy(amount_bnb=0.01)
-```
+生产环境需要设置 `DATABASE_URL`、`ADMIN_SECRET`、`CRYPTOMINDS_INTERNAL_TOKEN`、`SENTRY_DSN` 等，详见 `environments/` 目录。
 
 ---
 
-## 核心组件
+## API 示例
 
-### Agent 守护进程 (`agent_daemon.py`)
-
-让 Agent 真正"活"起来：
-- 任务队列（线程安全）
-- 执行器（可注册自定义）
-- 状态机（idle → working → idle）
-- 并发控制
-
-**内置执行器：**
-- `token_delivery` - 代币交付（支持 four.meme + PancakeSwap）
-- `data_delivery` - 数据交付（支持 API 获取、分析、翻译）
-- `compute_result` - 计算任务（支持推理、计算、转换）
-
-**自定义执行器：**
-```python
-def my_executor(task):
-    # 执行任务逻辑
-    return {"result": "success"}
-
-daemon.register_executor("custom_task", my_executor)
-```
-
-### 任务闭环处理器 (`task_closer.py`)
-
-完整的任务生命周期：
-```
-任务执行 → 提交结果 → 验证门验证 → 结算放款 → 记录履约 → 更新信誉
-```
-
-### 市场监听器 (`market_listener.py`)
-
-Agent 自动发现任务：
-- 轮询市场 API
-- 过滤匹配的任务
-- 自动接单
-
-### 信用货币 (`reputation/credit.py`) ⚠️ 实验性
-
-> **注意**：信用货币是"衍生层"功能，需要先有足够多的 Agent 和交易量才有实际意义。目前保留实现，暂不推荐生产使用。
-
-高信誉 Agent 可发行信用货币：
-- 发行：信誉分 ≥ 4.0
-- 流通：转账、支付
-- 接受度：其他 Agent 可选择接受/拒绝
-
----
-
-## 信誉分计算
-
-```
-总分 = 成功率分(0-3) + 质量分(0-1) + 交易量分(0-0.5) + 响应时间分(0-0.5) + 近期加成(0-0.3)
-
-等级: S(≥4.5), A(≥4.0), B(≥3.5), C(≥3.0), D(<3.0)
-```
-
----
-
-## API 服务
-
-### 启动服务
+### Escrow 全流程
 
 ```bash
-# 启动所有服务（Node.js + Python）
-cd web && ./start_services.sh
+# 1. 创建托管订单
+curl -X POST localhost:3458/api/v1/escrow/create \
+  -H 'X-Admin-Secret: your-secret' \
+  -H 'X-CryptoMinds-Internal-Token: your-token' \
+  -d '{"task_id":"t1","buyer_wallet":"0xB","seller_wallet":"0xS","amount":"0.5","channel_id":"mock","chain":"bsc"}'
 
-# 或单独启动
-npm start          # Node.js API (3457)
-python3 api_server.py  # Python API (3458)
+# 2-6. 锁定 → 接单 → 交付 → 验证 → 释放
+curl -X POST localhost:3458/api/v1/escrow/{id}/fund/confirm  -d '{"buyer_wallet":"0xB"}'
+curl -X POST localhost:3458/api/v1/escrow/{id}/seller-accept -d '{"seller_wallet":"0xS"}'
+curl -X POST localhost:3458/api/v1/escrow/{id}/deliver      -d '{"seller_wallet":"0xS","result":"done"}'
+curl -X POST localhost:3458/api/v1/escrow/{id}/verify       -d '{"task_type":"token_delivery"}'
+curl -X POST localhost:3458/api/v1/escrow/{id}/release
 ```
 
-### API 端点
+### Session Key
 
-**统一入口 (Node.js:3457)**
-
-```
-# 市场相关
-GET  /api/sellers           # 卖家列表
-GET  /api/purchases         # 购买记录
-GET  /api/market            # 市场信息
-GET  /api/balance           # 余额查询
-
-# Agent 相关
-POST /api/agents/register   # 注册 Agent
-GET  /api/agents            # Agent 列表
-
-# 协议相关（代理到 Python）
-GET  /api/protocol/info     # 协议信息
-POST /api/protocol/agents/register  # 注册 Agent（协议层）
-POST /api/protocol/tasks/create     # 创建任务
-POST /api/protocol/tasks/verify     # 验证任务
+```bash
+curl -X POST localhost:3458/api/v1/session-keys/create \
+  -H 'X-CryptoMinds-Internal-Token: your-token' \
+  -d '{"main_wallet":"0x","main_private_key":"DEMO","agent_id":"a1","chains":["bsc"],"per_tx_limit":"1.0","total_quota":"10.0","actions":["pay"]}'
 ```
 
-**Python API (3458)**
+### Voucher 按量计费
 
-```
-GET  /api/info              # 协议信息
-GET  /api/channels          # 结算通道列表
-GET  /api/gates             # 验证门列表
-POST /api/agents/register   # 注册 Agent
-POST /api/tasks/create      # 创建任务
-POST /api/tasks/verify      # 验证任务
-POST /api/agent-buy         # Agent 自主下单
+```bash
+curl -X POST localhost:3458/api/v1/voucher/create \
+  -H 'X-CryptoMinds-Internal-Token: your-token' \
+  -d '{"seller_agent_id":"tiedan","buyer_wallet":"0xB","service_type":"compute_result","total_units":100,"price_per_unit":"0.001","chain":"bsc","channel_id":"mock"}'
+
+curl -X POST localhost:3458/api/v1/voucher/{id}/activate
+curl -X POST localhost:3458/api/v1/voucher/{id}/use -d '{"units":10}'
 ```
 
 ---
 
-## 文件结构
+## 测试
+
+```bash
+make test       # pytest + node:test
+make pytest     # Python 单元测试 (294 tests, 48% coverage)
+make e2e        # 端到端测试
+make lint       # flake8 代码检查
+```
+
+---
+
+## Docker 部署
+
+```bash
+docker-compose up   # Python API + Express + PostgreSQL
+```
+
+生产环境自动切换 PostgreSQL（设置 `DATABASE_URL`），开发环境使用 SQLite。
+
+---
+
+## 项目结构
 
 ```
 cryptominds/
-├── web/                        # Web 服务
-│   ├── server_modular.js       # 主入口（模块化）
-│   ├── routes/                 # 路由层
-│   │   ├── agent.js            # Agent 路由
-│   │   ├── admin.js            # 管理路由
-│   │   ├── market.js           # 市场路由
-│   │   ├── notification.js     # 通知路由
-│   │   ├── order.js            # 订单路由
-│   │   ├── payment.js          # 支付路由
-│   │   └── protocol.js         # 协议代理
-│   ├── lib/                    # 数据层
-│   │   ├── database.js         # SQLite 封装
-│   │   ├── datastore.js        # 数据存储适配器
-│   │   └── sellers_market_sqlite.js
-│   └── cryptominds.db          # SQLite 数据库
+├── api_server.py               # Python API (Flask/gunicorn)
+├── protocol.py                  # 协议统一入口
+├── config.py                    # 共享配置 + RPC retry
 │
-├── settlement/                 # 结算层
-│   ├── base.py                 # SettlementChannel 抽象
-│   ├── registry.py             # ChannelRegistry
-│   └── channels/
-│       ├── bsc_native.py       # BSC/BNB
-│       ├── eth_native.py       # ETH/ETH
-│       ├── sol_native.py       # Solana/SOL
-│       └── mock.py             # Mock (测试)
+├── settlement/                  # 结算层 (多链通道 + Escrow 状态机)
+├── escrow/                      # Escrow 业务 (仲裁 + Slashing)
+├── voucher/                     # 按量计费 (7态状态机 + 消费链)
+├── auth/                        # Session Key (ECDSA + 5维度权限)
+├── verification/                # 验证门 (三分支判定)
+├── agent/                       # Agent 能力描述 + 注册
+├── reputation/                  # 信誉分 + 信用货币
 │
-├── verification/               # 验证层
-│   ├── base.py                 # VerificationGate 抽象
-│   ├── registry.py             # GateRegistry
-│   └── gates/
-│       ├── token_delivery.py   # 代币交付
-│       ├── data_delivery.py    # 数据交付
-│       ├── compute_result.py   # 计算结果
-│       └── signal_content.py   # 信号订阅 + 内容交付
+├── data/                        # 数据层 (SQLite/PG factory)
+├── contracts/                   # ServiceEscrow.sol + SkillStaking.sol
+├── web/                         # Express + Web UI (3457)
+├── agent_runtimes/              # Agent 运行时 (扫描/风控/报告)
+├── agentpay_sdk/                # 多链 SDK + Fernet 加密
+├── monitoring/                  # Prometheus + Grafana + alert rules
+├── scripts/                     # 部署/测试/健康检查/压力测试
+├── docs/                        # 白皮书 + API文档 + 灾难恢复SOP
 │
-├── agent/                      # Agent 层
-│   ├── capability.py           # AgentCapability
-│   └── registry.py             # AgentRegistry
-│
-├── reputation/                 # 信誉层
-│   ├── record.py               # PerformanceRecord
-│   ├── score.py                # ReputationCalculator
-│   └── credit.py               # CreditCurrency
-│
-├── tests/                      # 测试
-│   ├── test_database.js        # 数据库测试
-│   ├── test_verification.py    # 验证门测试
-│   ├── test_settlement.py      # 结算通道测试
-│   └── test_protocol_regressions.py
-│
-├── agent_daemon.py             # Agent 守护进程
-├── market_listener.py          # 市场监听器
-├── task_closer.py              # 任务闭环处理器
-├── agent_service.py            # Agent 服务 (整合)
-├── api_server.py               # Python API 服务
-├── protocol.py                 # 协议统一入口
-└── cryptominds_sdk.py          # SDK
+├── docker-compose.yml           # Docker Compose (含 PostgreSQL)
+├── Dockerfile                   # supervisord 前台管理
+└── demo.sh                      # 一键演示
 ```
 
 ---
 
-## 与现有系统的关系
+## 文档
 
-| 现有文件 | 新协议对应 | 状态 |
-|----------|-----------|------|
-| `x402_pay.py` | `settlement/x402.py` | 已迁移 |
-| `orchestrator.py` | `agent_service.py` | 可替换 |
-| `token_buyer.py` | `verification/gates/token_delivery.py` | 已迁移 |
-| `web/server.js` | `api_server.py` | 可替换 |
+| 文档 | 读者 | 内容 |
+|------|------|------|
+| [docs/WHITEPAPER.md](docs/WHITEPAPER.md) | 投资人/合作伙伴 | 市场机会、协议创新、经济模型、安全设计 |
+| [docs/WHITEPAPER_TECH_SPEC.md](docs/WHITEPAPER_TECH_SPEC.md) | 技术团队 | 完整技术规范、状态机、合约规范、威胁模型 |
+| [docs/API.md](docs/API.md) | 开发者 | API 端点文档 |
+| [docs/DISASTER_RECOVERY.md](docs/DISASTER_RECOVERY.md) | 运维 | 灾难恢复 SOP |
+| [docs/openapi.json](docs/openapi.json) | 开发者 | OpenAPI schema |
 
 ---
 
-## 下一步
+## Roadmap
 
-**当前重点：**
-- [ ] 部署到生产环境
-- [ ] 完善执行器（真实链上交易）
-- [ ] 添加更多 Agent 接入
-- [ ] 添加 Web UI
-
-**未来规划：**
-- [ ] 添加更多链支持（Polygon, Arbitrum）
-- [ ] 信用货币流通（需先建立交易基础）
-- [ ] Agent 衍生服务（保险、预测市场等）
+```
+Phase 1 ✅ 协议核心 — Escrow · 验证门 · Agent · 信誉 · Slashing
+Phase 2 ✅ 安全+基础设施 — Session Key · Voucher · PG · 监控 · 安全加固
+Phase 3 🔄 生态扩展 — 更多链 · 合约升级 · 多签仲裁
+Phase 4 📋 Agent经济体 — 信用货币 · DAO · 跨协议互操作
+```
 
 ---
 
 ## License
 
 MIT
-
----
-
-> Four.meme AI Sprint Hackathon 2026

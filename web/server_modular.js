@@ -39,10 +39,11 @@ const { createProtocolRoutes } = require('./routes/protocol');
 
 const PORT = process.env.PORT || 3457;
 const BSC_RPC = process.env.BSC_RPC || 'https://bsc-dataseed1.binance.org/';
+const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:3458';
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || '';
 const MINIMAX_BASE_URL = 'https://api.minimaxi.com/v1';
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
-const DEMO_WALLET = '0xd2f899ce74320aef9d8f2359183232a554f4c0e1';
+const DEMO_WALLET = process.env.DEMO_WALLET || '0xd2f899ce74320aef9d8f2359183232a554f4c0e1';
 const DEPOSIT_POOL_ADDRESS = process.env.DEPOSIT_POOL_ADDRESS || '0x287A44aAADDB78CA67EffCD94E83046353723862';
 const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
@@ -152,71 +153,6 @@ async function sendPushNotification(wallet, payload) {
   }
 }
 
-// ── 速率限制 ───────────────────────────────────
-
-// Redis-backed rate limiting if available, in-memory fallback
-let redisClient = null;
-try {
-  const { createClient } = require('redis');
-  redisClient = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
-  redisClient.connect().catch(() => {
-    console.log('[rate-limit] Redis connection failed, using in-memory fallback');
-    redisClient = null;
-  });
-  if (redisClient && redisClient.isReady) {
-    console.log('[rate-limit] Redis-backed rate limiting enabled');
-  }
-} catch (e) {
-  console.log('[rate-limit] Redis module unavailable, using in-memory fallback');
-}
-
-const rateLimiter = {
-  _counts: new Map(),
-  windowMs: 60_000,
-  maxRequests: 30,
-  sensitiveMax: 5,
-
-  async check(ip, path) {
-    const isSensitive = /pay|register|agent-buy|execute|deposit/.test(path);
-    const max = isSensitive ? this.sensitiveMax : this.maxRequests;
-    const key = `rl:${ip}:${path}:${isSensitive ? 's' : 'g'}`;
-
-    if (redisClient && redisClient.isReady) {
-      try {
-        const count = await redisClient.incr(key);
-        if (count === 1) {
-          await redisClient.expire(key, 60);
-        }
-        return { allowed: count <= max, remaining: max - count };
-      } catch (e) {
-        // Redis error, fall through to in-memory
-      }
-    }
-
-    // In-memory fallback
-    const now = Date.now();
-    const entry = this._counts.get(key);
-
-    if (!entry || now > entry.resetAt) {
-      this._counts.set(key, { count: 1, resetAt: now + this.windowMs });
-      return { allowed: true, remaining: max - 1 };
-    }
-    entry.count++;
-    if (entry.count > max) {
-      return { allowed: false, remaining: 0 };
-    }
-    return { allowed: true, remaining: max - entry.count };
-  }
-};
-
-app.use(async (req, res, next) => {
-  const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-  const result = await rateLimiter.check(ip, req.path);
-  if (!result.allowed) {
-    return res.status(429).json({ ok: false, error: '请求过于频繁，请稍后再试' });
-  }
-  next();
-});
 app.use(metricsMiddleware);
 
 app.set('view engine', 'ejs');
@@ -236,10 +172,36 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', origin);
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-402-Payment, X-Admin-Secret, X-Admin-Wallet');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-402-Payment, X-Admin-Secret, X-Admin-Wallet, X-CryptoMinds-Internal-Token');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+
+// ── Rate limiting ─────────────────────────────────────
+const rateLimit = require('express-rate-limit');
+const RATE_LIMIT_PER_MINUTE = parseInt(process.env.RATE_LIMIT_PER_MINUTE || '60', 10);
+const _isDemo = process.env.DEMO_MODE === 'true' || process.env.CRYPTOMINDS_DEBUG === 'true';
+
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: RATE_LIMIT_PER_MINUTE,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: '请求频率过高，请稍后再试' },
+  skip: (req) => _isDemo || req.path === '/healthz' || req.path === '/metrics',
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: '管理员操作频率过高' },
+  skip: (req) => _isDemo,
+});
+
+app.use(globalLimiter);
+// Admin routes get stricter limits (applied in route handlers via requireAdmin)
 
 // ── 路由注册 ─────────────────────────────────────
 
@@ -455,21 +417,48 @@ async function start() {
   try {
     await setupRoutes();
 
-    app.listen(PORT, () => {
-      console.log(`CryptoMinds API running on http://localhost:${PORT}`);
-      console.log(`[db] SQLite 数据库已初始化`);
+    const SSL_CERT = process.env.SSL_CERT_PATH;
+    const SSL_KEY = process.env.SSL_KEY_PATH;
 
-      const escrowAddr = getEscrowAddress();
-      if (escrowAddr) {
-        console.log(`[escrow] 合约地址: ${escrowAddr}`);
-      } else {
-        console.log('[escrow] 合约未部署');
-      }
-
-      if (DEMO_MODE) {
-        console.log('[demo] Demo 模式已启用');
-      }
-    });
+    if (SSL_CERT && SSL_KEY) {
+      // HTTPS mode — production recommended
+      const fs = require('fs');
+      const https = require('https');
+      const cert = fs.readFileSync(SSL_CERT);
+      const key = fs.readFileSync(SSL_KEY);
+      https.createServer({ cert, key }, app).listen(PORT, () => {
+        console.log(`CryptoMinds API running on https://localhost:${PORT}`);
+        console.log(`[ssl] TLS enabled — cert: ${SSL_CERT}, key: ${SSL_KEY}`);
+        console.log(`[db] SQLite 数据库已初始化`);
+        const escrowAddr = getEscrowAddress();
+        if (escrowAddr) {
+          console.log(`[escrow] 合约地址: ${escrowAddr}`);
+        } else {
+          console.log('[escrow] 合约未部署');
+        }
+        if (DEMO_MODE) {
+          console.log('[demo] Demo 模式已启用');
+        }
+      });
+    } else {
+      // HTTP mode — dev/demo only
+      app.listen(PORT, () => {
+        console.log(`CryptoMinds API running on http://localhost:${PORT}`);
+        if (!DEMO_MODE) {
+          console.warn('[security] ⚠️  HTTP mode — set SSL_CERT_PATH + SSL_KEY_PATH for HTTPS in production');
+        }
+        console.log(`[db] SQLite 数据库已初始化`);
+        const escrowAddr = getEscrowAddress();
+        if (escrowAddr) {
+          console.log(`[escrow] 合约地址: ${escrowAddr}`);
+        } else {
+          console.log('[escrow] 合约未部署');
+        }
+        if (DEMO_MODE) {
+          console.log('[demo] Demo 模式已启用');
+        }
+      });
+    }
   } catch (err) {
     console.error('启动失败:', err);
     process.exit(1);

@@ -24,9 +24,8 @@ def run(task_description=None, token_address=None):
     from web3 import Web3
     from web3.middleware import ExtraDataToPOAMiddleware
 
-    from config import BSC_RPC
-    w3 = Web3(Web3.HTTPProvider(BSC_RPC))
-    w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+    from config import create_web3_with_retry
+    w3, used_rpc = create_web3_with_retry()
 
     target = token_address or "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82"
     _exec("Risk Sentinel", f"分析合约 {target[:10]}... — 5 项链上安全检查")

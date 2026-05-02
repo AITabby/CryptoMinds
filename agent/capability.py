@@ -40,9 +40,11 @@ class CapabilitySpec:
     # }
 
     # 定价模型
-    pricing_model: str = "fixed"            # fixed, percentage, dynamic
+    pricing_model: str = "fixed"            # fixed, percentage, dynamic, metered
     base_price: Decimal = Decimal("0")      # 基础价格（固定定价）
     percentage_rate: Decimal = Decimal("0") # 百分比费率（百分比定价）
+    unit_price: Decimal = Decimal("0")      # 每单位价格（按量计费）
+    unit_type: str = ""                     # 单位类型（api_call, token_analysis, data_point）
 
     # 可用性
     available: bool = True                  # 是否可用
@@ -58,6 +60,8 @@ class CapabilitySpec:
             "pricing_model": self.pricing_model,
             "base_price": str(self.base_price),
             "percentage_rate": str(self.percentage_rate),
+            "unit_price": str(self.unit_price),
+            "unit_type": self.unit_type,
             "available": self.available,
             "max_concurrent": self.max_concurrent,
         }
@@ -74,6 +78,8 @@ class CapabilitySpec:
             pricing_model=data.get("pricing_model", "fixed"),
             base_price=Decimal(str(data.get("base_price", 0))),
             percentage_rate=Decimal(str(data.get("percentage_rate", 0))),
+            unit_price=Decimal(str(data.get("unit_price", 0))),
+            unit_type=data.get("unit_type", ""),
             available=data.get("available", True),
             max_concurrent=data.get("max_concurrent", 10),
         )
