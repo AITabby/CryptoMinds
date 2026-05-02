@@ -7,13 +7,13 @@ ArbitrationEngine — 争议解决、信誉加权仲裁、卖家 slashing。
 import os
 import time
 from decimal import Decimal
-from typing import Optional
+from typing import Dict
 
 from settlement.escrow_state import EscrowState, EscrowStateMachine
-from escrow.models import EscrowOrder
 
 
 MINIMUM_ARBITRATION_WAIT_SECONDS = int(os.getenv("MINIMUM_ARBITRATION_WAIT_SECONDS", "300"))  # 5 minutes default
+
 
 class ArbitrationEngine:
     """争议仲裁引擎"""

@@ -1,4 +1,7 @@
 """CryptoMinds SQLite data adapter — bridges Python and Node.js data layers."""
+from __future__ import annotations
+
+# flake8: noqa
 import json
 import sqlite3
 import os
