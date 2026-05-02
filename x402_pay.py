@@ -30,7 +30,7 @@ NATIVE_DECIMALS = 18
 
 class X402PaymentRequest:
     """x402 支付请求"""
-    def __init__(self, chain: str, token: str, to: str, amount: int, 
+    def __init__(self, chain: str, token: str, to: str, amount: int,
                  order_id: str, description: str, nonce: str = None):
         self.chain = chain
         self.token = token
@@ -40,7 +40,7 @@ class X402PaymentRequest:
         self.timestamp = int(time.time())
         self.order_id = order_id
         self.description = description
-    
+
     def to_dict(self) -> Dict:
         return {
             "chain": self.chain,
@@ -52,22 +52,22 @@ class X402PaymentRequest:
             "order_id": self.order_id,
             "description": self.description
         }
-    
+
     def to_message(self) -> str:
         """构造签名消息"""
         data = self.to_dict()
         data.pop('timestamp', None)
         return json.dumps(data, sort_keys=True)
-    
+
     def sign(self, private_key: str) -> str:
         """使用私钥签名"""
         try:
             from eth_account import Account
             from eth_account.messages import encode_defunct
-            
+
             if not private_key.startswith("0x"):
                 private_key = "0x" + private_key
-            
+
             message = self.to_message()
             encoded = encode_defunct(text=message)
             signed = Account.sign_message(encoded, private_key=private_key)
@@ -81,13 +81,13 @@ class X402PaymentRequest:
                 hashlib.sha256
             ).hexdigest()
             return signature
-    
+
     def get_signer(self, signature: str) -> str:
         """从签名恢复地址"""
         try:
             from eth_account import Account
             from eth_account.messages import encode_defunct
-            
+
             message = self.to_message()
             encoded = encode_defunct(text=message)
             recovered = Account.recover_message(encoded, signature=signature)
@@ -101,7 +101,7 @@ def get_bnb_balance(address: str) -> float:
     try:
         from web3 import Web3
         from web3.middleware import ExtraDataToPOAMiddleware
-        
+
         w3 = Web3(Web3.HTTPProvider(BSC_RPC))
         w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
         balance = w3.eth.get_balance(Web3.to_checksum_address(address))
@@ -117,24 +117,24 @@ def get_usdc_balance(address: str) -> float:
     return get_bnb_balance(address)
 
 
-def x402_pay(from_name: str, to_name: str, amount_bnb: float, 
+def x402_pay(from_name: str, to_name: str, amount_bnb: float,
              order_id: str, description: str) -> Tuple[bool, str, Dict]:
     """
     执行 x402 支付流程（BNB 原生转账）
-    
+
     返回: (success, tx_hash, payment_info)
     """
     global TEST_MODE
     wallets = load_wallets()
-    
+
     if from_name not in wallets:
         return False, "", {"error": f"未知发送方: {from_name}"}
     if to_name not in wallets:
         return False, "", {"error": f"未知接收方: {to_name}"}
-    
+
     from_wallet = wallets[from_name]
     to_wallet = wallets[to_name]
-    
+
     # 1. 创建支付请求
     amount_wei = int(amount_bnb * (10 ** NATIVE_DECIMALS))
     payment_req = X402PaymentRequest(
@@ -145,26 +145,26 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
         order_id=order_id,
         description=description
     )
-    
+
     # 2. 签名支付请求
     try:
         signature = payment_req.sign(get_wallet_key(from_name))
-        print(f"   📝 支付请求已签名")
+        print("   📝 支付请求已签名")
     except Exception as e:
         return False, "", {"error": f"签名失败: {e}"}
-    
+
     # 3. 验证签名（客户端自验证）
     signer = payment_req.get_signer(signature)
     if signer.lower() != from_wallet["address"].lower():
         return False, "", {"error": "签名验证失败，地址不匹配"}
     print(f"   ✓ 签名验证通过: {signer[:10]}...")
-    
+
     # 测试模式：模拟交易
     if TEST_MODE:
-        print(f"   🧪 测试模式：模拟交易")
+        print("   🧪 测试模式：模拟交易")
         fake_tx_hash = hashlib.sha256(f"{time.time()}{from_name}{to_name}".encode()).hexdigest()
         fake_tx_hash = "0x" + fake_tx_hash[:64]
-        
+
         payment_info = {
             "tx_hash": fake_tx_hash,
             "from": from_wallet["address"],
@@ -183,15 +183,15 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
         }
         print(f"   ✓ 模拟交易完成: {fake_tx_hash[:20]}...")
         return True, fake_tx_hash, payment_info
-    
+
     # 4. 执行链上 BNB 原生转账
     try:
         from web3 import Web3
         from web3.middleware import ExtraDataToPOAMiddleware
-        
+
         w3 = Web3(Web3.HTTPProvider(BSC_RPC))
         w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-        
+
         nonce = w3.eth.get_transaction_count(from_wallet["address"])
         tx = {
             'chainId': 56,
@@ -201,20 +201,20 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
             'gasPrice': w3.eth.gas_price,
             'nonce': nonce,
         }
-        
+
         # 签名并发送
         signed_tx = w3.eth.account.sign_transaction(tx, get_wallet_key(from_name))
         raw_tx = getattr(signed_tx, 'raw_transaction', None) or getattr(signed_tx, 'rawTransaction')
         tx_hash = w3.eth.send_raw_transaction(raw_tx)
         tx_hash_hex = tx_hash.hex()
-        
+
         print(f"   ⛓️ 交易已发送: {tx_hash_hex[:20]}...")
-        
+
         # 等待确认
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
         if receipt.status == 1:
             print(f"   ✓ 交易已确认: https://bscscan.com/tx/{tx_hash_hex}")
-            
+
             payment_info = {
                 "tx_hash": tx_hash_hex,
                 "from": from_wallet["address"],
@@ -233,7 +233,7 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
             return True, tx_hash_hex, payment_info
         else:
             return False, "", {"error": "交易执行失败"}
-            
+
     except Exception as e:
         return False, "", {"error": f"链上交易失败: {e}"}
 
@@ -241,48 +241,48 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
 def verify_x402_payment(payment_info: Dict) -> Tuple[bool, str]:
     """
     验证 x402 支付（服务端调用）
-    
+
     返回: (valid, message)
     """
     try:
         # 测试模式：只验证签名
         if payment_info.get("test_mode"):
-            print(f"   🧪 测试模式：只验证签名")
+            print("   🧪 测试模式：只验证签名")
             print("   ⚠️ 测试模式：跳过签名验证")
-            print(f"   ✓ x402 支付验证通过（测试模式）")
+            print("   ✓ x402 支付验证通过（测试模式）")
             print(f"     金额: {payment_info.get('amount_bnb', payment_info.get('amount_usdc', '?'))} BNB")
             return True, "支付验证通过（测试模式）"
-        
+
         from web3 import Web3
         from web3.middleware import ExtraDataToPOAMiddleware
-        
+
         w3 = Web3(Web3.HTTPProvider(BSC_RPC))
         w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-        
+
         tx_hash = payment_info.get("tx_hash")
         if not tx_hash:
             return False, "缺少交易哈希"
-        
+
         # 1. 获取交易回执
         receipt = w3.eth.get_transaction_receipt(tx_hash)
         if receipt.status != 1:
             return False, "交易执行失败"
-        
+
         # 2. 获取交易详情
         tx = w3.eth.get_transaction(tx_hash)
-        
+
         # 3. 验证发送方
         if tx["from"].lower() != payment_info["from"].lower():
             return False, "交易发送方不匹配"
-        
+
         # 4. 验证接收方（BNB 原生转账：tx.to 就是收款地址）
         if tx["to"].lower() != payment_info["to"].lower():
             return False, "交易接收方不匹配"
-        
+
         # 5. 验证金额（BNB 原生转账：tx.value 就是金额）
         if tx["value"] != payment_info["amount_wei"]:
             return False, f"金额不匹配: 期望 {payment_info['amount_wei']}, 实际 {tx['value']}"
-        
+
         # 6. 验证签名（用原始 description 和 nonce 重建请求）
         payment_req = X402PaymentRequest(
             chain=payment_info["chain"],
@@ -293,19 +293,19 @@ def verify_x402_payment(payment_info: Dict) -> Tuple[bool, str]:
             description=payment_info.get("description", ""),
             nonce=payment_info.get("nonce")
         )
-        
+
         recovered = payment_req.get_signer(payment_info["signature"])
         if recovered.lower() != payment_info["signer"].lower():
             return False, "签名验证失败"
-        
+
         amount_display = payment_info.get('amount_bnb', payment_info.get('amount_usdc', '?'))
-        print(f"   ✓ x402 支付验证通过")
+        print("   ✓ x402 支付验证通过")
         print(f"     交易: {tx_hash[:20]}...")
         print(f"     签名者: {recovered[:10]}...")
         print(f"     金额: {amount_display} BNB")
-        
+
         return True, "支付验证通过"
-        
+
     except Exception as e:
         return False, f"验证失败: {e}"
 
@@ -313,7 +313,7 @@ def verify_x402_payment(payment_info: Dict) -> Tuple[bool, str]:
 if __name__ == "__main__":
     # 测试 x402 支付
     print("=== x402 支付测试（BNB 原生转账）===")
-    
+
     wallets = load_wallets()
     for name in wallets:
         addr = wallets[name]["address"]
