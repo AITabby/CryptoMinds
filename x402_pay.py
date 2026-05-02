@@ -59,7 +59,7 @@ class X402PaymentRequest:
         return json.dumps(data, sort_keys=True)
 
     def sign(self, private_key: str) -> str:
-        """使用私钥签名"""
+        """使用私钥签名 — requires eth_account for ECDSA"""
         try:
             from eth_account import Account
             from eth_account.messages import encode_defunct
@@ -72,17 +72,10 @@ class X402PaymentRequest:
             signed = Account.sign_message(encoded, private_key=private_key)
             return signed.signature.hex()
         except ImportError:
-            import hmac
-            message = self.to_message()
-            signature = hmac.new(
-                private_key.encode() if isinstance(private_key, str) else private_key,
-                message.encode(),
-                hashlib.sha256
-            ).hexdigest()
-            return signature
+            raise RuntimeError("eth_account is required for signing — HMAC fallback removed for security")
 
     def get_signer(self, signature: str) -> str:
-        """从签名恢复地址"""
+        """从签名恢复地址 — requires eth_account"""
         try:
             from eth_account import Account
             from eth_account.messages import encode_defunct
@@ -92,7 +85,7 @@ class X402PaymentRequest:
             recovered = Account.recover_message(encoded, signature=signature)
             return recovered
         except ImportError:
-            return signature
+            raise RuntimeError("eth_account is required for signature recovery — HMAC fallback removed for security")
 
 
 def get_bnb_balance(address: str) -> float:

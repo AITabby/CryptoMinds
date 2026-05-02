@@ -6,7 +6,6 @@ CryptoMinds 共享配置
 
 import json
 import os
-from functools import lru_cache
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -32,22 +31,33 @@ DEFAULT_SLIPPAGE_BPS = int(os.getenv("DEFAULT_SLIPPAGE_BPS", "500"))
 
 # ── 集中式钱包加载 ──────────────────────────────────────────
 
-@lru_cache(maxsize=1)
 def load_wallets() -> dict:
-    """Load and normalize wallets.json once per process."""
-    if not WALLETS_FILE.exists():
-        return {}
-    raw = json.loads(WALLETS_FILE.read_text())
-    normalized = {}
-    for name, info in raw.items():
-        pk = info.get("private_key") or info.get("privateKey") or info.get("key") or ""
-        if pk and not pk.startswith("0x"):
-            pk = "0x" + pk
-        normalized[name] = {
-            "address": info.get("address", ""),
-            "private_key": pk,
-        }
-    return normalized
+    """Load wallets from env vars (priority) then wallets.json. Not cached."""
+    result = {}
+    # First: load from WALLET_KEY_{NAME} env vars
+    for env_key, value in os.environ.items():
+        if env_key.startswith("WALLET_KEY_"):
+            name = env_key[len("WALLET_KEY_"):].lower()
+            pk = value
+            if pk and not pk.startswith("0x"):
+                pk = "0x" + pk
+            # Derive address from env var if WALLET_ADDR_{NAME} is set, else empty
+            addr = os.getenv(f"WALLET_ADDR_{name.upper()}", "")
+            result[name] = {"address": addr, "private_key": pk}
+    # Second: load from wallets.json (env vars override same names)
+    if WALLETS_FILE.exists():
+        raw = json.loads(WALLETS_FILE.read_text())
+        for name, info in raw.items():
+            if name in result:
+                continue  # env var wins
+            pk = info.get("private_key") or info.get("privateKey") or info.get("key") or ""
+            if pk and not pk.startswith("0x"):
+                pk = "0x" + pk
+            result[name] = {
+                "address": info.get("address", ""),
+                "private_key": pk,
+            }
+    return result
 
 
 def get_wallet_key(name: str) -> str:
@@ -65,8 +75,7 @@ def get_wallet_key(name: str) -> str:
 
 
 def reload_wallets():
-    """Clear cache and re-read wallets from disk."""
-    load_wallets.cache_clear()
+    """Re-read wallets from disk (no cache to clear — always fresh)."""
     return load_wallets()
 
 

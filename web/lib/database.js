@@ -3,8 +3,10 @@
  *
  * 替换 JSON 文件存储，提供：
  * - 事务支持
- * - 并发安全
- * - 更好的性能
+ * - 并发安全 (WAL mode + busy_timeout)
+ *
+ * ⚠️ SQLite 在 supervisord 多进程环境下仅支持单写入者并发。
+ * 生产环境请使用 PostgreSQL (DATABASE_URL) 替代。
  */
 
 const sqlite3 = require('sqlite3').verbose();
@@ -23,6 +25,10 @@ class Database {
     return new Promise((resolve, reject) => {
       this.db = new sqlite3.Database(this.dbPath, (err) => {
         if (err) return reject(err);
+        // WAL mode + busy_timeout for cross-process concurrency safety
+        this.db.run('PRAGMA journal_mode=WAL');
+        this.db.run('PRAGMA busy_timeout=5000');
+        this.db.run('PRAGMA foreign_keys=ON');
         this._createTables().then(resolve).catch(reject);
       });
     });
@@ -183,7 +189,10 @@ class Database {
         response_time_ms INTEGER DEFAULT 0,
         payment_tx TEXT,
         payment_amount TEXT,
-        evidence TEXT
+        evidence TEXT,
+        disputed INTEGER DEFAULT 0,
+        dispute_reason TEXT,
+        resolution TEXT
       )`,
 
       // 信用货币（Python CreditRegistry 持久化）
@@ -207,6 +216,54 @@ class Database {
         balance TEXT,
         PRIMARY KEY (currency_id, wallet)
       )`,
+      `CREATE TABLE IF NOT EXISTS escrow_orders (
+        escrow_id TEXT PRIMARY KEY,
+        task_id TEXT,
+        order_id TEXT,
+        buyer_wallet TEXT NOT NULL,
+        seller_wallet TEXT NOT NULL,
+        seller_agent_id TEXT,
+        amount TEXT NOT NULL,
+        channel_id TEXT,
+        chain TEXT DEFAULT 'bsc',
+        on_chain_order_id TEXT,
+        state TEXT DEFAULT 'created',
+        created_at INTEGER,
+        funded_at INTEGER,
+        delivered_at INTEGER,
+        verified_at INTEGER,
+        disputed_at INTEGER,
+        resolved_at INTEGER,
+        seller_timeout_at INTEGER,
+        buyer_timeout_at INTEGER,
+        dispute_reason TEXT DEFAULT '',
+        dispute_initiator TEXT DEFAULT '',
+        arbitration_weight_buyer REAL DEFAULT 0,
+        arbitration_weight_seller REAL DEFAULT 0,
+        resolution TEXT DEFAULT '',
+        resolution_reason TEXT DEFAULT '',
+        verification_score REAL DEFAULT 0,
+        verification_threshold REAL DEFAULT 0.7,
+        dispute_window_seconds INTEGER DEFAULT 172800,
+        evidence TEXT DEFAULT ''
+      )`,
+      `CREATE TABLE IF NOT EXISTS session_keys (
+        session_key_id TEXT PRIMARY KEY,
+        main_wallet TEXT NOT NULL,
+        agent_id TEXT NOT NULL,
+        available_chains TEXT,
+        per_tx_limit TEXT,
+        total_quota TEXT,
+        total_used TEXT DEFAULT '0',
+        callable_actions TEXT,
+        created_at INTEGER,
+        expires_at INTEGER,
+        nonce INTEGER DEFAULT 0,
+        revoked INTEGER DEFAULT 0,
+        revoked_at INTEGER DEFAULT 0,
+        session_address TEXT NOT NULL,
+        authorization_signature TEXT NOT NULL
+      )`,
 
       // 索引
       `CREATE INDEX IF NOT EXISTS idx_orders_seller ON orders(seller_wallet)`,
@@ -220,10 +277,33 @@ class Database {
       `CREATE INDEX IF NOT EXISTS idx_records_seller ON performance_records(seller_wallet)`,
       `CREATE INDEX IF NOT EXISTS idx_records_buyer ON performance_records(buyer_wallet)`,
       `CREATE INDEX IF NOT EXISTS idx_records_task ON performance_records(task_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_escrow_state ON escrow_orders(state)`,
+      `CREATE INDEX IF NOT EXISTS idx_escrow_seller ON escrow_orders(seller_wallet)`,
+      `CREATE INDEX IF NOT EXISTS idx_session_keys_agent ON session_keys(agent_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_session_keys_wallet ON session_keys(main_wallet)`,
     ];
 
     for (const sql of tables) {
       await this._run(sql);
+    }
+
+    // 迁移: 为旧数据库补充新增列
+    await this._migrate();
+  }
+
+  async _migrate() {
+    const migrations = [
+      { table: 'performance_records', column: 'disputed', type: 'INTEGER DEFAULT 0' },
+      { table: 'performance_records', column: 'dispute_reason', type: 'TEXT' },
+      { table: 'performance_records', column: 'resolution', type: 'TEXT' },
+    ];
+
+    for (const m of migrations) {
+      try {
+        await this._run(`ALTER TABLE ${m.table} ADD COLUMN ${m.column} ${m.type}`);
+      } catch (e) {
+        // Column already exists — ignore
+      }
     }
   }
 

@@ -114,10 +114,14 @@ def _validate(env_name: str, config: dict) -> list:
             if not os.getenv(var):
                 errors.append(f"Missing required env var: {var}")
 
-    # Always check wallets.json permissions
+    # Always check wallets.json permissions — enforce strict permissions
     wallets_path = PROJECT_ROOT / "wallets.json"
-    if wallets_path.exists() and (wallets_path.stat().st_mode & stat.S_IROTH):
-        errors.append("wallets.json permissions too open — run: chmod 600 wallets.json")
+    if wallets_path.exists():
+        mode = wallets_path.stat().st_mode
+        if mode & stat.S_IROTH:
+            errors.append("wallets.json permissions too open — run: chmod 600 wallets.json (refusing to load)")
+        if mode & stat.S_IRGRP:
+            errors.append("wallets.json is group-readable — run: chmod 600 wallets.json")
 
     # Prod must not be in demo mode
     if env_name == "prod" and config["DEMO_MODE"]:
@@ -135,14 +139,33 @@ def _validate(env_name: str, config: dict) -> list:
     weak_tokens = {"", "dev-internal-token", "test-token", "secret", "password", "admin"}
     if config["INTERNAL_TOKEN"].lower() in weak_tokens:
         if env_name in ("prod", "staging"):
-            errors.append(f"CRYPTOMINDS_INTERNAL_TOKEN is too weak ('{config['INTERNAL_TOKEN'][:8]}...') — use a strong random value")
+            errors.append(
+                "CRYPTOMINDS_INTERNAL_TOKEN is too weak "
+                f"('{config['INTERNAL_TOKEN'][:8]}...') — use a strong random value"
+            )
 
-    # ADMIN_SECRET must not be weak
+    # ADMIN_SECRET must not be weak — hard block in staging/prod, warn in dev
     admin_secret = os.getenv("ADMIN_SECRET", "")
-    weak_admin = {"", "admin", "secret", "password", "test"}
+    weak_admin = {"", "admin", "secret", "password", "test", "cryptominds-admin-2024"}
     if admin_secret.lower() in weak_admin:
         if env_name in ("prod", "staging"):
-            errors.append(f"ADMIN_SECRET is too weak ('{admin_secret[:8]}...') — use a strong random value")
+            errors.append(
+                f"ADMIN_SECRET is too weak ('{admin_secret[:8]}...') — "
+                "use a strong random value (min 32 chars)"
+            )
+        else:
+            logger.warning(
+                "ADMIN_SECRET is too weak for production ('%s...') — use min 32 chars before deploying",
+                admin_secret[:8],
+            )
+    elif len(admin_secret) < 32:
+        if env_name in ("prod", "staging"):
+            errors.append(f"ADMIN_SECRET too short ({len(admin_secret)} chars) — minimum 32 characters required")
+        else:
+            logger.warning(
+                "ADMIN_SECRET too short (%s chars) for production — minimum 32 chars recommended",
+                len(admin_secret),
+            )
 
     return errors
 

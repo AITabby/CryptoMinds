@@ -7,11 +7,11 @@
 const path = require('path');
 const fs = require('fs');
 
-const PROJECT_ROOT = path.join(__dirname, '..');
+const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const ENVIRONMENTS_DIR = path.join(PROJECT_ROOT, 'environments');
 
-const REQUIRED_PROD = ['CRYPTOMINDS_INTERNAL_TOKEN', 'BSC_RPC', 'DEPOSIT_POOL_ADDRESS'];
-const REQUIRED_STAGING = ['CRYPTOMINDS_INTERNAL_TOKEN', 'BSC_RPC'];
+const REQUIRED_PROD = ['CRYPTOMINDS_INTERNAL_TOKEN', 'ADMIN_SECRET', 'BSC_RPC', 'DEPOSIT_POOL_ADDRESS'];
+const REQUIRED_STAGING = ['CRYPTOMINDS_INTERNAL_TOKEN', 'ADMIN_SECRET', 'BSC_RPC'];
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return false;
@@ -90,7 +90,7 @@ function readConfig(envName) {
     DEMO_MODE: (process.env.DEMO_MODE || 'false').toLowerCase() === 'true',
     DEBUG: (process.env.CRYPTOMINDS_DEBUG || 'false').toLowerCase() === 'true',
     LOG_LEVEL: (process.env.CRYPTOMINDS_LOG_LEVEL || 'INFO').toUpperCase(),
-    LOG_JSON: (process.env.CRYPTOMINDS_LOG_JSON || envName === 'prod' ? 'true' : 'false').toLowerCase() === 'true',
+    LOG_JSON: (process.env.CRYPTOMINDS_LOG_JSON || (envName === 'prod' ? 'true' : 'false')).toLowerCase() === 'true',
     INTERNAL_TOKEN: process.env.CRYPTOMINDS_INTERNAL_TOKEN || '',
     PORT: parseInt(process.env.PORT || '3457', 10),
   };

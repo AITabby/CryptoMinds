@@ -6,6 +6,7 @@ import os
 import sys
 import unittest
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
 DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, DIR)
@@ -18,6 +19,8 @@ from agent_daemon import AgentConfig, Executor, Task
 from reputation.record import TaskStatus
 from task_closer import TaskCloser
 from verification.base import TaskOutput
+from escrow.models import EscrowOrder
+from settlement.escrow_state import EscrowState
 
 
 class ProtocolRegressionTests(unittest.TestCase):
@@ -179,6 +182,92 @@ class ProtocolRegressionTests(unittest.TestCase):
                 os.environ.pop("CRYPTOMINDS_DEBUG", None)
             else:
                 os.environ["CRYPTOMINDS_DEBUG"] = old_debug_env
+
+    def test_bsc_release_requires_chain_confirmation_before_local_release(self):
+        import api_server
+
+        order = EscrowOrder(
+            escrow_id="esc-bsc-1",
+            task_id="t1",
+            order_id="o1",
+            buyer_wallet="0xBuyer",
+            seller_wallet="0xSeller",
+            seller_agent_id="seller-1",
+            amount=Decimal("1"),
+            channel_id="bsc-native",
+            on_chain_order_id="0xabc",
+            state=EscrowState.VERIFIED,
+        )
+        store = MagicMock()
+        store.get.return_value = order
+
+        channel = MagicMock()
+        channel.escrow_sync_state.return_value = {"status_mapped": "delivered"}
+        channel.escrow_prepare_contract_call.return_value = {"method": "confirm"}
+
+        with patch.object(api_server, "_get_escrow_store", return_value=store), \
+             patch.object(api_server, "_is_demo_mode", return_value=True), \
+             patch("settlement.channels.bsc_native.BSCNativeChannel", return_value=channel):
+            resp = api_server.app.test_client().post(
+                "/api/v1/escrow/esc-bsc-1/release",
+                headers={"X-CryptoMinds-Internal-Token": "test-token"},
+                json={"wallet": "0xBuyer"},
+            )
+
+        self.assertEqual(resp.status_code, 202)
+        self.assertEqual(order.state, EscrowState.VERIFIED)
+        store.save.assert_not_called()
+
+    def test_bsc_resolve_does_not_mutate_local_state_when_chain_fails(self):
+        import api_server
+
+        order = EscrowOrder(
+            escrow_id="esc-bsc-2",
+            task_id="t1",
+            order_id="o1",
+            buyer_wallet="0xBuyer",
+            seller_wallet="0xSeller",
+            seller_agent_id="seller-1",
+            amount=Decimal("1"),
+            channel_id="bsc-native",
+            on_chain_order_id="0xabc",
+            state=EscrowState.DISPUTED,
+            disputed_at=1,
+        )
+        store = MagicMock()
+        store.get.return_value = order
+        record_store = MagicMock()
+
+        failed = MagicMock(success=False, error="chain failed", tx_hash="")
+        channel = MagicMock()
+        channel.escrow_refund_on_chain.return_value = failed
+
+        old_secret = os.environ.get("ADMIN_SECRET")
+        old_admin_key = os.environ.get("ADMIN_PRIVATE_KEY")
+        os.environ["ADMIN_SECRET"] = "x" * 40
+        os.environ["ADMIN_PRIVATE_KEY"] = "0x" + "1" * 64
+        try:
+            with patch.object(api_server, "_get_escrow_store", return_value=store), \
+                 patch.object(api_server, "_get_record_store", return_value=record_store), \
+                 patch("settlement.channels.bsc_native.BSCNativeChannel", return_value=channel):
+                resp = api_server.app.test_client().post(
+                    "/api/v1/escrow/esc-bsc-2/resolve",
+                    headers={"X-Admin-Secret": "x" * 40},
+                    json={"decision": "buyer_win", "reason": "failed delivery"},
+                )
+        finally:
+            if old_secret is None:
+                os.environ.pop("ADMIN_SECRET", None)
+            else:
+                os.environ["ADMIN_SECRET"] = old_secret
+            if old_admin_key is None:
+                os.environ.pop("ADMIN_PRIVATE_KEY", None)
+            else:
+                os.environ["ADMIN_PRIVATE_KEY"] = old_admin_key
+
+        self.assertEqual(resp.status_code, 502)
+        self.assertEqual(order.state, EscrowState.DISPUTED)
+        store.save.assert_not_called()
 
 
 if __name__ == "__main__":

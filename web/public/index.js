@@ -4281,34 +4281,73 @@ async function confirmDepositModal() {
     }
   }
 
+  function normalizeCsvInput(value) {
+    return value.split(',').map(v => v.trim()).filter(Boolean);
+  }
+
+  async function signWalletMessage(wallet, message) {
+    if (!window.ethereum) throw new Error('需要钱包签名');
+    return window.ethereum.request({
+      method: 'personal_sign',
+      params: [message, wallet]
+    });
+  }
+
+  function buildSessionKeyAuthMessage(agentId, chains, perTxLimit, totalQuota, actions, expiresAt, sessionAddress) {
+    return [
+      'CryptoMinds session key authorization',
+      'Agent: ' + agentId,
+      'Chains: ' + chains.join(','),
+      'PerTxLimit: ' + perTxLimit,
+      'TotalQuota: ' + totalQuota,
+      'Actions: ' + actions.join(','),
+      'Nonce: 0',
+      'Expires: ' + expiresAt,
+      'SessionAddress: ' + sessionAddress
+    ].join('\n');
+  }
+
   async function createSessionKey() {
     const wallet = currentAccount || getActiveWallet();
     if (!wallet) { alert('请先连接钱包'); return; }
     const agentId = document.getElementById('skAgentId').value.trim();
-    const chains = document.getElementById('skChains').value.trim().split(',');
+    const sessionAddress = document.getElementById('skSessionAddress').value.trim();
+    const chains = normalizeCsvInput(document.getElementById('skChains').value.trim());
     const perTxLimit = document.getElementById('skPerTxLimit').value.trim();
     const totalQuota = document.getElementById('skTotalQuota').value.trim();
-    const actions = document.getElementById('skActions').value.trim().split(',');
+    const actions = normalizeCsvInput(document.getElementById('skActions').value.trim());
     const validityHours = parseInt(document.getElementById('skValidityHours').value || '24');
-    if (!agentId || !perTxLimit || !totalQuota) { alert('请填写 Agent ID、单笔上限、总额度'); return; }
+    if (!agentId || !sessionAddress || !perTxLimit || !totalQuota) {
+      alert('请填写 Agent ID、Session Address、单笔上限、总额度');
+      return;
+    }
     try {
+      const expiresAt = Math.floor(Date.now() / 1000) + validityHours * 3600;
+      const message = buildSessionKeyAuthMessage(
+        agentId, chains, perTxLimit, totalQuota, actions, expiresAt, sessionAddress
+      );
+      const signature = await signWalletMessage(wallet, message);
       const res = await fetch('/api/v1/protocol/session-keys/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           main_wallet: wallet,
-          main_private_key: 'DEMO', // Demo mode: placeholder key
           agent_id: agentId,
+          session_address: sessionAddress,
           chains: chains,
           per_tx_limit: perTxLimit,
           total_quota: totalQuota,
           actions: actions,
           validity_seconds: validityHours * 3600,
+          expires_at: expiresAt,
+          message: message,
+          signature: signature,
+          authorization_signature: signature,
         })
       });
       const data = await res.json();
       if (data.ok || data.session_key_id) {
-        alert('Session Key 创建成功!\nID: ' + (data.session_key_id || '--') + '\n请保存私钥: ' + (data.session_private_key || '未返回'));
+        alert('Session Key 创建成功!\nID: ' + (data.session_key_id || '--'));
         loadSessionKeys();
       } else {
         alert('创建失败: ' + (data.error || '未知错误'));
@@ -4323,10 +4362,12 @@ async function confirmDepositModal() {
     if (!wallet) return;
     if (!confirm('确认撤销 Session Key ' + keyId + '?')) return;
     try {
+      const message = 'CryptoMinds revoke session key\nKey: ' + keyId + '\nWallet: ' + wallet;
+      const signature = await signWalletMessage(wallet, message);
       const res = await fetch(`/api/v1/protocol/session-keys/${keyId}/revoke`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ main_wallet: wallet, main_private_key: 'DEMO' })
+        body: JSON.stringify({ main_wallet: wallet, message: message, signature: signature })
       });
       const data = await res.json();
       if (data.ok) {
@@ -4484,10 +4525,22 @@ async function confirmDepositModal() {
     const wallet = currentAccount || getActiveWallet();
     if (!wallet) return;
     try {
+      const message = [
+        'CryptoMinds increase session key quota',
+        'Key: ' + keyId,
+        'Additional: ' + additional,
+        'Wallet: ' + wallet
+      ].join('\n');
+      const signature = await signWalletMessage(wallet, message);
       const res = await fetch(`/api/v1/protocol/session-keys/${keyId}/increase-quota`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ additional_quota: additional, main_wallet: wallet, main_private_key: 'DEMO' })
+        body: JSON.stringify({
+          additional_quota: additional,
+          main_wallet: wallet,
+          message: message,
+          signature: signature
+        })
       });
       const data = await res.json();
       if (data.ok) {

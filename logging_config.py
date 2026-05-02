@@ -3,7 +3,13 @@ import json
 import logging
 import os
 import sys
+import uuid
 from datetime import datetime
+
+
+def generate_request_id():
+    """Generate a unique request ID for correlation across Python/Express boundary."""
+    return str(uuid.uuid4())[:16]
 
 
 class JsonFormatter(logging.Formatter):
@@ -16,6 +22,10 @@ class JsonFormatter(logging.Formatter):
             "module": record.name,
             "message": record.getMessage(),
         }
+        # Include request_id if set on the record
+        request_id = getattr(record, "request_id", None)
+        if request_id:
+            log_entry["request_id"] = request_id
         if record.exc_info and record.exc_info[0] is not None:
             log_entry["exception"] = self.formatException(record.exc_info)
         return json.dumps(log_entry, ensure_ascii=False)

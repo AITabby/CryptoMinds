@@ -110,14 +110,7 @@ class BSCNativeChannel(SettlementChannel):
             signed = Account.sign_message(encoded, private_key=private_key)
             return signed.signature.hex()
         except ImportError:
-            # 降级：HMAC 签名
-            import hmac
-            message = request.to_sign_message()
-            return hmac.new(
-                private_key.encode() if isinstance(private_key, str) else private_key,
-                message.encode(),
-                hashlib.sha256
-            ).hexdigest()
+            raise RuntimeError("eth_account is required for signing — HMAC fallback removed for security")
 
     def execute_payment(
         self,
@@ -265,42 +258,216 @@ class BSCNativeChannel(SettlementChannel):
         timeout_seconds: int = 1800,
         **kwargs
     ) -> EscrowResult:
-        """
-        通过 ServiceEscrow 合约锁定资金
-
-        注意：这需要前端通过 MetaMask 调用合约
-        这里返回合约调用参数，供前端使用
-        """
-        # TODO: 实现合约托管逻辑
-        # 当前返回合约调用信息，供前端使用
+        """买家通过 MetaMask 调用 createOrder, 不在此处直接链上锁定"""
         return EscrowResult(
             success=False,
             error="合约托管需要前端通过 MetaMask 调用，请使用 escrow_prepare_contract_call",
         )
 
+    def _get_contract_address(self) -> str:
+        """获取合约部署地址"""
+        env_addr = os.getenv("ESCROW_CONTRACT_ADDRESS", "")
+        if env_addr:
+            return env_addr
+        deploy_path = Path(__file__).parent.parent.parent / "escrow_deployment.json"
+        if deploy_path.exists():
+            deploy_data = json.loads(deploy_path.read_text())
+            return deploy_data.get("address", "")
+        return ""
+
     def escrow_prepare_contract_call(
         self,
-        seller_address: str,
-        order_id: str,
-        buyer_timeout_seconds: int = 86400,
-        seller_timeout_seconds: int = 1800,
+        action: str,
+        **kwargs,
     ) -> Dict:
         """
-        准备合约调用参数
+        准备合约调用参数，供前端 MetaMask 使用
 
-        返回前端 MetaMask 需要的参数
+        action: createOrder, deliver, confirm, dispute, claimBuyerTimeout, claimSellerTimeout
         """
-        return {
-            "contract_address": os.getenv("BSCEscrow_CONTRACT", ""),
-            "method": "createOrder",
-            "args": [
-                seller_address,
-                order_id,
-                buyer_timeout_seconds,
-                seller_timeout_seconds,
-            ],
-            "abi": self._get_escrow_abi(),
-        }
+        from web3 import Web3
+
+        contract_address = self._get_contract_address()
+        abi = self._get_escrow_abi()
+
+        if action == "createOrder":
+            return {
+                "contract_address": contract_address,
+                "method": "createOrder",
+                "args": [
+                    kwargs.get("seller_address", ""),
+                    kwargs.get("order_id", ""),
+                    kwargs.get("buyer_timeout_seconds", 86400),
+                    kwargs.get("seller_timeout_seconds", 1800),
+                ],
+                "value": str(self.w3.to_wei(float(kwargs.get("amount", 0)), 'ether')),
+                "abi": abi,
+            }
+        elif action == "deliver":
+            return {
+                "contract_address": contract_address,
+                "method": "deliver",
+                "args": [
+                    kwargs.get("on_chain_order_id", ""),
+                    kwargs.get("result", ""),
+                ],
+                "abi": abi,
+            }
+        elif action == "confirm":
+            return {
+                "contract_address": contract_address,
+                "method": "confirm",
+                "args": [kwargs.get("on_chain_order_id", "")],
+                "abi": abi,
+            }
+        elif action == "dispute":
+            return {
+                "contract_address": contract_address,
+                "method": "dispute",
+                "args": [kwargs.get("on_chain_order_id", "")],
+                "abi": abi,
+            }
+        elif action in ("claimBuyerTimeout", "claimSellerTimeout"):
+            return {
+                "contract_address": contract_address,
+                "method": action,
+                "args": [kwargs.get("on_chain_order_id", "")],
+                "abi": abi,
+            }
+        else:
+            return {"error": f"unsupported action: {action}"}
+
+    def escrow_confirm_on_chain(
+        self,
+        escrow_id: str,
+        on_chain_order_id: str,
+        admin_private_key: str,
+    ) -> EscrowResult:
+        """管理员调用 arbitrateRelease (owner-only)"""
+        from web3 import Web3
+
+        if not admin_private_key.startswith("0x"):
+            admin_private_key = "0x" + admin_private_key
+
+        contract_address = self._get_contract_address()
+        if not contract_address:
+            return EscrowResult(success=False, error="合约地址未配置")
+
+        try:
+            contract = self.w3.eth.contract(
+                address=Web3.to_checksum_address(contract_address),
+                abi=self._get_escrow_abi(),
+            )
+
+            admin_account = self.w3.eth.account.from_key(admin_private_key)
+            nonce = self.w3.eth.get_transaction_count(admin_account.address)
+
+            order_id_bytes = Web3.to_bytes(hexstr=on_chain_order_id) if on_chain_order_id.startswith("0x") else Web3.to_bytes(text=on_chain_order_id)
+
+            tx = contract.functions.arbitrateRelease(order_id_bytes).build_transaction({
+                'from': admin_account.address,
+                'nonce': nonce,
+                'gas': 100000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': BSC_CHAIN_ID,
+            })
+
+            signed = self.w3.eth.account.sign_transaction(tx, admin_private_key)
+            raw_tx = getattr(signed, 'raw_transaction', None) or getattr(signed, 'rawTransaction')
+            tx_hash = self.w3.eth.send_raw_transaction(raw_tx)
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+
+            if receipt.status == 1:
+                return EscrowResult(success=True, escrow_id=escrow_id, tx_hash=tx_hash.hex())
+            return EscrowResult(success=False, error="on-chain arbitrateRelease failed")
+        except Exception as e:
+            return EscrowResult(success=False, error=str(e))
+
+    def escrow_refund_on_chain(
+        self,
+        escrow_id: str,
+        on_chain_order_id: str,
+        reason: str,
+        admin_private_key: str,
+    ) -> EscrowResult:
+        """管理员调用 arbitrateRefund (owner-only)"""
+        from web3 import Web3
+
+        if not admin_private_key.startswith("0x"):
+            admin_private_key = "0x" + admin_private_key
+
+        contract_address = self._get_contract_address()
+        if not contract_address:
+            return EscrowResult(success=False, error="合约地址未配置")
+
+        try:
+            contract = self.w3.eth.contract(
+                address=Web3.to_checksum_address(contract_address),
+                abi=self._get_escrow_abi(),
+            )
+
+            admin_account = self.w3.eth.account.from_key(admin_private_key)
+            nonce = self.w3.eth.get_transaction_count(admin_account.address)
+
+            order_id_bytes = Web3.to_bytes(hexstr=on_chain_order_id) if on_chain_order_id.startswith("0x") else Web3.to_bytes(text=on_chain_order_id)
+
+            tx = contract.functions.arbitrateRefund(order_id_bytes, reason).build_transaction({
+                'from': admin_account.address,
+                'nonce': nonce,
+                'gas': 100000,
+                'gasPrice': self.w3.eth.gas_price,
+                'chainId': BSC_CHAIN_ID,
+            })
+
+            signed = self.w3.eth.account.sign_transaction(tx, admin_private_key)
+            raw_tx = getattr(signed, 'raw_transaction', None) or getattr(signed, 'rawTransaction')
+            tx_hash = self.w3.eth.send_raw_transaction(raw_tx)
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+
+            if receipt.status == 1:
+                return EscrowResult(success=True, escrow_id=escrow_id, tx_hash=tx_hash.hex())
+            return EscrowResult(success=False, error="on-chain arbitrateRefund failed")
+        except Exception as e:
+            return EscrowResult(success=False, error=str(e))
+
+    def escrow_sync_state(
+        self,
+        on_chain_order_id: str,
+    ) -> Dict:
+        """读取链上订单状态, 映射为 EscrowState"""
+        from web3 import Web3
+        from settlement.escrow_state import EscrowState
+
+        contract_address = self._get_contract_address()
+        if not contract_address:
+            return {"error": "合约地址未配置"}
+
+        try:
+            contract = self.w3.eth.contract(
+                address=Web3.to_checksum_address(contract_address),
+                abi=self._get_escrow_abi(),
+            )
+
+            order_id_bytes = Web3.to_bytes(hexstr=on_chain_order_id) if on_chain_order_id.startswith("0x") else Web3.to_bytes(text=on_chain_order_id)
+
+            order_data = contract.functions.getOrder(order_id_bytes).call()
+
+            chain_status = order_data[8]
+            return {
+                "buyer": order_data[0],
+                "seller": order_data[1],
+                "serviceId": order_data[2],
+                "amount": str(self.w3.from_wei(order_data[3], 'ether')),
+                "createdAt": order_data[4],
+                "deliveredAt": order_data[5],
+                "buyerTimeoutAt": order_data[6],
+                "sellerTimeoutAt": order_data[7],
+                "status": chain_status,
+                "status_mapped": EscrowState.from_chain_status(chain_status).value,
+                "deliverResult": order_data[9],
+            }
+        except Exception as e:
+            return {"error": str(e)}
 
     def _get_escrow_abi(self) -> list:
         """获取 ServiceEscrow 合约 ABI"""

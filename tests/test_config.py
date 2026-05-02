@@ -8,11 +8,9 @@ from config import load_wallets, get_wallet_key, reload_wallets, WALLETS_FILE
 
 
 @pytest.fixture(autouse=True)
-def _clear_wallet_cache():
-    """Clear lru_cache before each test so state doesn't leak."""
-    load_wallets.cache_clear()
+def _no_cache_needed():
+    """load_wallets is no longer cached — no cache clearing needed."""
     yield
-    load_wallets.cache_clear()
 
 
 @pytest.fixture
@@ -24,7 +22,6 @@ def wallet_file(tmp_path):
     config.WALLETS_FILE = path
     yield path
     config.WALLETS_FILE = original
-    load_wallets.cache_clear()
 
 
 class TestLoadWallets:
@@ -89,7 +86,8 @@ class TestLoadWallets:
         result = load_wallets()
         assert result["test"]["private_key"] == ""
 
-    def test_cache_returns_same_object(self, wallet_file):
+    def test_no_cache_returns_equal_data(self, wallet_file):
+        """load_wallets is not cached but returns consistent data."""
         wallet_file.write_text(json.dumps({"test": {"address": "0x1", "private_key": "0x2"}}))
         first = load_wallets()
         second = load_wallets()

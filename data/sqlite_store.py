@@ -226,6 +226,20 @@ def _ensure_tables(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_voucher_agent ON vouchers(agent_id);
         CREATE INDEX IF NOT EXISTS idx_voucher_issuer ON vouchers(issuer_wallet);
         CREATE INDEX IF NOT EXISTS idx_voucher_state ON vouchers(state);
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            agent_id TEXT DEFAULT '',
+            wallet TEXT DEFAULT '',
+            target_id TEXT DEFAULT '',
+            details_json TEXT DEFAULT '{}',
+            result TEXT DEFAULT ''
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+        CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
     """)
     conn.commit()
 

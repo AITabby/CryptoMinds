@@ -175,6 +175,10 @@ router.post('/protocol/escrow/create', requireAdmin, async (req, res) => {
   await proxyToPython(req, res, '/api/v1/escrow/create', { injectToken: true, forwardAdminSecret: true });
 });
 
+router.get('/protocol/escrow/disputed', async (req, res) => {
+  await proxyToPython(req, res, '/api/v1/escrow/disputed', { injectToken: true });
+});
+
 router.get('/protocol/escrow/:escrowId', async (req, res) => {
   await proxyToPython(req, res, `/api/v1/escrow/${req.params.escrowId}`, { injectToken: true });
 });
@@ -186,10 +190,6 @@ router.post('/protocol/escrow/:escrowId/dispute', async (req, res) => {
 
 router.post('/protocol/escrow/:escrowId/resolve', requireAdmin, async (req, res) => {
   await proxyToPython(req, res, `/api/v1/escrow/${req.params.escrowId}/resolve`, { injectToken: true, forwardAdminSecret: true });
-});
-
-router.get('/protocol/escrow/disputed', async (req, res) => {
-  await proxyToPython(req, res, '/api/v1/escrow/disputed', { injectToken: true });
 });
 
 // ── Escrow 正向路径 (生命周期) ──────────────────────

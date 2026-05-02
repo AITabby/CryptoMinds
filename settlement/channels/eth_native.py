@@ -91,7 +91,7 @@ class ETHNativeChannel(SettlementChannel):
         )
 
     def sign_payment(self, request: PaymentRequest, private_key: str) -> str:
-        """签名支付请求"""
+        """签名支付请求 — requires eth_account for ECDSA"""
         try:
             from eth_account import Account
             from eth_account.messages import encode_defunct
@@ -104,13 +104,7 @@ class ETHNativeChannel(SettlementChannel):
             signed = Account.sign_message(encoded, private_key=private_key)
             return signed.signature.hex()
         except ImportError:
-            import hmac
-            message = request.to_sign_message()
-            return hmac.new(
-                private_key.encode() if isinstance(private_key, str) else private_key,
-                message.encode(),
-                hashlib.sha256
-            ).hexdigest()
+            raise RuntimeError("eth_account is required for signing — HMAC fallback removed for security")
 
     def execute_payment(
         self,

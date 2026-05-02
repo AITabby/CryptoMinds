@@ -1,3 +1,4 @@
+# flake8: noqa
 """
 CryptoMinds API 服务层
 
@@ -15,7 +16,7 @@ import sys
 import time
 from functools import wraps
 
-from logging_config import setup_logging
+from logging_config import setup_logging, generate_request_id
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ if _sentry_dsn:
             environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
             release=os.getenv("SENTRY_RELEASE", "cryptoMinds@unknown"),
         )
-        logger.info("Sentry initialized: %s", _sentry_dsn[:20] + "...")
+        logger.info("Sentry initialized")
     except ImportError:
         logger.warning("sentry-sdk not installed — error reporting disabled")
 
@@ -87,23 +88,37 @@ def redirect_old_api():
         from flask import redirect
         return redirect(f"/api/v1{request.path[4:]}", code=301)
 
+    # Assign request ID for correlation
+    g._request_id = request.headers.get("X-Request-ID") or generate_request_id()
+    g._start_time = time.time()
+
 @app.after_request
 def add_cors_and_log(response):
     # CORS — mirror Express ALLOWED_ORIGINS policy
-    allowed_origins = os.getenv("ALLOWED_ORIGINS", "*")
+    allowed_origins = os.getenv("ALLOWED_ORIGINS", "")
     origin = request.headers.get("Origin", "")
     if allowed_origins == "*":
         response.headers["Access-Control-Allow-Origin"] = "*"
+        logger.warning("⚠️ ALLOWED_ORIGINS=* is not safe for production — set specific origins")
     elif origin and origin in allowed_origins.split(","):
         response.headers["Access-Control-Allow-Origin"] = origin
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-402-Payment, X-Admin-Secret, X-Admin-Wallet, X-CryptoMinds-Internal-Token"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-402-Payment, X-Request-ID"
+    # Propagate request ID in response
+    request_id = g.get("_request_id", "")
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
     if request.method == "OPTIONS":
         response.status_code = 204
 
     # Request logging
     duration_ms = (time.time() - g.get('_start_time', time.time())) * 1000
+    # Track HTTP request metrics
+    METRIC_HTTP_REQUESTS.labels(method=request.method, path=request.path, status=response.status_code).inc()
+    METRIC_HTTP_DURATION.labels(method=request.method, path=request.path).observe(duration_ms / 1000.0)
+
     logger.info("request", extra={
+        "request_id": g.get("_request_id", ""),
         "method": request.method,
         "path": request.path,
         "status": response.status_code,
@@ -114,11 +129,14 @@ def add_cors_and_log(response):
 
 def require_internal_token():
     """Require an explicit shared secret for state-mutating internal APIs."""
-    if not INTERNAL_TOKEN:
-        if os.getenv("CRYPTOMINDS_DEBUG", "false").lower() == "true":
-            return True
-        return False
     supplied = request.headers.get("X-CryptoMinds-Internal-Token", "")
+    if not INTERNAL_TOKEN:
+        if _is_protected_env():
+            logger.error("INTERNAL_TOKEN 未配置，拒绝受保护环境中的内部 API 请求")
+            return False
+        if not supplied:
+            logger.warning("⚠️ INTERNAL_TOKEN 未配置，API 完全开放！请设置 CRYPTOMINDS_INTERNAL_TOKEN")
+            return True
     if len(supplied) != len(INTERNAL_TOKEN):
         return False
     return hmac.compare_digest(supplied, INTERNAL_TOKEN)
@@ -129,7 +147,7 @@ def verify_admin_secret():
     admin_secret = os.getenv("ADMIN_SECRET", "")
     if not admin_secret:
         return (jsonify({"error": "管理员认证未配置 (ADMIN_SECRET)"}), 403), None
-    supplied = request.headers.get("X-Admin-Secret") or (request.get_json() or {}).get("adminSecret", "")
+    supplied = request.headers.get("X-Admin-Secret")
     if not supplied:
         return (jsonify({"error": "需要管理员密钥 (X-Admin-Secret)"}), 403), None
     supplied_buf = supplied.encode("utf-8")
@@ -187,6 +205,40 @@ def _require_wallet_signature(data: dict, wallet: str, action: str, escrow_id: s
     if not _verify_wallet_signature(wallet, message, signature):
         return jsonify({"error": "钱包签名验证失败"}), 403
     return None
+
+
+def _require_wallet_signature_always(data: dict, wallet: str, action: str, escrow_id: str):
+    """Require actor signature for financial operations regardless of environment mode."""
+    message = data.get("message", "")
+    signature = data.get("signature", "")
+    expected = f"CryptoMinds escrow {action}\nEscrow: {escrow_id}\nWallet: {wallet}"
+    if not signature:
+        # In demo mode, allow wallet address match as fallback
+        if _is_demo_mode():
+            caller_wallet = data.get("wallet", data.get("buyer_wallet", ""))
+            if caller_wallet.lower() == wallet.lower():
+                return None
+        return jsonify({"error": "需要钱包签名", "expected_message": expected}), 403
+    if message != expected:
+        return jsonify({"error": "签名消息不匹配", "expected_message": expected}), 403
+    if not _verify_wallet_signature(wallet, message, signature):
+        return jsonify({"error": "钱包签名验证失败"}), 403
+    return None
+
+
+def _require_exact_wallet_signature(data: dict, wallet: str, expected_message: str):
+    """Require a wallet signature over an exact canonical message."""
+    signature = data.get("signature", "")
+    message = data.get("message", "")
+    if message != expected_message:
+        return jsonify({"error": "签名消息不匹配", "expected_message": expected_message}), 403
+    if not _verify_wallet_signature(wallet, message, signature):
+        return jsonify({"error": "钱包签名验证失败"}), 403
+    return None
+
+
+def _voucher_message(action: str, voucher_id: str, wallet: str) -> str:
+    return f"CryptoMinds voucher {action}\nVoucher: {voucher_id}\nWallet: {wallet}"
 
 
 def _reject_demo_private_key(main_private_key: str):
@@ -602,6 +654,36 @@ def _get_voucher_store():
 def _get_session_key_store():
     return _init_stores()["session_key"]
 
+
+def _write_audit_log(action: str, agent_id: str = "", wallet: str = "",
+                     target_id: str = "", details: dict = None, result: str = ""):
+    """Write an audit log entry to the database (SQLite or PostgreSQL)."""
+    try:
+        database_url = os.getenv("DATABASE_URL", "")
+        timestamp = int(time.time())
+        details_json = json.dumps(details or {})
+
+        if database_url and database_url.startswith(("postgres://", "postgresql://")):
+            from data.pg_store import _get_conn, _return_conn
+            conn = _get_conn(database_url)
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO audit_log (timestamp, action, agent_id, wallet, target_id, details_json, result) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (timestamp, action, agent_id, wallet, target_id, details_json, result),
+            )
+            conn.commit()
+            cur.close()
+            _return_conn(conn)
+        else:
+            conn = _init_stores()["escrow"]._conn
+            conn.execute(
+                "INSERT INTO audit_log (timestamp, action, agent_id, wallet, target_id, details_json, result) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (timestamp, action, agent_id, wallet, target_id, details_json, result),
+            )
+            conn.commit()
+    except Exception as e:
+        logger.warning("audit log write failed: %s", e)
+
 @app.route("/api/v1/escrow/create", methods=["POST"])
 @require_auth
 def api_escrow_create():
@@ -633,6 +715,8 @@ def api_escrow_create():
     _escrow_store.save(order)
 
     _increment_metric("escrow_created")
+    _write_audit_log("escrow_create", wallet=data.get("buyer_wallet", ""),
+                     target_id=escrow_id, details={"buyer": data.get("buyer_wallet"), "seller": data.get("seller_wallet"), "amount": str(data.get("amount", 0))})
     return jsonify({
         "ok": True,
         "escrow_id": escrow_id,
@@ -666,13 +750,13 @@ def api_escrow_dispute(escrow_id):
     if not order:
         return jsonify({"error": f"未知 Escrow: {escrow_id}"}), 404
 
-    if _is_protected_env():
-        initiator_wallet = data.get("initiator_wallet") or data.get("wallet", "")
-        if initiator_wallet.lower() not in (order.buyer_wallet.lower(), order.seller_wallet.lower()):
-            return jsonify({"error": "只有买家或卖家可以发起争议"}), 403
-        signature_error = _require_wallet_signature(data, initiator_wallet, "dispute", escrow_id)
-        if signature_error:
-            return signature_error
+    # Always verify dispute initiator authorization
+    initiator_wallet = data.get("initiator_wallet") or data.get("wallet", "")
+    if initiator_wallet.lower() not in (order.buyer_wallet.lower(), order.seller_wallet.lower()):
+        return jsonify({"error": "只有买家或卖家可以发起争议"}), 403
+    signature_error = _require_wallet_signature_always(data, initiator_wallet, "dispute", escrow_id)
+    if signature_error:
+        return signature_error
 
     sm = EscrowStateMachine(order.state)
     try:
@@ -715,38 +799,61 @@ def api_escrow_resolve(escrow_id):
 
     _escrow_store = _get_escrow_store()
     _record_store = _get_record_store()
+    order = _escrow_store.get(escrow_id)
+    if not order:
+        return jsonify({"error": f"未知 Escrow: {escrow_id}"}), 404
+    from settlement.escrow_state import EscrowState
+    if order.state != EscrowState.DISPUTED:
+        return jsonify({"error": f"Escrow 状态非 DISPUTED: {order.state.value}"}), 400
+    from escrow.arbitration import MINIMUM_ARBITRATION_WAIT_SECONDS
+    elapsed = int(time.time()) - order.disputed_at
+    if elapsed < MINIMUM_ARBITRATION_WAIT_SECONDS:
+        remaining = MINIMUM_ARBITRATION_WAIT_SECONDS - elapsed
+        return jsonify({"error": f"仲裁等待期未满: 还需 {remaining} 秒"}), 400
+
+    decision = data.get("decision", "")
+    if order.on_chain_order_id and order.channel_id == "bsc-native":
+        if decision == "split":
+            return jsonify({"error": "bsc-native 当前不支持链上 split 仲裁，请选择 buyer_win 或 seller_win"}), 400
+        admin_key = os.getenv("ADMIN_PRIVATE_KEY", "")
+        if not admin_key:
+            return jsonify({"error": "ADMIN_PRIVATE_KEY 未配置，不能执行链上仲裁"}), 409
+
+        from settlement.channels.bsc_native import BSCNativeChannel
+        channel = BSCNativeChannel()
+        if decision == "buyer_win":
+            on_chain_result = channel.escrow_refund_on_chain(
+                escrow_id=escrow_id,
+                on_chain_order_id=order.on_chain_order_id,
+                reason=data.get("reason", ""),
+                admin_private_key=admin_key,
+            )
+        elif decision == "seller_win":
+            on_chain_result = channel.escrow_confirm_on_chain(
+                escrow_id=escrow_id,
+                on_chain_order_id=order.on_chain_order_id,
+                admin_private_key=admin_key,
+            )
+        else:
+            return jsonify({"error": f"未知仲裁决定: {decision}"}), 400
+
+        if not on_chain_result.success:
+            return jsonify({
+                "error": "链上仲裁失败，本地状态保持 disputed",
+                "details": on_chain_result.error,
+            }), 502
+
     from escrow.arbitration import ArbitrationEngine
     engine = ArbitrationEngine(_escrow_store, _record_store, AgentRegistry)
     result = engine.resolve_dispute(
         escrow_id=escrow_id,
         arbiter=data.get("arbiter", "admin"),
-        decision=data.get("decision", ""),
+        decision=decision,
         reason=data.get("reason", ""),
     )
     if result.get("ok"):
-        # 如果有链上订单, 尝试链上仲裁
-        order = _escrow_store.get(escrow_id)
-        if order and order.on_chain_order_id and order.channel_id == "bsc-native":
-            admin_key = os.getenv("ADMIN_PRIVATE_KEY", "")
-            if admin_key:
-                from settlement.channels.bsc_native import BSCNativeChannel
-                channel = BSCNativeChannel()
-                decision = data.get("decision", "")
-                if decision == "buyer_win":
-                    on_chain_result = channel.escrow_refund_on_chain(
-                        escrow_id=escrow_id,
-                        on_chain_order_id=order.on_chain_order_id,
-                        reason=data.get("reason", ""),
-                        admin_private_key=admin_key,
-                    )
-                    result["on_chain_tx"] = on_chain_result.tx_hash if on_chain_result.success else None
-                elif decision in ("seller_win", "split"):
-                    on_chain_result = channel.escrow_confirm_on_chain(
-                        escrow_id=escrow_id,
-                        on_chain_order_id=order.on_chain_order_id,
-                        admin_private_key=admin_key,
-                    )
-                    result["on_chain_tx"] = on_chain_result.tx_hash if on_chain_result.success else None
+        if order.on_chain_order_id and order.channel_id == "bsc-native":
+            result["on_chain_tx"] = on_chain_result.tx_hash
         return jsonify(result), 200
     return jsonify(result), 400
 
@@ -1011,18 +1118,23 @@ def api_escrow_release(escrow_id):
     if not order:
         return jsonify({"error": f"未知 Escrow: {escrow_id}"}), 404
 
-    if _is_protected_env():
-        buyer_wallet = data.get("buyer_wallet") or data.get("wallet", "")
-        if buyer_wallet.lower() != order.buyer_wallet.lower():
-            return jsonify({"error": "只有买家可以确认释放"}), 403
-        signature_error = _require_wallet_signature(data, order.buyer_wallet, "release", escrow_id)
-        if signature_error:
-            return signature_error
-        if order.channel_id == "bsc-native":
-            if not order.on_chain_order_id:
-                return jsonify({"error": "缺少链上订单 ID，不能释放"}), 400
-            from settlement.channels.bsc_native import BSCNativeChannel
-            channel = BSCNativeChannel()
+    # Always require buyer authorization for escrow release
+    buyer_wallet = data.get("buyer_wallet") or data.get("wallet", "")
+    if buyer_wallet.lower() != order.buyer_wallet.lower():
+        return jsonify({"error": "只有买家可以确认释放"}), 403
+    signature_error = _require_wallet_signature_always(data, order.buyer_wallet, "release", escrow_id)
+    if signature_error:
+        return signature_error
+
+    if order.channel_id == "bsc-native":
+        if not order.on_chain_order_id:
+            return jsonify({"error": "缺少链上订单 ID，不能释放"}), 400
+        from settlement.channels.bsc_native import BSCNativeChannel
+        channel = BSCNativeChannel()
+        on_chain_state = channel.escrow_sync_state(order.on_chain_order_id)
+        if on_chain_state.get("error"):
+            return jsonify({"error": f"链上状态读取失败: {on_chain_state['error']}"}), 502
+        if on_chain_state.get("status_mapped") != "released":
             contract_params = channel.escrow_prepare_contract_call(
                 action="confirm",
                 on_chain_order_id=order.on_chain_order_id,
@@ -1032,6 +1144,7 @@ def api_escrow_release(escrow_id):
                 "escrow_id": escrow_id,
                 "state": order.state.value,
                 "requires_on_chain_confirmation": True,
+                "chain_state": on_chain_state.get("status_mapped"),
                 "metamask_params": contract_params,
             }), 202
 
@@ -1055,23 +1168,18 @@ def api_escrow_release(escrow_id):
             escrow_result = channel.escrow_release(
                 escrow_id=escrow_id,
                 to_address=order.seller_wallet,
-                private_key=data.get("private_key", ""),
             )
             if escrow_result.success:
                 release_details["tx_hash"] = escrow_result.tx_hash
             else:
                 release_details["error"] = escrow_result.error
     elif order.channel_id == "bsc-native" and order.on_chain_order_id:
-        from settlement.channels.bsc_native import BSCNativeChannel
-        channel = BSCNativeChannel()
-        contract_params = channel.escrow_prepare_contract_call(
-            action="confirm",
-            on_chain_order_id=order.on_chain_order_id,
-        )
-        release_details["metamask_params"] = contract_params
+        release_details["on_chain_order_id"] = order.on_chain_order_id
 
     _escrow_store.save(order)
     _increment_metric("escrow_released")
+    _write_audit_log("escrow_release", wallet=order.buyer_wallet,
+                     target_id=escrow_id, result="released")
     response = {"ok": True, "escrow_id": escrow_id, "state": order.state.value}
     if release_details:
         response["release_details"] = release_details
@@ -1095,11 +1203,24 @@ def api_voucher_create():
     unit_price = D(str(data.get("unit_price", "0")))
     total_units = int(data.get("total_units", 0))
     total_deposit = unit_price * total_units
+    issuer_wallet = data.get("issuer_wallet", "")
+    if _is_protected_env():
+        expected = (
+            "CryptoMinds voucher create\n"
+            f"Issuer: {issuer_wallet}\n"
+            f"Agent: {data.get('agent_id', '')}\n"
+            f"TaskType: {data.get('capability_task_type', '')}\n"
+            f"UnitPrice: {unit_price}\n"
+            f"TotalUnits: {total_units}"
+        )
+        signature_error = _require_exact_wallet_signature(data, issuer_wallet, expected)
+        if signature_error:
+            return signature_error
 
     voucher_id = f"vch-{data.get('issuer_wallet', '')[:8]}-{int(time.time())}"
     voucher = Voucher(
         voucher_id=voucher_id,
-        issuer_wallet=data.get("issuer_wallet", ""),
+        issuer_wallet=issuer_wallet,
         agent_id=data.get("agent_id", ""),
         capability_task_type=data.get("capability_task_type", ""),
         unit_price=unit_price,
@@ -1137,6 +1258,14 @@ def api_voucher_activate(voucher_id):
     voucher = _voucher_store.get(voucher_id)
     if not voucher:
         return jsonify({"error": f"未知 Voucher: {voucher_id}"}), 404
+    if _is_protected_env():
+        signature_error = _require_exact_wallet_signature(
+            request.get_json() or {},
+            voucher.issuer_wallet,
+            _voucher_message("activate", voucher_id, voucher.issuer_wallet),
+        )
+        if signature_error:
+            return signature_error
 
     from voucher.state import VoucherStateMachine, InvalidTransitionError
     sm = VoucherStateMachine(voucher.state)
@@ -1161,6 +1290,14 @@ def api_voucher_use(voucher_id):
     voucher = _voucher_store.get(voucher_id)
     if not voucher:
         return jsonify({"error": f"未知 Voucher: {voucher_id}"}), 404
+    if _is_protected_env():
+        expected = (
+            f"{_voucher_message('use', voucher_id, voucher.issuer_wallet)}\n"
+            f"Units: {int(data.get('units', 1))}"
+        )
+        signature_error = _require_exact_wallet_signature(data, voucher.issuer_wallet, expected)
+        if signature_error:
+            return signature_error
 
     from voucher.state import VoucherStateMachine, InvalidTransitionError, VoucherState
     units = int(data.get("units", 1))
@@ -1214,6 +1351,17 @@ def api_voucher_dispute(voucher_id):
     voucher = _voucher_store.get(voucher_id)
     if not voucher:
         return jsonify({"error": f"未知 Voucher: {voucher_id}"}), 404
+    if _is_protected_env():
+        initiator_wallet = data.get("initiator_wallet") or data.get("wallet", "")
+        if initiator_wallet.lower() != voucher.issuer_wallet.lower():
+            return jsonify({"error": "只有 Voucher 发行钱包可以发起争议"}), 403
+        signature_error = _require_exact_wallet_signature(
+            data,
+            voucher.issuer_wallet,
+            _voucher_message("dispute", voucher_id, voucher.issuer_wallet),
+        )
+        if signature_error:
+            return signature_error
 
     from voucher.state import VoucherStateMachine, InvalidTransitionError
     sm = VoucherStateMachine(voucher.state)
@@ -1294,10 +1442,53 @@ def api_session_key_create():
         return jsonify({"error": "缺少请求体"}), 400
 
     from auth.session_signer import SessionSigner
+    from auth.session_key import SessionKey
     _sk_store = _get_session_key_store()
 
-    # Demo mode: generate a random private key if placeholder passed
     main_private_key = data.get("main_private_key", "")
+    if _is_protected_env():
+        if main_private_key:
+            return jsonify({"error": "生产环境禁止把主钱包私钥发送到后端，请改用钱包签名授权"}), 400
+        now = int(time.time())
+        expires_at = int(data.get("expires_at", now + int(data.get("validity_seconds", 86400))))
+        if expires_at <= now:
+            return jsonify({"error": "Session Key 过期时间必须晚于当前时间"}), 400
+        session_address = data.get("session_address", "")
+        if not session_address:
+            return jsonify({"error": "缺少 session_address"}), 400
+        sk = SessionKey(
+            session_key_id=hashlib.sha256(
+                f"{data.get('main_wallet', '')}:{data.get('agent_id', '')}:{session_address}:{now}".encode()
+            ).hexdigest()[:16],
+            main_wallet=data.get("main_wallet", ""),
+            agent_id=data.get("agent_id", ""),
+            available_chains=data.get("chains", ["bsc"]),
+            per_tx_limit=Decimal(str(data.get("per_tx_limit", "1.0"))),
+            total_quota=Decimal(str(data.get("total_quota", "10.0"))),
+            total_used=Decimal("0"),
+            callable_actions=data.get("actions", ["pay"]),
+            created_at=now,
+            expires_at=expires_at,
+            nonce=0,
+            session_private_key="",
+            session_address=session_address,
+            authorization_signature=data.get("authorization_signature", data.get("signature", "")),
+        )
+        signature_error = _require_exact_wallet_signature(
+            data,
+            sk.main_wallet,
+            sk.authorization_message(),
+        )
+        if signature_error:
+            return signature_error
+        sk.authorization_signature = data.get("signature", sk.authorization_signature)
+        _sk_store.save(sk)
+        _increment_metric("session_keys_created")
+        _write_audit_log("session_key_create", agent_id=sk.agent_id, wallet=sk.main_wallet,
+                         target_id=sk.session_address, details={"chains": sk.available_chains})
+        return jsonify(sk.to_dict()), 200
+
+    # Demo/dev mode: generate a random private key if placeholder passed
     demo_error = _reject_demo_private_key(main_private_key)
     if demo_error:
         return demo_error
@@ -1324,10 +1515,14 @@ def api_session_key_create():
         return jsonify({"error": str(e)}), 400
 
     _increment_metric("session_keys_created")
-    return jsonify(sk.to_dict(include_private=True)), 200
+    _write_audit_log("session_key_create", agent_id=data.get("agent_id", ""),
+                     wallet=data.get("main_wallet", ""), target_id=sk.session_address,
+                     details={"chains": data.get("chains", ["bsc"])})
+    return jsonify(sk.to_dict()), 200
 
 
 @app.route("/api/v1/session-keys/<key_id>", methods=["GET"])
+@require_auth
 def api_session_key_get(key_id):
     """获取 Session Key 信息"""
     _sk_store = _get_session_key_store()
@@ -1352,16 +1547,40 @@ def api_session_key_revoke(key_id):
     signer = SessionSigner(_sk_store)
 
     main_private_key = data.get("main_private_key", "")
-    demo_error = _reject_demo_private_key(main_private_key)
-    if demo_error:
-        return demo_error
-    # Demo mode: skip ECDSA, just verify wallet matches
-    if not main_private_key or main_private_key.upper() in ("DEMO", "PLACEHOLDER", "TEST"):
+    if _is_protected_env():
         sk = _sk_store.get(key_id)
         if not sk:
             return jsonify({"error": f"未知 Session Key: {key_id}"}), 404
         if data.get("main_wallet", "").lower() != sk.main_wallet.lower():
             return jsonify({"error": "只有主钱包可以撤销 Session Key"}), 403
+        expected = f"CryptoMinds revoke session key\nKey: {key_id}\nWallet: {sk.main_wallet}"
+        signature_error = _require_exact_wallet_signature(data, sk.main_wallet, expected)
+        if signature_error:
+            return signature_error
+        sk.nonce += 1
+        sk.revoked = True
+        sk.revoked_at = int(time.time())
+        _sk_store.save(sk)
+        _increment_metric("session_keys_revoked")
+        return jsonify({"ok": True, "nonce": sk.nonce}), 200
+
+    demo_error = _reject_demo_private_key(main_private_key)
+    if demo_error:
+        return demo_error
+    # Require wallet signature for revocation (no raw private key in request)
+    if not main_private_key or main_private_key.upper() in ("DEMO", "PLACEHOLDER", "TEST"):
+        # In demo mode: verify wallet address matches + optional signature
+        sk = _sk_store.get(key_id)
+        if not sk:
+            return jsonify({"error": f"未知 Session Key: {key_id}"}), 404
+        if data.get("main_wallet", "").lower() != sk.main_wallet.lower():
+            return jsonify({"error": "只有主钱包可以撤销 Session Key"}), 403
+        # Still require a valid signature if provided, even in demo
+        sig = data.get("signature", "")
+        msg = data.get("message", "")
+        if sig and msg:
+            if not _verify_wallet_signature(sk.main_wallet, msg, sig):
+                return jsonify({"error": "钱包签名验证失败"}), 403
         sk.nonce += 1
         sk.revoked = True
         sk.revoked_at = int(time.time())
@@ -1394,16 +1613,42 @@ def api_session_key_increase_quota(key_id):
     signer = SessionSigner(_sk_store)
 
     main_private_key = data.get("main_private_key", "")
+    if _is_protected_env():
+        sk = _sk_store.get(key_id)
+        if not sk:
+            return jsonify({"error": f"未知 Session Key: {key_id}"}), 404
+        if data.get("main_wallet", "").lower() != sk.main_wallet.lower():
+            return jsonify({"error": "只有主钱包可以提额"}), 403
+        additional = Decimal(str(data.get("additional_quota", "0")))
+        expected = (
+            f"CryptoMinds increase session key quota\n"
+            f"Key: {key_id}\n"
+            f"Additional: {additional}\n"
+            f"Wallet: {sk.main_wallet}"
+        )
+        signature_error = _require_exact_wallet_signature(data, sk.main_wallet, expected)
+        if signature_error:
+            return signature_error
+        sk.total_quota += additional
+        _sk_store.save(sk)
+        return jsonify({"ok": True, "total_quota": str(sk.total_quota)}), 200
+
     demo_error = _reject_demo_private_key(main_private_key)
     if demo_error:
         return demo_error
-    # Demo mode: skip ECDSA, just verify wallet matches
+    # Require wallet signature for quota increase (no raw private key in request)
     if not main_private_key or main_private_key.upper() in ("DEMO", "PLACEHOLDER", "TEST"):
         sk = _sk_store.get(key_id)
         if not sk:
             return jsonify({"error": f"未知 Session Key: {key_id}"}), 404
         if data.get("main_wallet", "").lower() != sk.main_wallet.lower():
             return jsonify({"error": "只有主钱包可以提额"}), 403
+        # Still require a valid signature if provided, even in demo
+        sig = data.get("signature", "")
+        msg = data.get("message", "")
+        if sig and msg:
+            if not _verify_wallet_signature(sk.main_wallet, msg, sig):
+                return jsonify({"error": "钱包签名验证失败"}), 403
         additional = Decimal(str(data.get("additional_quota", "0")))
         sk.total_quota += additional
         _sk_store.save(sk)
@@ -1431,55 +1676,119 @@ def api_session_keys_by_agent(agent_id):
 @app.route("/healthz", methods=["GET"])
 @limiter.exempt
 def health_check():
-    """健康检查"""
+    """健康检查 — includes DB and BSC RPC connectivity"""
     checks = {
         "status": "ok",
         "agents": {"registered": len(AgentRegistry._agents) if hasattr(AgentRegistry, '_agents') else 0},
         "channels": {"available": ChannelRegistry.list_all()},
         "gates": {"available": GateRegistry.list_all()},
     }
+
+    # Check database connectivity
+    db_ok = True
+    db_error = None
+    try:
+        store = _get_escrow_store()
+        if hasattr(store, 'ping'):
+            store.ping()
+    except Exception as e:
+        db_ok = False
+        db_error = str(e)
+    checks["database"] = {"status": "ok" if db_ok else "error", "error": db_error}
+
+    # Check BSC RPC connectivity
+    rpc_ok = True
+    rpc_error = None
+    rpc_block = None
+    try:
+        from web3 import Web3
+        from web3.middleware import ExtraDataToPOAMiddleware
+        w3 = Web3(Web3.HTTPProvider(BSC_RPC, request_kwargs={"timeout": 5}))
+        w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+        rpc_block = w3.eth.block_number
+    except Exception as e:
+        rpc_ok = False
+        rpc_error = str(e)[:100]
+    checks["bsc_rpc"] = {"status": "ok" if rpc_ok else "error", "error": rpc_error, "block_number": rpc_block}
+
+    overall = "ok" if db_ok and rpc_ok else "degraded"
+    http_status = 200 if overall == "ok" else 503
     return jsonify({
-        "status": "ok",
+        "status": overall,
         "version": "2.2.0",
         "timestamp": time.time(),
         "checks": checks,
-    })
+    }), http_status
 
-# ── Prometheus 指标 ────────────────────────────────────
+# ── Prometheus 指标 (prometheus_client) ────────────────────────────────────
 
-_metrics_counters = {
-    "agents_registered": 0,
-    "tasks_created": 0,
-    "tasks_completed": 0,
-    "tasks_verified": 0,
-    "credits_issued": 0,
-    "agent_buys": 0,
-    "escrow_created": 0,
-    "escrow_disputed": 0,
-    "escrow_released": 0,
-    "session_keys_created": 0,
-    "session_keys_revoked": 0,
-    "vouchers_created": 0,
-    "vouchers_activated": 0,
-    "vouchers_exhausted": 0,
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
+
+# Business counters
+METRIC_AGENTS_REGISTERED = Counter("cryptominds_python_agents_registered", "Agents registered")
+METRIC_TASKS_CREATED = Counter("cryptominds_python_tasks_created", "Tasks created")
+METRIC_TASKS_COMPLETED = Counter("cryptominds_python_tasks_completed", "Tasks completed")
+METRIC_TASKS_VERIFIED = Counter("cryptominds_python_tasks_verified", "Tasks verified")
+METRIC_CREDITS_ISSUED = Counter("cryptominds_python_credits_issued", "Credits issued")
+METRIC_AGENT_BUYS = Counter("cryptominds_python_agent_buys", "Agent buy operations")
+METRIC_ESCROW_CREATED = Counter("cryptominds_python_escrow_created", "Escrow orders created")
+METRIC_ESCROW_DISPUTED = Counter("cryptominds_python_escrow_disputed", "Escrow orders disputed")
+METRIC_ESCROW_RELEASED = Counter("cryptominds_python_escrow_released", "Escrow orders released")
+METRIC_SESSION_KEYS_CREATED = Counter("cryptominds_python_session_keys_created", "Session keys created")
+METRIC_SESSION_KEYS_REVOKED = Counter("cryptominds_python_session_keys_revoked", "Session Keys revoked")
+METRIC_VOUCHERS_CREATED = Counter("cryptominds_python_vouchers_created", "Vouchers created")
+METRIC_VOUCHERS_ACTIVATED = Counter("cryptominds_python_vouchers_activated", "Vouchers activated")
+METRIC_VOUCHERS_EXHAUSTED = Counter("cryptominds_python_vouchers_exhausted", "Vouchers exhausted")
+
+# Gauges
+METRIC_AGENTS_ONLINE = Gauge("cryptominds_python_agents_online", "Agents currently online")
+METRIC_MARKET_TASKS = Gauge("cryptominds_python_market_tasks", "Tasks in the market")
+
+# HTTP request metrics
+METRIC_HTTP_REQUESTS = Counter(
+    "cryptominds_python_http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
+)
+METRIC_HTTP_DURATION = Histogram(
+    "cryptominds_python_request_duration_seconds",
+    "HTTP request duration",
+    ["method", "path"],
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0],
+)
+
+# Map of metric names to prometheus_client objects
+_METRIC_MAP = {
+    "agents_registered": METRIC_AGENTS_REGISTERED,
+    "tasks_created": METRIC_TASKS_CREATED,
+    "tasks_completed": METRIC_TASKS_COMPLETED,
+    "tasks_verified": METRIC_TASKS_VERIFIED,
+    "credits_issued": METRIC_CREDITS_ISSUED,
+    "agent_buys": METRIC_AGENT_BUYS,
+    "escrow_created": METRIC_ESCROW_CREATED,
+    "escrow_disputed": METRIC_ESCROW_DISPUTED,
+    "escrow_released": METRIC_ESCROW_RELEASED,
+    "session_keys_created": METRIC_SESSION_KEYS_CREATED,
+    "session_keys_revoked": METRIC_SESSION_KEYS_REVOKED,
+    "vouchers_created": METRIC_VOUCHERS_CREATED,
+    "vouchers_activated": METRIC_VOUCHERS_ACTIVATED,
+    "vouchers_exhausted": METRIC_VOUCHERS_EXHAUSTED,
 }
 
 
 def _increment_metric(name: str):
-    _metrics_counters[name] = _metrics_counters.get(name, 0) + 1
+    metric = _METRIC_MAP.get(name)
+    if metric:
+        metric.inc()
 
 @app.route("/metrics", methods=["GET"])
 @limiter.exempt
 def metrics():
-    """Prometheus text format metrics"""
-    lines = []
-    for name, value in _metrics_counters.items():
-        lines.append(f"# TYPE cryptominds_python_{name} counter")
-        lines.append(f"cryptominds_python_{name} {value}")
-    lines.append(f"# TYPE cryptominds_python_agents_registered gauge")
-    lines.append(f"cryptominds_python_agents_online {len(AgentRegistry._agents)}")
-    lines.append(f"cryptominds_python_market_tasks {len(MARKET_TASKS)}")
-    return "\n".join(lines) + "\n", 200, {"Content-Type": "text/plain; version=0.0.4"}
+    """Prometheus metrics endpoint — uses prometheus_client library."""
+    # Update gauges before generating output
+    METRIC_AGENTS_ONLINE.set(len(AgentRegistry._agents))
+    METRIC_MARKET_TASKS.set(len(MARKET_TASKS))
+    return generate_latest(), 200, {"Content-Type": "text/plain; version=0.0.4"}
 
 
 # ── 启动 ────────────────────────────────────────────
@@ -1518,7 +1827,7 @@ def start_api(port=None, debug=None):
                     return self.application
 
             options = {
-                "bind": f"127.0.0.1:{port}",
+                "bind": f"{os.getenv('GUNICORN_HOST', '0.0.0.0')}:{port}",
                 "workers": int(os.getenv("GUNICORN_WORKERS", "2")),
                 "threads": int(os.getenv("GUNICORN_THREADS", "4")),
                 "timeout": 120,

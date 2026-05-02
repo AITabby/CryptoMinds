@@ -172,6 +172,19 @@ def _ensure_tables(conn):
         CREATE INDEX IF NOT EXISTS idx_voucher_agent ON vouchers(agent_id);
         CREATE INDEX IF NOT EXISTS idx_voucher_issuer ON vouchers(issuer_wallet);
         CREATE INDEX IF NOT EXISTS idx_voucher_state ON vouchers(state);
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id SERIAL PRIMARY KEY,
+            timestamp BIGINT NOT NULL,
+            action TEXT NOT NULL,
+            agent_id TEXT DEFAULT '',
+            wallet TEXT DEFAULT '',
+            target_id TEXT DEFAULT '',
+            details_json JSONB DEFAULT '{}',
+            result TEXT DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+        CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
     """)
     conn.commit()
     cur.close()

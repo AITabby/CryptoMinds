@@ -1,4 +1,4 @@
-.PHONY: test pytest node-test e2e start stop demo clean lint
+.PHONY: test pytest node-test e2e start stop demo clean lint deploy-staging deploy-prod deploy-stop
 
 # ── 测试 ──
 
@@ -28,6 +28,17 @@ stop:
 demo: stop
 	@echo "Starting in DEMO mode..."
 	bash demo.sh
+
+# ── 部署 ──
+
+deploy-staging:
+	bash scripts/deploy.sh staging
+
+deploy-prod:
+	bash scripts/deploy.sh prod
+
+deploy-stop:
+	docker-compose down
 
 # ── 清理 ──
 

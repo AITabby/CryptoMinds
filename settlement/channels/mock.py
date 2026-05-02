@@ -5,6 +5,7 @@ Mock 通道 - 内存模拟
 """
 
 import hashlib
+import threading
 import time
 from decimal import Decimal
 from typing import Dict, Optional, Tuple
@@ -36,6 +37,8 @@ class MockChannel(SettlementChannel):
     def __init__(self):
         # 内存余额表
         self._balances: Dict[str, Decimal] = {}
+        # Lock for escrow state transitions to prevent race conditions
+        self._escrow_lock = threading.Lock()
         # 内存托管表
         self._escrows: Dict[str, Dict] = {}
         # 交易历史
@@ -212,21 +215,21 @@ class MockChannel(SettlementChannel):
         self,
         escrow_id: str,
         to_address: str,
-        private_key: str
+        private_key: str = "",
     ) -> EscrowResult:
         """释放托管资金给卖家"""
+        with self._escrow_lock:
+            escrow = self._escrows.get(escrow_id)
+            if not escrow:
+                return EscrowResult(success=False, error="托管记录不存在")
 
-        escrow = self._escrows.get(escrow_id)
-        if not escrow:
-            return EscrowResult(success=False, error="托管记录不存在")
+            if escrow["status"] != "locked":
+                return EscrowResult(success=False, error=f"托管状态错误: {escrow['status']}")
 
-        if escrow["status"] != "locked":
-            return EscrowResult(success=False, error=f"托管状态错误: {escrow['status']}")
-
-        # 释放资金
-        to_addr = to_address.lower()
-        self._balances[to_addr] = self._balances.get(to_addr, Decimal("0")) + escrow["amount"]
-        escrow["status"] = "released"
+            # 释放资金
+            to_addr = to_address.lower()
+            self._balances[to_addr] = self._balances.get(to_addr, Decimal("0")) + escrow["amount"]
+            escrow["status"] = "released"
 
         tx_hash = "0x" + hashlib.sha256(f"{escrow_id}{time.time()}".encode()).hexdigest()[:64]
 
@@ -241,21 +244,21 @@ class MockChannel(SettlementChannel):
         self,
         escrow_id: str,
         to_address: str,
-        private_key: str
+        private_key: str = "",
     ) -> EscrowResult:
         """退款给买家"""
+        with self._escrow_lock:
+            escrow = self._escrows.get(escrow_id)
+            if not escrow:
+                return EscrowResult(success=False, error="托管记录不存在")
 
-        escrow = self._escrows.get(escrow_id)
-        if not escrow:
-            return EscrowResult(success=False, error="托管记录不存在")
+            if escrow["status"] != "locked":
+                return EscrowResult(success=False, error=f"托管状态错误: {escrow['status']}")
 
-        if escrow["status"] != "locked":
-            return EscrowResult(success=False, error=f"托管状态错误: {escrow['status']}")
-
-        # 退款给买家
-        buyer_addr = escrow["buyer"]
-        self._balances[buyer_addr] = self._balances.get(buyer_addr, Decimal("0")) + escrow["amount"]
-        escrow["status"] = "refunded"
+            # 退款给买家
+            buyer_addr = escrow["buyer"]
+            self._balances[buyer_addr] = self._balances.get(buyer_addr, Decimal("0")) + escrow["amount"]
+            escrow["status"] = "refunded"
 
         tx_hash = "0x" + hashlib.sha256(f"{escrow_id}{time.time()}".encode()).hexdigest()[:64]
 

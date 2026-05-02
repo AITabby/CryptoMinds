@@ -76,7 +76,7 @@ class ArbitrationEngine:
         elif decision == "split":
             # split resolution: 部分退款 + 部分释放
             # 验证分数决定比例: seller gets score * amount, buyer gets (1 - score) * amount
-            sm.transition("arbitrate_seller_win", timestamp=now, actor=arbiter, reason=reason)
+            sm.transition("arbitrate_split", timestamp=now, actor=arbiter, reason=reason)
             order.state = sm.state
             order.resolution = "split"
             order.resolution_reason = reason
@@ -106,8 +106,8 @@ class ArbitrationEngine:
 
         now = int(time.time())
 
-        # 信誉加权决定
-        if order.arbitration_weight_seller >= order.arbitration_weight_buyer:
+        # 信誉加权决定 — ties result in split resolution
+        if order.arbitration_weight_seller > order.arbitration_weight_buyer:
             sm = EscrowStateMachine(order.state)
             sm.transition("auto_resolve_seller_win", timestamp=now, actor="system",
                           reason="争议窗口超时，卖家信誉更高，自动胜出")
@@ -115,7 +115,7 @@ class ArbitrationEngine:
             order.resolution = "seller_win"
             order.resolution_reason = "auto: dispute window expired, seller reputation higher"
             order.resolved_at = now
-        else:
+        elif order.arbitration_weight_buyer > order.arbitration_weight_seller:
             sm = EscrowStateMachine(order.state)
             sm.transition("auto_resolve_buyer_win", timestamp=now, actor="system",
                           reason="争议窗口超时，买家信誉更高，自动胜出")
@@ -124,6 +124,14 @@ class ArbitrationEngine:
             order.resolution_reason = "auto: dispute window expired, buyer reputation higher"
             order.resolved_at = now
             self._slash_seller(order.seller_agent_id)
+        else:
+            sm = EscrowStateMachine(order.state)
+            sm.transition("auto_resolve_split", timestamp=now, actor="system",
+                          reason="争议窗口超时，信誉权重相等，50/50 分割")
+            order.state = sm.state
+            order.resolution = "split"
+            order.resolution_reason = "auto: dispute window expired, equal reputation, split 50/50"
+            order.resolved_at = now
 
         self._escrow_store.save(order)
         return {"ok": True, "resolution": order.resolution, "escrow_id": escrow_id}

@@ -107,8 +107,10 @@ VALID_TRANSITIONS: Dict[EscrowState, Dict[str, EscrowState]] = {
     EscrowState.DISPUTED: {
         "arbitrate_buyer_win": EscrowState.RESOLVED_REFUND,
         "arbitrate_seller_win": EscrowState.RESOLVED_RELEASE,
+        "arbitrate_split": EscrowState.RESOLVED_RELEASE,
         "auto_resolve_buyer_win": EscrowState.RESOLVED_REFUND,
         "auto_resolve_seller_win": EscrowState.RESOLVED_RELEASE,
+        "auto_resolve_split": EscrowState.RESOLVED_RELEASE,
     },
 }
 

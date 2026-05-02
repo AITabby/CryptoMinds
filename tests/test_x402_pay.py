@@ -37,12 +37,12 @@ class TestX402PaymentRequest:
         req = X402PaymentRequest("bsc", "BNB", "0xTO", 1000, "order-1", "desc")
         assert len(req.nonce) > 0
 
-    def test_sign_hmac_fallback(self):
-        """When eth_account is unavailable, sign falls back to HMAC."""
+    def test_sign_raises_runtime_error_without_eth_account(self):
+        """When eth_account is unavailable, sign raises RuntimeError (HMAC fallback removed)."""
         with patch.dict("sys.modules", {"eth_account": None, "eth_account.messages": None}):
             req = X402PaymentRequest("bsc", "BNB", "0xTO", 1000, "order-1", "desc", nonce="n")
-            sig = req.sign("0xPRIVATEKEY")
-            assert len(sig) > 0
+            with pytest.raises(RuntimeError, match="eth_account is required"):
+                req.sign("0xPRIVATEKEY")
 
 
 class TestX402PayTestMode:
