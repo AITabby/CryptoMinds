@@ -7,17 +7,16 @@ CryptoMinds x402 支付模块
 未来：跨链时扩展 USDC/SOL 等代币支付
 """
 
+import hashlib
+import json
 import os
+import time
+from typing import Dict, Tuple
+
+from config import BSC_RPC, load_wallets, get_wallet_key
 
 # 测试模式配置：默认真实链上模式，设 X402_TEST_MODE=true 才启用假交易
 TEST_MODE = os.getenv("X402_TEST_MODE", "false").lower() == "true"
-
-import json
-import time
-import hashlib
-from typing import Dict, Optional, Tuple
-
-from config import BSC_RPC, load_wallets, get_wallet_key
 
 # ── 当前：BNB 原生支付 ──
 NATIVE_TOKEN = "BNB"
@@ -124,7 +123,6 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
 
     返回: (success, tx_hash, payment_info)
     """
-    global TEST_MODE
     wallets = load_wallets()
 
     if from_name not in wallets:

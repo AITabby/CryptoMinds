@@ -16,7 +16,29 @@ jobs:
           python-version: "3.9"
           cache: pip
       - run: pip install flake8
-      - run: python3 -m flake8 --max-line-length=120 --exclude=node_modules,__pycache__,web/node_modules,build,agentpay_sdk .
+      - name: Lint changed Python files
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE="HEAD~1"
+          fi
+
+          files=$(git diff --name-only "$BASE" HEAD -- '*.py' \
+            | grep -Ev '(^|/)(node_modules|__pycache__|build|agentpay_sdk|web/node_modules)/' || true)
+
+          if [ -z "$files" ]; then
+            echo "No changed Python files to lint."
+            exit 0
+          fi
+
+          echo "$files" | xargs python3 -m flake8 --max-line-length=120
 
   pytest:
     runs-on: ubuntu-latest
