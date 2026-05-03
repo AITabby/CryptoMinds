@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-05-03 — 主网部署加固 + 测试基线更新
+
+- **主网部署路径加固**：Nginx/SSL 反代、Docker 内部端口隔离、生产环境显式 `CRYPTOMINDS_ENV=prod` 与 `DEMO_MODE=false`
+- **链上/本地状态一致性**：BSC Escrow release 与 dispute resolve 均改为链上确认成功后再落本地终态
+- **签名授权收口**：Session Key 生产路径改为主钱包签名授权，禁止主私钥进入后端；Voucher 写路径要求钱包签名
+- **测试基线**：`635 passed, 1 skipped` pytest，全量覆盖率 `70.75%`（达到 70% 门槛）；Node `10 passed`
+
 ## 2026-05-01 — Escrow 争议 + Session Key 授权 + 安全加固
 
 - **Escrow 状态机**：11 状态完整生命周期 (created → funded → executing → delivered → verified → released, 含争议/仲裁/超时分支)
@@ -13,7 +20,7 @@
 - **OpenAPI 3.0.0**：新增 Escrow/Session Key schema 和 admin_secret security scheme
 - **前端新增两个 tab**：争议仲裁 + Session Key 管理
 - **Node.js 数据层**：新增 escrow_orders/session_keys 表 + _migrate() 自动补列
-- **268 tests passing** (含 33 escrow + 26 session key + 22 integration + 4 task_closer dispute)
+- **635 pytest passing, 1 skipped**（当前总覆盖率 70.75%，Node 10 tests passing）
 
 ## 2026-04-18 — 智能合约上线 + 清理优化
 

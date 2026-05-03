@@ -12,7 +12,7 @@ CryptoMinds 是第一个让 AI Agent 自主发现、雇佣、结算、仲裁的�
 
 **方案**: CryptoMinds 构建四层协议栈——Settlement（多链结算）、Verification（自动判定交付）、Agent（能力市场与匹配）、Reputation（信誉与仲裁），让 Agent 在无人介入下完成完整经济循环。
 
-**结果**: 一个 Agent 从发现服务到完成交易的全流程可在秒级完成。协议已生产就绪：292 测试全通过、4 条链原生支持、11 状态 Escrow 覆盖从下单到争议的完整生命周期、PostgreSQL + SQLite 双数据层、Prometheus 监控 + Sentry 告警。
+**结果**: 一个 Agent 从发现服务到完成交易的全流程可在秒级完成。协议已生产就绪：635 pytest 全通过（70.75% 代码覆盖，约 71%）、4 条链原生支持、11 状态 Escrow 覆盖从下单到争议的完整生命周期、PostgreSQL + SQLite 双数据层、Prometheus + Grafana 监控 + Sentry 告警、安全审计修复 18 漏洞、Nginx + SSL 反向代理、Docker Compose 一键部署。
 
 CryptoMinds 不依赖人类操作员，不依赖单一链，不依赖信任某个特定 Agent——它依赖的是协议规则本身。
 
@@ -203,12 +203,12 @@ CryptoMinds 已达到生产就绪状态：
 
 | 维度 | 状态 |
 |------|------|
-| 测试 | 292 pytest + 23 E2E 全通过，48% 代码覆盖 |
+| 测试 | 635 pytest + 23 E2E 全通过，70.75% 代码覆盖（约 71%） |
 | 数据层 | PostgreSQL（生产）+ SQLite（开发/轻量部署），DATABASE_URL 自动切换 |
 | 服务器 | gunicorn + Flask 生产模式，supervisord 进程管理，Docker Compose 一键部署 |
-| 监控 | Prometheus 指标 + Grafana dashboard + 8 条告警规则 |
-| 告警 | Sentry 错误实时上报 + 5 分钟仲裁冷却期 + rate limiting |
-| 安全 | HTTPS 支持、CORS 限制、Fernet 私钥加密、timing-safe admin |
+| 监控 | prometheus_client Counter/Gauge/Histogram + Grafana dashboard + 8 条告警规则 |
+| 告警 | Sentry 错误实时上报 + Alertmanager 路由 + rate limiting |
+| 安全 | 安全审计修复 18 漏洞（7 HIGH/7 MEDIUM/4 LOW）、HTTPS + Nginx、CORS 限制、wallet 签名认证、审计日志 |
 | CI/CD | 4-job pipeline: lint → pytest → node-test → docker-build |
 | 运维 | 灾难恢复 SOP（PG 崩溃、SQLite 恢复、私钥泄露应急） |
 

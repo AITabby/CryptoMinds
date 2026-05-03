@@ -1094,9 +1094,9 @@ Escrow 托管改变了买卖双方的博弈结构：
 
 | 类型 | 数量 | 覆盖 |
 |------|------|------|
-| pytest 单元测试 | 292 | 50% 代码覆盖, 40% 门槛 |
+| pytest 单元测试 | 635 passed, 1 skipped | 70.75% 代码覆盖, 70% 门槛 |
 | E2E 测试 | 23 | 全正向路径 + 争议 + 安全 |
-| node:test | 8 | SQLite + API + 端口 |
+| node:test | 10 | SQLite + API + 端口 |
 
 ## 附录 B: 数据层 Schema
 

@@ -162,7 +162,7 @@ make e2e        # end-to-end test script
 make lint       # flake8
 ```
 
-Current local baseline: `294 passed, 1 skipped` for Python tests and `10 passed` for Node tests.
+Current local baseline: `635 passed, 1 skipped` for Python tests with `70.75%` total coverage, plus `10 passed` for Node tests.
 
 ---
 
