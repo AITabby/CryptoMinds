@@ -39,8 +39,8 @@ WORKDIR /app/web
 RUN npm install --production
 WORKDIR /app
 
-# Expose ports
-EXPOSE 3457 3458 5001 5002 5003 5004
+# Expose ports — web API (Node) + Python API
+EXPOSE 3457 3458
 
 # Do NOT copy secrets into image
 # wallets.json, .env, web/cryptominds.db are injected via volumes/env/secrets

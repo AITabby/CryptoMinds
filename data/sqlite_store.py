@@ -150,6 +150,7 @@ def _ensure_tables(conn: sqlite3.Connection):
             channel_id TEXT,
             chain TEXT DEFAULT 'bsc',
             on_chain_order_id TEXT,
+            chain_synced INTEGER DEFAULT 1,
             state TEXT DEFAULT 'created',
             created_at INTEGER,
             funded_at INTEGER,
@@ -174,6 +175,7 @@ def _ensure_tables(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_escrow_task ON escrow_orders(task_id);
         CREATE INDEX IF NOT EXISTS idx_escrow_seller ON escrow_orders(seller_wallet);
         CREATE INDEX IF NOT EXISTS idx_escrow_state ON escrow_orders(state);
+
 
         CREATE TABLE IF NOT EXISTS session_keys (
             session_key_id TEXT PRIMARY KEY,
@@ -253,6 +255,13 @@ def _migrate(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE performance_records ADD COLUMN disputed INTEGER DEFAULT 0")
         conn.execute("ALTER TABLE performance_records ADD COLUMN dispute_reason TEXT DEFAULT ''")
         conn.execute("ALTER TABLE performance_records ADD COLUMN resolution TEXT DEFAULT ''")
+        conn.commit()
+
+    # Check if chain_synced column exists in escrow_orders
+    try:
+        conn.execute("SELECT chain_synced FROM escrow_orders LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE escrow_orders ADD COLUMN chain_synced INTEGER DEFAULT 1")
         conn.commit()
 
 
@@ -684,6 +693,7 @@ class SqliteEscrowStore:
             channel_id=row["channel_id"] or "",
             chain=row["chain"] or "bsc",
             on_chain_order_id=row["on_chain_order_id"] or None,
+            chain_synced=bool(row["chain_synced"] if "chain_synced" in row.keys() else 1),
             state=EscrowState(row["state"] or "created"),
             created_at=row["created_at"] or 0,
             funded_at=row["funded_at"] or 0,
@@ -717,6 +727,7 @@ class SqliteEscrowStore:
             "channel_id": order.channel_id,
             "chain": order.chain,
             "on_chain_order_id": order.on_chain_order_id or "",
+            "chain_synced": int(order.chain_synced),
             "state": order.state.value,
             "created_at": order.created_at,
             "funded_at": order.funded_at,

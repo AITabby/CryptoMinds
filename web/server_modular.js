@@ -43,8 +43,13 @@ const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:3458';
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || '';
 const MINIMAX_BASE_URL = 'https://api.minimaxi.com/v1';
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
-const DEMO_WALLET = process.env.DEMO_WALLET || '0xd2f899ce74320aef9d8f2359183232a554f4c0e1';
-const DEPOSIT_POOL_ADDRESS = process.env.DEPOSIT_POOL_ADDRESS || '0x287A44aAADDB78CA67EffCD94E83046353723862';
+const DEMO_WALLET = process.env.DEMO_WALLET || '';
+const DEPOSIT_POOL_ADDRESS = process.env.DEPOSIT_POOL_ADDRESS || '';
+
+if (!DEPOSIT_POOL_ADDRESS && process.env.CRYPTOMINDS_ENV === 'prod') {
+  console.error('FATAL: DEPOSIT_POOL_ADDRESS is not set. Refusing to start.');
+  process.exit(1);
+}
 const PYTHON_BIN = process.env.PYTHON_BIN || 'python3';
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';

@@ -101,8 +101,8 @@ def buy_on_fourmeme(seller_key, seller_addr, buyer_addr, token_addr, bnb_amount)
     
     funds_wei = w3.to_wei(bnb_amount, 'ether')
     nonce = w3.eth.get_transaction_count(seller_addr)
-    # four.meme 当前脚本里没有可靠 quote ABI，先避免把 minAmount 彻底设为 0。
-    min_amount = 1
+    # four.meme 没有 quote ABI，用 BNB 投入量估算 minAmount 作为滑点保护
+    min_amount = apply_slippage(funds_wei)
     
     # origin=0 表示标准买币
     tx = mgr.functions.buyTokenAMAP(

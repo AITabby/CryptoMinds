@@ -3,6 +3,7 @@
 import json
 import os
 import time
+import atexit
 import hashlib
 from decimal import Decimal
 from typing import Dict, List, Optional
@@ -16,6 +17,15 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 # ── Connection pool ────────────────────────────────────────
 
 _pool: Optional[pool.SimpleConnectionPool] = None
+
+
+def _close_pool():
+    global _pool
+    if _pool is not None and not _pool.closed:
+        _pool.closeall()
+
+
+atexit.register(_close_pool)
 
 
 def _get_pool(url: str = None) -> pool.SimpleConnectionPool:
@@ -99,6 +109,7 @@ def _ensure_tables(conn):
             channel_id TEXT,
             chain TEXT DEFAULT 'bsc',
             on_chain_order_id TEXT,
+            chain_synced INTEGER DEFAULT 1,
             state TEXT DEFAULT 'created',
             created_at INTEGER,
             funded_at INTEGER,
@@ -122,6 +133,15 @@ def _ensure_tables(conn):
         CREATE INDEX IF NOT EXISTS idx_escrow_task ON escrow_orders(task_id);
         CREATE INDEX IF NOT EXISTS idx_escrow_seller ON escrow_orders(seller_wallet);
         CREATE INDEX IF NOT EXISTS idx_escrow_state ON escrow_orders(state);
+    """)
+
+    # Migration: add chain_synced if missing
+    try:
+        cur.execute("SELECT chain_synced FROM escrow_orders LIMIT 1")
+    except Exception:
+        cur.execute("ALTER TABLE escrow_orders ADD COLUMN chain_synced INTEGER DEFAULT 1")
+
+    cur.execute("""
 
         CREATE TABLE IF NOT EXISTS session_keys (
             session_key_id TEXT PRIMARY KEY,
@@ -622,6 +642,7 @@ class PgEscrowStore:
             channel_id=row_dict.get("channel_id", ""),
             chain=row_dict.get("chain", "bsc"),
             on_chain_order_id=row_dict.get("on_chain_order_id") or None,
+            chain_synced=bool(row_dict.get("chain_synced", 1)),
             state=EscrowState(row_dict.get("state") or "created"),
             created_at=row_dict.get("created_at") or 0,
             funded_at=row_dict.get("funded_at") or 0,
@@ -652,7 +673,7 @@ class PgEscrowStore:
         cur.execute("""
             INSERT INTO escrow_orders (
                 escrow_id, task_id, order_id, buyer_wallet, seller_wallet, seller_agent_id,
-                amount, channel_id, chain, on_chain_order_id, state,
+                amount, channel_id, chain, on_chain_order_id, chain_synced, state,
                 created_at, funded_at, delivered_at, verified_at, disputed_at, resolved_at,
                 seller_timeout_at, buyer_timeout_at,
                 dispute_reason, dispute_initiator,
@@ -660,10 +681,10 @@ class PgEscrowStore:
                 resolution, resolution_reason,
                 verification_score, verification_threshold, dispute_window_seconds, evidence
             ) VALUES (
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
             ) ON CONFLICT(escrow_id) DO UPDATE SET
                 task_id=%s, order_id=%s, buyer_wallet=%s, seller_wallet=%s, seller_agent_id=%s,
-                amount=%s, channel_id=%s, chain=%s, on_chain_order_id=%s, state=%s,
+                amount=%s, channel_id=%s, chain=%s, on_chain_order_id=%s, chain_synced=%s, state=%s,
                 funded_at=%s, delivered_at=%s, verified_at=%s, disputed_at=%s, resolved_at=%s,
                 seller_timeout_at=%s, buyer_timeout_at=%s,
                 dispute_reason=%s, dispute_initiator=%s,
@@ -674,7 +695,7 @@ class PgEscrowStore:
             order.escrow_id, order.task_id, order.order_id, order.buyer_wallet,
             order.seller_wallet, order.seller_agent_id, str(order.amount),
             order.channel_id, order.chain, order.on_chain_order_id or "",
-            order.state.value, order.created_at, order.funded_at, order.delivered_at,
+            int(order.chain_synced), order.state.value, order.created_at, order.funded_at, order.delivered_at,
             order.verified_at, order.disputed_at, order.resolved_at,
             order.seller_timeout_at, order.buyer_timeout_at,
             order.dispute_reason, order.dispute_initiator,
@@ -685,7 +706,7 @@ class PgEscrowStore:
             # update values
             order.task_id, order.order_id, order.buyer_wallet, order.seller_wallet,
             order.seller_agent_id, str(order.amount), order.channel_id, order.chain,
-            order.on_chain_order_id or "", order.state.value,
+            order.on_chain_order_id or "", int(order.chain_synced), order.state.value,
             order.funded_at, order.delivered_at, order.verified_at,
             order.disputed_at, order.resolved_at,
             order.seller_timeout_at, order.buyer_timeout_at,

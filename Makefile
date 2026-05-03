@@ -1,4 +1,4 @@
-.PHONY: test pytest node-test e2e start stop demo clean lint deploy-staging deploy-prod deploy-stop
+.PHONY: test pytest node-test e2e start stop demo clean lint deploy-staging deploy-prod deploy-stop compile-contracts deploy-escrow deploy-escrow-v2 deploy-multisig
 
 # ── 测试 ──
 
@@ -55,8 +55,20 @@ lint:
 
 # ── 合约 ──
 
+compile-contracts:
+	npx solcjs --bin --abi --optimize -o build contracts/ServiceEscrow.sol
+	npx solcjs --bin --abi --optimize -o build contracts/ServiceEscrowV2.sol
+	npx solcjs --bin --abi --optimize -o build contracts/MultiSigEscrowArbiter.sol
+	@echo "All contracts compiled → build/"
+
 deploy-escrow:
 	node scripts/deploy_service_escrow.js
+
+deploy-escrow-v2:
+	node scripts/deploy_service_escrow_v2.js
+
+deploy-multisig:
+	node scripts/deploy_multisig_arbiter.js
 
 # ── 数据库迁移 ──
 

@@ -5,6 +5,8 @@ web/node_modules/
 # Secrets
 wallets.json
 .env
+environments/.env.prod
+environments/.env.staging
 
 # Runtime data
 orders.json

@@ -788,14 +788,53 @@ def api_escrow_dispute(escrow_id):
 @app.route("/api/v1/escrow/<escrow_id>/resolve", methods=["POST"])
 @limiter.shared_limit("10 per minute", scope="admin")
 def api_escrow_resolve(escrow_id):
-    """管理员仲裁争议 (需 X-Admin-Secret)"""
-    error, _ = verify_admin_secret()
-    if error:
-        return error
-
+    """仲裁争议 — 支持 X-Admin-Secret（单管理员）或 arbiter_wallet 签名（多签）"""
     data = request.get_json()
     if not data:
         return jsonify({"error": "缺少请求体"}), 400
+
+    # Check auth: admin secret OR arbiter wallet signature
+    is_admin = False
+    admin_error, _ = verify_admin_secret()
+    if not admin_error:
+        is_admin = True
+
+    arbiter_wallet = data.get("arbiter_wallet", "")
+    arbiter_signature = data.get("arbiter_signature", "")
+    arbiter_message = data.get("arbiter_message", "")
+    arbiter_signatures = data.get("arbiter_signatures", [])  # [{wallet, signature, message}, ...]
+    is_arbiter = False
+    confirmed_arbiters = []
+
+    configured_arbiters = [a.strip().lower() for a in os.getenv("ARBITER_WALLETS", "").split(",") if a.strip()]
+    required_confirmations = max(2, len(configured_arbiters) // 2 + 1) if configured_arbiters else 2
+    decision = data.get("decision", "")
+
+    # Collect valid arbiter signatures — multi-sig: require M-of-N
+    # Support both single arbiter_wallet/signature and arbiter_signatures array
+    sigs_to_check = []
+    if arbiter_wallet and arbiter_signature and arbiter_message:
+        sigs_to_check.append({"wallet": arbiter_wallet, "signature": arbiter_signature, "message": arbiter_message})
+    sigs_to_check.extend(arbiter_signatures)
+
+    for sig in sigs_to_check:
+        w, s, m = sig.get("wallet", ""), sig.get("signature", ""), sig.get("message", "")
+        if not w or not s or not m:
+            continue
+        expected_prefix = f"CryptoMinds arbitration\nEscrow: {escrow_id}\nDecision: {decision}"
+        if not m.startswith(expected_prefix):
+            continue
+        if _verify_wallet_signature(w, m, s):
+            if w.lower() in configured_arbiters:
+                confirmed_arbiters.append(w.lower())
+
+    # Deduplicate — same arbiter signing twice doesn't count
+    confirmed_arbiters = list(set(confirmed_arbiters))
+    if len(confirmed_arbiters) >= required_confirmations:
+        is_arbiter = True
+
+    if not is_admin and not is_arbiter:
+        return jsonify({"error": "需要管理员密钥 (X-Admin-Secret) 或仲裁员签名"}), 403
 
     _escrow_store = _get_escrow_store()
     _record_store = _get_record_store()
@@ -812,6 +851,8 @@ def api_escrow_resolve(escrow_id):
         return jsonify({"error": f"仲裁等待期未满: 还需 {remaining} 秒"}), 400
 
     decision = data.get("decision", "")
+    on_chain_result = None
+
     if order.on_chain_order_id and order.channel_id == "bsc-native":
         if decision == "split":
             return jsonify({"error": "bsc-native 当前不支持链上 split 仲裁，请选择 buyer_win 或 seller_win"}), 400
@@ -847,13 +888,14 @@ def api_escrow_resolve(escrow_id):
     engine = ArbitrationEngine(_escrow_store, _record_store, AgentRegistry)
     result = engine.resolve_dispute(
         escrow_id=escrow_id,
-        arbiter=data.get("arbiter", "admin"),
+        arbiter=arbiter_wallet if is_arbiter else data.get("arbiter", "admin"),
         decision=decision,
         reason=data.get("reason", ""),
     )
     if result.get("ok"):
-        if order.on_chain_order_id and order.channel_id == "bsc-native":
+        if on_chain_result:
             result["on_chain_tx"] = on_chain_result.tx_hash
+        result["arbiter_type"] = "arbiter" if is_arbiter else "admin"
         return jsonify(result), 200
     return jsonify(result), 400
 
@@ -950,6 +992,7 @@ def api_escrow_fund_confirm(escrow_id):
     order.state = sm.state
     order.funded_at = int(time.time())
     order.on_chain_order_id = on_chain_order_id
+    order.seller_timeout_at = int(time.time()) + data.get("seller_timeout_seconds", 1800)
 
     _escrow_store.save(order)
     return jsonify({"ok": True, "escrow_id": escrow_id, "state": order.state.value}), 200
@@ -983,6 +1026,7 @@ def api_escrow_seller_accept(escrow_id):
         return jsonify({"error": str(e)}), 400
 
     order.state = sm.state
+    order.seller_timeout_at = int(time.time()) + data.get("seller_timeout_seconds", 1800)
     _escrow_store.save(order)
     return jsonify({"ok": True, "escrow_id": escrow_id, "state": order.state.value}), 200
 
@@ -1016,6 +1060,7 @@ def api_escrow_deliver(escrow_id):
 
     order.state = sm.state
     order.delivered_at = int(time.time())
+    order.buyer_timeout_at = int(time.time()) + data.get("buyer_timeout_seconds", 86400)
     if data.get("evidence"):
         order.verification_evidence = data.get("evidence", {})
 
@@ -1183,6 +1228,143 @@ def api_escrow_release(escrow_id):
     response = {"ok": True, "escrow_id": escrow_id, "state": order.state.value}
     if release_details:
         response["release_details"] = release_details
+    return jsonify(response), 200
+
+
+def _execute_chain_claim(order, action):
+    """Execute on-chain timeout claim. Returns (success, tx_hash_or_error)."""
+    if order.channel_id != "bsc-native" or not order.on_chain_order_id:
+        return True, None  # no on-chain component
+    admin_key = os.getenv("ADMIN_PRIVATE_KEY", "")
+    if not admin_key:
+        return False, "ADMIN_PRIVATE_KEY 未配置，无法执行链上 claim"
+    try:
+        from settlement.channels.bsc_native import BSCNativeChannel
+        from web3 import Web3
+        channel = BSCNativeChannel()
+        if not admin_key.startswith("0x"):
+            admin_key = "0x" + admin_key
+        result = channel.escrow_prepare_contract_call(
+            action=action,
+            on_chain_order_id=order.on_chain_order_id,
+        )
+        if not result.get("method") == action:
+            return False, f"合约调用参数异常: {result}"
+        contract_address = result["contract_address"]
+        abi = result["abi"]
+        admin_account = channel.w3.eth.account.from_key(admin_key)
+        tx = channel.w3.eth.contract(
+            address=Web3.to_checksum_address(contract_address),
+            abi=abi,
+        ).functions[action](
+            Web3.to_bytes(hexstr=order.on_chain_order_id)
+            if order.on_chain_order_id.startswith("0x")
+            else Web3.to_bytes(text=order.on_chain_order_id)
+        ).build_transaction({
+            'from': admin_account.address,
+            'nonce': channel.w3.eth.get_transaction_count(admin_account.address),
+            'gas': 100000,
+            'gasPrice': channel.w3.eth.gas_price,
+            'chainId': 56,
+        })
+        signed = channel.w3.eth.account.sign_transaction(tx, admin_key)
+        raw_tx = getattr(signed, 'raw_transaction', None) or getattr(signed, 'rawTransaction')
+        tx_hash = channel.w3.eth.send_raw_transaction(raw_tx)
+        receipt = channel.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        if receipt.status == 1:
+            return True, tx_hash.hex()
+        return False, f"链上交易 revert: {tx_hash.hex()}"
+    except Exception as e:
+        return False, str(e)
+
+
+@app.route("/api/v1/escrow/<escrow_id>/claim-seller-timeout", methods=["POST"])
+@require_auth
+def api_escrow_claim_seller_timeout(escrow_id):
+    """卖家超时，FUNDED/EXECUTING → REFUNDED_TIMEOUT（链上优先）"""
+    _escrow_store = _get_escrow_store()
+    order = _escrow_store.get(escrow_id)
+    if not order:
+        return jsonify({"error": f"未知 Escrow: {escrow_id}"}), 404
+
+    from settlement.escrow_state import EscrowStateMachine, InvalidTransitionError, EscrowState
+    if order.state not in (EscrowState.FUNDED, EscrowState.EXECUTING):
+        return jsonify({"error": f"当前状态 {order.state.value} 不支持卖家超时"}), 400
+
+    now = int(time.time())
+    if not order.seller_timeout_at or now < order.seller_timeout_at:
+        return jsonify({"error": "卖家超时尚未到期或未设置"}), 400
+
+    # Chain first: if on-chain order exists, execute claim before changing local state
+    chain_ok, chain_detail = _execute_chain_claim(order, "claimSellerTimeout")
+    if not chain_ok:
+        order.chain_synced = False
+        _escrow_store.save(order)
+        _write_audit_log("escrow_seller_timeout_failed", target_id=escrow_id,
+                         wallet=order.seller_wallet, result="chain_claim_failed",
+                         details={"error": chain_detail})
+        return jsonify({"error": f"链上 claim 失败，本地状态保持不变: {chain_detail}"}), 502
+
+    sm = EscrowStateMachine(order.state)
+    try:
+        sm.transition("seller_timeout", timestamp=now, actor="system",
+                      reason="seller delivery timeout (manual claim)")
+    except InvalidTransitionError as e:
+        return jsonify({"error": str(e)}), 400
+
+    order.state = sm.state
+    order.chain_synced = True
+    _escrow_store.save(order)
+    _write_audit_log("escrow_seller_timeout", target_id=escrow_id,
+                     wallet=order.seller_wallet, result="refunded_timeout")
+    response = {"ok": True, "escrow_id": escrow_id, "state": order.state.value}
+    if chain_detail:
+        response["on_chain_tx"] = chain_detail
+    return jsonify(response), 200
+
+
+@app.route("/api/v1/escrow/<escrow_id>/claim-buyer-timeout", methods=["POST"])
+@require_auth
+def api_escrow_claim_buyer_timeout(escrow_id):
+    """买家确认超时，DELIVERED → EXPIRED（链上优先）"""
+    _escrow_store = _get_escrow_store()
+    order = _escrow_store.get(escrow_id)
+    if not order:
+        return jsonify({"error": f"未知 Escrow: {escrow_id}"}), 404
+
+    from settlement.escrow_state import EscrowStateMachine, InvalidTransitionError, EscrowState
+    if order.state != EscrowState.DELIVERED:
+        return jsonify({"error": f"当前状态 {order.state.value} 不支持买家超时"}), 400
+
+    now = int(time.time())
+    if not order.buyer_timeout_at or now < order.buyer_timeout_at:
+        return jsonify({"error": "买家超时尚未到期或未设置"}), 400
+
+    # Chain first: if on-chain order exists, execute claim before changing local state
+    chain_ok, chain_detail = _execute_chain_claim(order, "claimBuyerTimeout")
+    if not chain_ok:
+        order.chain_synced = False
+        _escrow_store.save(order)
+        _write_audit_log("escrow_buyer_timeout_failed", target_id=escrow_id,
+                         wallet=order.buyer_wallet, result="chain_claim_failed",
+                         details={"error": chain_detail})
+        return jsonify({"error": f"链上 claim 失败，本地状态保持不变: {chain_detail}"}), 502
+
+    sm = EscrowStateMachine(order.state)
+    try:
+        sm.transition("buyer_timeout", timestamp=now, actor="system",
+                      reason="buyer confirmation timeout (manual claim)")
+    except InvalidTransitionError as e:
+        return jsonify({"error": str(e)}), 400
+
+    order.state = sm.state
+    order.chain_synced = True
+    _escrow_store.save(order)
+    _write_audit_log("escrow_buyer_timeout", target_id=escrow_id,
+                     wallet=order.buyer_wallet, result="expired")
+    response = {"ok": True, "escrow_id": escrow_id, "state": order.state.value}
+    if chain_detail:
+        response["on_chain_tx"] = chain_detail
     return jsonify(response), 200
 
 
@@ -1493,9 +1675,8 @@ def api_session_key_create():
     if demo_error:
         return demo_error
     if not main_private_key or main_private_key.upper() in ("DEMO", "PLACEHOLDER", "TEST"):
-        main_private_key = "0x" + hashlib.sha256(
-            f"{data.get('main_wallet', '')}:{data.get('agent_id', '')}:{int(time.time())}".encode()
-        ).hexdigest()
+        import secrets as _secrets
+        main_private_key = "0x" + _secrets.token_hex(32)
 
     _sk_store = _get_session_key_store()
     signer = SessionSigner(_sk_store)
@@ -1526,7 +1707,6 @@ def api_session_key_create():
 def api_session_key_get(key_id):
     """获取 Session Key 信息"""
     _sk_store = _get_session_key_store()
-    _sk_store = _get_session_key_store()
     sk = _sk_store.get(key_id)
     if not sk:
         return jsonify({"error": f"未知 Session Key: {key_id}"}), 404
@@ -1542,7 +1722,6 @@ def api_session_key_revoke(key_id):
         return jsonify({"error": "缺少请求体"}), 400
 
     from auth.session_signer import SessionSigner
-    _sk_store = _get_session_key_store()
     _sk_store = _get_session_key_store()
     signer = SessionSigner(_sk_store)
 
@@ -1609,7 +1788,6 @@ def api_session_key_increase_quota(key_id):
 
     from auth.session_signer import SessionSigner
     _sk_store = _get_session_key_store()
-    _sk_store = _get_session_key_store()
     signer = SessionSigner(_sk_store)
 
     main_private_key = data.get("main_private_key", "")
@@ -1668,7 +1846,6 @@ def api_session_key_increase_quota(key_id):
 @app.route("/api/v1/session-keys/agent/<agent_id>", methods=["GET"])
 def api_session_keys_by_agent(agent_id):
     """获取 Agent 的活跃 Session Keys"""
-    _sk_store = _get_session_key_store()
     _sk_store = _get_session_key_store()
     keys = _sk_store.get_by_agent(agent_id)
     return jsonify({"ok": True, "keys": [k.to_dict() for k in keys]}), 200
@@ -1807,6 +1984,16 @@ def start_api(port=None, debug=None):
     start_backup_thread(db_path)
     register_shutdown_checkpoint(db_path)
 
+    # Start Escrow Watchdog (auto-trigger timeout state transitions)
+    from escrow.watchdog import EscrowWatchdog
+    _watchdog = EscrowWatchdog(
+        _get_escrow_store(),
+        _get_record_store(),
+        AgentRegistry,
+        check_interval=int(os.getenv("WATCHDOG_INTERVAL", "60")),
+    )
+    _watchdog.start()
+
     # Production: use gunicorn if available and not in debug mode
     if not debug:
         try:
@@ -1834,7 +2021,10 @@ def start_api(port=None, debug=None):
                 "accesslog": "-",
                 "errorlog": "-",
             }
-            print(f"[production] gunicorn启动: bind=127.0.0.1:{port}, workers={options['workers']}, threads={options['threads']}")
+            print(
+                f"[production] gunicorn启动: bind={options['bind']}, "
+                f"workers={options['workers']}, threads={options['threads']}"
+            )
             StandaloneApplication(app, options).run()
             return
         except ImportError:

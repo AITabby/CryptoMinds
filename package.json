@@ -1,5 +1,5 @@
 {
-  "dependencies": {
-    "solc": "^0.8.20"
+  "devDependencies": {
+    "solc": "^0.8.35"
   }
 }

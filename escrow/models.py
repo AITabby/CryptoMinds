@@ -27,6 +27,7 @@ class EscrowOrder:
     channel_id: str
     chain: str = "bsc"
     on_chain_order_id: Optional[str] = None  # bytes32 from ServiceEscrow.sol
+    chain_synced: bool = True  # False if DB state changed but on-chain state not yet updated
 
     # State machine
     state: EscrowState = EscrowState.CREATED
@@ -70,6 +71,7 @@ class EscrowOrder:
             "channel_id": self.channel_id,
             "chain": self.chain,
             "on_chain_order_id": self.on_chain_order_id,
+            "chain_synced": self.chain_synced,
             "state": self.state.value,
             "created_at": self.created_at,
             "funded_at": self.funded_at,

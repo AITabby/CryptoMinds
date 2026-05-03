@@ -290,3 +290,92 @@ class TestSessionKeyLifecycle:
     def test_create_task_missing_fields(self, client, auth):
         r = client.post("/api/v1/tasks/create", headers=auth, json={})
         assert r.status_code in (400, 500)
+
+
+# ── Claim Timeout endpoints ──
+
+class TestClaimTimeoutEndpoints:
+
+    def test_claim_seller_timeout_not_found(self, client, auth):
+        r = client.post("/api/v1/escrow/nonexistent/claim-seller-timeout",
+                        headers=auth, json={})
+        assert r.status_code == 404
+
+    def test_claim_buyer_timeout_not_found(self, client, auth):
+        r = client.post("/api/v1/escrow/nonexistent/claim-buyer-timeout",
+                        headers=auth, json={})
+        assert r.status_code == 404
+
+    def test_claim_seller_timeout_wrong_state(self, client, auth):
+        """Create escrow in CREATED state → claim-seller-timeout should reject."""
+        r = client.post("/api/v1/escrow/create", headers=auth,
+                        json={"buyer_wallet": "0xB", "seller_wallet": "0xS",
+                              "amount": 0.01, "order_id": "o-claim-1"})
+        if r.status_code not in (200, 201):
+            pytest.skip("escrow create failed")
+        eid = r.get_json().get("escrow_id", "")
+        if not eid:
+            pytest.skip("no escrow_id in response")
+        r2 = client.post(f"/api/v1/escrow/{eid}/claim-seller-timeout",
+                         headers=auth, json={})
+        # CREATED state should reject (not FUNDED/EXECUTING)
+        assert r2.status_code in (400, 404)
+
+    def test_claim_buyer_timeout_wrong_state(self, client, auth):
+        """Create escrow in CREATED state → claim-buyer-timeout should reject."""
+        r = client.post("/api/v1/escrow/create", headers=auth,
+                        json={"buyer_wallet": "0xB", "seller_wallet": "0xS",
+                              "amount": 0.01, "order_id": "o-claim-2"})
+        if r.status_code not in (200, 201):
+            pytest.skip("escrow create failed")
+        eid = r.get_json().get("escrow_id", "")
+        if not eid:
+            pytest.skip("no escrow_id in response")
+        r2 = client.post(f"/api/v1/escrow/{eid}/claim-buyer-timeout",
+                         headers=auth, json={})
+        # CREATED state should reject (not DELIVERED)
+        assert r2.status_code in (400, 404)
+
+    def test_claim_seller_timeout_no_auth(self, client):
+        """Without auth header, should be rejected."""
+        r = client.post("/api/v1/escrow/e1/claim-seller-timeout", json={})
+        assert r.status_code == 403
+
+    def test_claim_buyer_timeout_no_auth(self, client):
+        """Without auth header, should be rejected."""
+        r = client.post("/api/v1/escrow/e1/claim-buyer-timeout", json={})
+        assert r.status_code == 403
+
+
+# ── Arbiter resolve endpoint ──
+
+class TestArbiterResolveEndpoint:
+
+    def test_resolve_no_auth(self, client):
+        """Resolve without admin secret or arbiter sig should be 403."""
+        r = client.post("/api/v1/escrow/nonexistent/resolve",
+                        json={"decision": "refund"})
+        assert r.status_code == 403
+
+    def test_resolve_missing_body(self, client, auth):
+        """Resolve with auth but no JSON body should fail."""
+        r = client.post("/api/v1/escrow/nonexistent/resolve",
+                        headers=auth, content_type="application/json")
+        assert r.status_code in (400, 403, 404)
+
+    def test_resolve_nonexistent_escrow(self, client, auth):
+        """Resolve a non-existent escrow should be 404 (after auth)."""
+        r = client.post("/api/v1/escrow/nonexistent/resolve",
+                        headers=auth, json={"decision": "refund"})
+        assert r.status_code in (400, 403, 404)
+
+    def test_resolve_arbiter_wallet_rejected_without_sig(self, client, auth):
+        """Passing arbiter_wallet without valid signature should be rejected."""
+        r = client.post("/api/v1/escrow/nonexistent/resolve",
+                        headers=auth,
+                        json={"decision": "refund",
+                              "arbiter_wallet": "0xBadWallet",
+                              "arbiter_signature": "invalid",
+                              "arbiter_message": "test"})
+        # Should be 400 (invalid message format) or 403 (no valid auth)
+        assert r.status_code in (400, 403)

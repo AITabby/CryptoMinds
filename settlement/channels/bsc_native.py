@@ -264,8 +264,18 @@ class BSCNativeChannel(SettlementChannel):
             error="合约托管需要前端通过 MetaMask 调用，请使用 escrow_prepare_contract_call",
         )
 
-    def _get_contract_address(self) -> str:
-        """获取合约部署地址"""
+    def _get_contract_address(self, version: str = "v1") -> str:
+        """获取合约部署地址。version='v1' 或 'v2'"""
+        if version == "v2":
+            env_addr = os.getenv("ESCROW_V2_CONTRACT_ADDRESS", "")
+            if env_addr:
+                return env_addr
+            deploy_path = Path(__file__).parent.parent.parent / "escrow_deployment_v2.json"
+            if deploy_path.exists():
+                deploy_data = json.loads(deploy_path.read_text())
+                return deploy_data.get("contractAddress", "")
+            return ""
+        # V1 (default)
         env_addr = os.getenv("ESCROW_CONTRACT_ADDRESS", "")
         if env_addr:
             return env_addr
@@ -291,18 +301,43 @@ class BSCNativeChannel(SettlementChannel):
         abi = self._get_escrow_abi()
 
         if action == "createOrder":
-            return {
-                "contract_address": contract_address,
-                "method": "createOrder",
-                "args": [
-                    kwargs.get("seller_address", ""),
-                    kwargs.get("order_id", ""),
-                    kwargs.get("buyer_timeout_seconds", 86400),
-                    kwargs.get("seller_timeout_seconds", 1800),
-                ],
-                "value": str(self.w3.to_wei(float(kwargs.get("amount", 0)), 'ether')),
-                "abi": abi,
-            }
+            token = kwargs.get("token", "bnb").lower()
+            version = "v2" if token != "bnb" else "v1"
+            contract_address = self._get_contract_address(version)
+            abi = self._get_escrow_abi(version)
+            if token == "bnb":
+                return {
+                    "contract_address": contract_address,
+                    "method": "createOrder",
+                    "args": [
+                        kwargs.get("seller_address", ""),
+                        kwargs.get("order_id", ""),
+                        kwargs.get("buyer_timeout_seconds", 86400),
+                        kwargs.get("seller_timeout_seconds", 1800),
+                    ],
+                    "value": str(self.w3.to_wei(float(kwargs.get("amount", 0)), 'ether')),
+                    "abi": abi,
+                }
+            else:
+                # ERC-20 mode: no BNB value, amount as parameter
+                amount_wei = self.w3.to_wei(float(kwargs.get("amount", 0)), 'ether')
+                return {
+                    "contract_address": contract_address,
+                    "method": "createOrder",
+                    "args": [
+                        kwargs.get("seller_address", ""),
+                        kwargs.get("order_id", ""),
+                        kwargs.get("buyer_timeout_seconds", 86400),
+                        kwargs.get("seller_timeout_seconds", 1800),
+                        str(amount_wei),
+                    ],
+                    "value": "0",
+                    "token": token,
+                    "token_address": kwargs.get("token_address", ""),
+                    "approve_required": True,
+                    "approve_amount": str(amount_wei),
+                    "abi": abi,
+                }
         elif action == "deliver":
             return {
                 "contract_address": contract_address,
@@ -469,9 +504,25 @@ class BSCNativeChannel(SettlementChannel):
         except Exception as e:
             return {"error": str(e)}
 
-    def _get_escrow_abi(self) -> list:
-        """获取 ServiceEscrow 合约 ABI"""
-        abi_path = Path(__file__).parent.parent.parent / "contracts" / "ServiceEscrow_sol_ServiceEscrow.abi"
+    def _get_escrow_abi(self, version: str = "v1") -> list:
+        """获取合约 ABI。version='v1' 或 'v2'"""
+        if version == "v2":
+            abi_path = Path(__file__).parent.parent.parent / "build" / "contracts_ServiceEscrowV2_sol_ServiceEscrowV2.abi"
+        else:
+            abi_path = Path(__file__).parent.parent.parent / "build" / "contracts_ServiceEscrow_sol_ServiceEscrow.abi"
         if abi_path.exists():
             return json.loads(abi_path.read_text())
         return []
+
+    def escrow_prepare_approve(self, token_address: str, amount_wei: int, spender: str = "") -> Dict:
+        """准备 ERC-20 approve 调用参数，供前端 MetaMask 使用"""
+        if not spender:
+            spender = self._get_contract_address("v2")
+        approve_abi = [{"inputs": [{"name": "spender", "type": "address"}, {"name": "amount", "type": "uint256"}], "name": "approve", "outputs": [{"name": "", "type": "bool"}], "stateMutability": "nonpayable", "type": "function"}]
+        return {
+            "contract_address": token_address,
+            "method": "approve",
+            "args": [spender, str(amount_wei)],
+            "value": "0",
+            "abi": approve_abi,
+        }

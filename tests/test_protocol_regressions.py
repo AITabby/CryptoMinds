@@ -132,10 +132,10 @@ class ProtocolRegressionTests(unittest.TestCase):
 
         class FakeCursor:
             def __init__(self):
-                self.sql = ""
+                self.sqls = []
 
             def execute(self, sql):
-                self.sql = sql
+                self.sqls.append(sql)
 
             def close(self):
                 pass
@@ -155,7 +155,10 @@ class ProtocolRegressionTests(unittest.TestCase):
         _ensure_tables(conn)
 
         self.assertTrue(conn.committed)
-        self.assertIn("CREATE TABLE IF NOT EXISTS performance_records", conn.cursor_obj.sql)
+        self.assertTrue(
+            any("CREATE TABLE IF NOT EXISTS performance_records" in s for s in conn.cursor_obj.sqls),
+            "expected performance_records CREATE TABLE in executed SQL"
+        )
 
     def test_demo_session_key_placeholder_rejected_in_protected_env(self):
         import api_server
