@@ -18,16 +18,16 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # 2. Check required secrets are set
-REQUIRED_VARS=("CRYPTOMINDS_INTERNAL_TOKEN" "ADMIN_SECRET" "BSC_RPC")
+REQUIRED_VARS=("CRYPTOMINDS_INTERNAL_TOKEN" "ADMIN_SECRET" "BSC_RPC" "POSTGRES_PASSWORD")
 for var in "${REQUIRED_VARS[@]}"; do
     value=$(grep "^${var}=" "$ENV_FILE" | cut -d'=' -f2)
     if [ -z "$value" ]; then
         echo "[ERROR] $var is empty in $ENV_FILE — fill it before deploying"
         exit 1
     fi
-    # Check for weak values
-    if echo "$value" | grep -qi "test-token\|admin\|password\|secret\|cryptominds-admin"; then
-        echo "[ERROR] $var has a weak value in $ENV_FILE — use a strong random value"
+    # Check for weak or placeholder values
+    if echo "$value" | grep -qi "test-token\|admin\|password\|secret\|cryptominds-admin\|CHANGE_ME"; then
+        echo "[ERROR] $var has a weak or placeholder value in $ENV_FILE — use a strong random value"
         exit 1
     fi
 done
