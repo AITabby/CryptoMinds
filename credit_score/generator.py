@@ -201,7 +201,8 @@ class CreditScoreDataGenerator:
                     resolution = ""
 
                 # 买家
-                buyer_wallet = f"0x{hashlib.sha256(f'buyer-{agent["agent_id"]}-{j}'.encode()).hexdigest()[:40]}"
+                buyer_seed = f"buyer-{agent['agent_id']}-{j}"
+                buyer_wallet = f"0x{hashlib.sha256(buyer_seed.encode()).hexdigest()[:40]}"
 
                 record_id = hashlib.sha256(f"record-{agent['wallet']}-{j}-{created_at}".encode()).hexdigest()[:32]
 
