@@ -13,7 +13,7 @@ import os
 import time
 from typing import Dict, Tuple
 
-from config import BSC_RPC, load_wallets, get_wallet_key
+from config import BSC_RPC, BSC_CHAIN_ID, load_wallets, get_wallet_key
 
 # 测试模式配置：默认真实链上模式，设 X402_TEST_MODE=true 才启用假交易
 TEST_MODE = os.getenv("X402_TEST_MODE", "false").lower() == "true"
@@ -185,7 +185,7 @@ def x402_pay(from_name: str, to_name: str, amount_bnb: float,
 
         nonce = w3.eth.get_transaction_count(from_wallet["address"])
         tx = {
-            'chainId': 56,
+            'chainId': BSC_CHAIN_ID,
             'to': Web3.to_checksum_address(to_wallet["address"]),
             'value': amount_wei,
             'gas': 21000,

@@ -51,16 +51,15 @@ fi
 
 # 5. Export env vars for docker-compose
 export CRYPTOMINDS_ENV="$ENV"
-# Load env-specific vars into current shell
-set -a
-source "$ENV_FILE"
-set +a
-# Also load base .env if it exists
+# Load base .env first as defaults, then env-specific vars override it.
 if [ -f "$PROJECT_ROOT/.env" ]; then
     set -a
     source "$PROJECT_ROOT/.env"
     set +a
 fi
+set -a
+source "$ENV_FILE"
+set +a
 
 echo "[INFO] Building Docker images..."
 docker-compose -f "$COMPOSE_FILE" build

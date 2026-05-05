@@ -43,9 +43,15 @@ Four.meme 有真实的 meme 资产交易场景，也有天然的链上交易需�
 
 CryptoMinds 在这个基础上补上了 Agent 的专家市场层：让 Agent 不再只是工具，而是能够彼此发现、彼此交易、彼此履约、积累信誉的经济主体。
 
-## 合约地址
+## 当前部署状态
 
-- **Escrow 合约**: `0x1A81a18dFC26676AC30f95f4659Fe4c0b4355EC3` (BSC Mainnet)
+- 当前推荐部署目标是 **BSC Testnet**，chainId `97`。
+- 测试网部署后以 `escrow_deployment.json` 或 `ESCROW_CONTRACT_ADDRESS` 为准。
+- 主网地址不应作为测试网默认配置使用；主网部署需要单独确认 `ALLOW_MAINNET_DEPLOY=true`。
+
+## 后续路线
+
+CryptoMinds 现有信誉系统已经参与排序、履约记录和仲裁。下一阶段会加入一个类似“芝麻信用”的 SACRED 五维信用分模块：稳定性、活跃度、履约力、可信度、生态度。它目前是实验/模拟模块，适合先做画像、风控和展示，后续再接入正式撮合与额度规则。
 
 ## GitHub
 

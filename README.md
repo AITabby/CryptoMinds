@@ -2,7 +2,7 @@
 
 CryptoMinds is an agent economy protocol for autonomous service discovery, hiring, verification, escrow settlement, and dispute resolution.
 
-It is currently **testnet-ready**: the core protocol flows, escrow state machine, verification gates, session keys, vouchers, reputation records, and SQLite/PostgreSQL storage are implemented. Production hardening is still ongoing around non-custodial session key UX, mainnet operations, monitoring, and multi-sig arbitration.
+It is currently **BSC testnet-ready**: the core protocol flows, escrow state machine, verification gates, session keys, vouchers, reputation records, PostgreSQL/SQLite storage, and Docker Compose deployment path are implemented. Production hardening is still ongoing around non-custodial session key UX, mainnet operations, long-running monitoring, multi-sig arbitration, and the upcoming SACRED credit-score module.
 
 For a higher-level protocol overview, start with [docs/WHITEPAPER.md](docs/WHITEPAPER.md).
 
@@ -41,7 +41,9 @@ CRYPTOMINDS_DEBUG=false
 CRYPTOMINDS_INTERNAL_TOKEN=<strong-random-token>
 ADMIN_SECRET=<strong-random-secret>
 BSC_RPC=<testnet-or-provider-rpc>
+BSC_CHAIN_ID=97
 ESCROW_CONTRACT_ADDRESS=<deployed-service-escrow-address>
+POSTGRES_PASSWORD=<strong-random-password>
 DATABASE_URL=postgresql://...
 ```
 
@@ -137,10 +139,24 @@ curl -X POST localhost:3458/api/v1/voucher/{id}/use \
 
 ## Testnet Deployment
 
-Docker Compose starts PostgreSQL, the Python API, the Express gateway, and managed agent services:
+The intended staging path is BSC Testnet (`chainId=97`) plus Docker Compose on a small VPS. Compile and deploy the escrow contract first:
 
 ```bash
-docker-compose up -d --build
+make test
+make compile-contracts
+
+BSC_RPC=https://bsc-testnet-dataseed.bnbchain.org \
+BSC_CHAIN_ID=97 \
+node scripts/deploy_service_escrow.js
+
+# copy the deployed address into environments/.env.staging
+ESCROW_CONTRACT_ADDRESS=0x...
+```
+
+Then start the stack:
+
+```bash
+bash scripts/deploy.sh staging
 ```
 
 For a public VPS, put Nginx or another reverse proxy in front of the Express gateway:
@@ -150,6 +166,7 @@ For a public VPS, put Nginx or another reverse proxy in front of the Express gat
 - use strong `CRYPTOMINDS_INTERNAL_TOKEN` and `ADMIN_SECRET`;
 - enable HTTPS before sharing the dashboard URL;
 - back up the PostgreSQL volume before upgrades.
+- keep `BSC_CHAIN_ID=97` for testnet. The signing path validates the connected RPC chain id before building transactions.
 
 ---
 
@@ -162,7 +179,7 @@ make e2e        # end-to-end test script
 make lint       # flake8
 ```
 
-Current local baseline: `635 passed, 1 skipped` for Python tests with `70.75%` total coverage, plus `10 passed` for Node tests.
+Current local baseline after testnet hardening: `777 passed, 1 skipped` for Python tests with `73.11%` total coverage, plus `10 passed` for Node tests.
 
 ---
 
@@ -193,6 +210,7 @@ cryptominds/
 ├── verification/          # verification gates
 ├── agent/                 # agent capability model and registry
 ├── reputation/            # performance records, reputation, credit currency
+├── credit_score/          # experimental SACRED credit-score simulator
 ├── data/                  # SQLite/PostgreSQL stores
 ├── contracts/             # escrow/staking contracts and ABI artifacts
 ├── web/                   # Express gateway and Web UI
@@ -209,8 +227,9 @@ cryptominds/
 ```text
 Phase 1 done   Core protocol: escrow, verification gates, agents, reputation
 Phase 2 done   Infrastructure: session keys, vouchers, PostgreSQL, monitoring
-Phase 3 active Testnet operations, wallet-signed session key UX, multi-sig arbitration
-Phase 4 later  Multi-chain expansion, DAO governance, cross-protocol integrations
+Phase 3 active BSC Testnet operations, wallet-signed UX, multi-sig arbitration
+Phase 4 next   SACRED credit score: a Sesame Credit-like agent trust layer
+Phase 5 later  Multi-chain expansion, DAO governance, cross-protocol integrations
 ```
 
 ---

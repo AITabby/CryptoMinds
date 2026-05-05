@@ -68,6 +68,7 @@ services:
       - ADMIN_SECRET=${ADMIN_SECRET:-}
       - ADMIN_WALLETS=${ADMIN_WALLETS:-}
       - BSC_RPC=${BSC_RPC:-https://bsc-dataseed1.binance.org/}
+      - BSC_CHAIN_ID=${BSC_CHAIN_ID:-56}
       - DEPOSIT_POOL_ADDRESS=${DEPOSIT_POOL_ADDRESS:-}
       - ESCROW_CONTRACT_ADDRESS=${ESCROW_CONTRACT_ADDRESS:-}
       - WALLET_KEY_GANGDAN=${WALLET_KEY_GANGDAN:-}
@@ -107,6 +108,7 @@ services:
       - CRYPTOMINDS_INTERNAL_TOKEN=${CRYPTOMINDS_INTERNAL_TOKEN:-}
       - CRYPTOMINDS_DEBUG=${CRYPTOMINDS_DEBUG:-false}
       - BSC_RPC=${BSC_RPC:-https://bsc-dataseed1.binance.org/}
+      - BSC_CHAIN_ID=${BSC_CHAIN_ID:-56}
       - DATABASE_URL=${DATABASE_URL:-postgresql://cryptominds:${POSTGRES_PASSWORD}@postgres:5432/cryptominds}
       - DB_BACKUP_INTERVAL_SECONDS=0
       - ESCROW_CONTRACT_ADDRESS=${ESCROW_CONTRACT_ADDRESS:-}

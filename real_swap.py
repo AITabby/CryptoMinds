@@ -6,7 +6,7 @@
 import sys, json, time
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
-from config import BSC_RPC, load_wallets, get_wallet_key, DEFAULT_SLIPPAGE_BPS
+from config import BSC_RPC, BSC_CHAIN_ID, load_wallets, get_wallet_key, DEFAULT_SLIPPAGE_BPS
 
 ROUTER = Web3.to_checksum_address('0x10ED43C718714eb63d5aA57B78B54704E256024E')
 WBNB = Web3.to_checksum_address('0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c')
@@ -125,7 +125,7 @@ def main():
         'gas': 300000,
         'gasPrice': w3.eth.gas_price,
         'nonce': nonce,
-        'chainId': 56,
+        'chainId': BSC_CHAIN_ID,
     })
 
     signed_swap = account.sign_transaction(swap_tx)
@@ -165,7 +165,7 @@ def main():
         'gas': 100000,
         'gasPrice': w3.eth.gas_price,
         'nonce': transfer_nonce,
-        'chainId': 56,
+        'chainId': BSC_CHAIN_ID,
     })
 
     signed_transfer = account.sign_transaction(transfer_tx)

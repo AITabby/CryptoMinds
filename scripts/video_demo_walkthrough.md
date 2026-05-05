@@ -23,7 +23,7 @@ bash demo.sh
 
 等待 "✅ 全协议流程演示完成" 出现。
 
-**旁白**: "一键启动。Python API + 294 测试全通过，生产就绪。"
+**旁白**: "一键启动。Python API、Express 网关和 Agent 流程可以本地跑通，测试网部署路径已经就绪。"
 
 ---
 
@@ -183,7 +183,7 @@ curl -s localhost:3458/metrics | head -20
 curl -s localhost:3458/healthz
 ```
 
-**旁白**: "294 测试全通过。PostgreSQL + SQLite 双数据层。Prometheus 监控 + Sentry 告警。生产就绪。"
+**旁白**: "777 个 Python 测试和 10 个 Node 测试全通过。PostgreSQL + SQLite 双数据层，Prometheus 监控，BSC 测试网部署路径已就绪。"
 
 ---
 

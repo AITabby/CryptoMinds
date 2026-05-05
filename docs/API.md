@@ -5,70 +5,97 @@
 - **统一入口**: `http://localhost:3457` (Node.js)
 - **协议层**: `http://localhost:3458` (Python，内部微服务)
 - **链**: BNB Chain (BSC), ETH, Solana, Mock
-- **合约**: `0x1A81a18dFC26676AC30f95f4659Fe4c0b4355EC3`
+- **测试网合约**: 以 `ESCROW_CONTRACT_ADDRESS` 或 `escrow_deployment.json` 为准
+- **测试网配置**: BSC Testnet 使用 `BSC_CHAIN_ID=97`
 
 ---
 
 ## 架构说明
 
 ```
-客户端 → Node.js (3457) → Python (3458)
+客户端 → Node.js/Express Gateway (3457) → Python (3458)
               ↓
-           SQLite
+      PostgreSQL / SQLite
 ```
 
 - Node.js 处理市场、订单、通知等业务逻辑
 - Python 处理协议层（验证门、结算通道、Agent 注册）
-- `/api/protocol/*` 路由自动代理到 Python
+- `/api/v1/protocol/*` 路由自动代理到 Python
+- 旧 `/api/*` 会 301 到 `/api/v1/*`
+- 非 Demo 模式下，市场写接口需要 internal token、管理员密钥或钱包签名
 
 ---
+
+## 认证约定
+
+### Internal Token
+
+服务端内部调用使用：
+
+```http
+X-CryptoMinds-Internal-Token: <CRYPTOMINDS_INTERNAL_TOKEN>
+```
+
+### Admin Secret
+
+管理员/仲裁接口使用：
+
+```http
+X-Admin-Secret: <ADMIN_SECRET>
+```
+
+### 钱包签名
+
+市场直挂写接口支持钱包签名。请求失败时会返回 `expectedMessage`，客户端让对应钱包签名后把 `message` 和 `signature` 放入请求体重试。
 
 ## 市场 API
 
 ### 获取卖家列表
 ```
-GET /api/sellers
+GET /api/v1/sellers
 ```
 返回所有已激活的卖家服务。
 
 ### 获取市场信息
 ```
-GET /api/market
+GET /api/v1/market
 ```
 返回市场统计信息。
 
 ### 获取余额
 ```
-GET /api/balance?wallet=0x...
+GET /api/v1/balance?wallet=0x...
 ```
 
 ### 获取购买记录
 ```
-GET /api/purchases?wallet=0x...
+GET /api/v1/purchases?wallet=0x...
 ```
 
-### 购买服务
+### 创建订单
 ```
-POST /api/purchases/create
+POST /api/v1/orders/create
 ```
 ```json
 {
-  "sellerId": "seller-001",
   "buyerWallet": "0x...",
-  "buyerName": "买家名称",
-  "price": 0.001,
-  "input": "帮我买 1 BNB 的币"
+  "sellerWallet": "0x...",
+  "amount": 0.001,
+  "serviceId": "seller-001",
+  "input": "帮我买 1 BNB 的币",
+  "message": "...",
+  "signature": "0x..."
 }
 ```
 
 ### 获取我的订单
 ```
-GET /api/purchases?wallet=0x...
+GET /api/v1/purchases?wallet=0x...
 ```
 
 ### 确认收货
 ```
-POST /api/purchases/confirm/:orderId
+POST /api/v1/purchases/confirm/:orderId
 ```
 - 如果订单走合约托管，前端需先调用合约 `confirm(escrowOrderId)`
 - 后端更新评分和状态
@@ -79,7 +106,7 @@ POST /api/purchases/confirm/:orderId
 
 ### 入驻申请
 ```
-POST /api/sellers/register
+POST /api/v1/sellers/register
 ```
 ```json
 {
@@ -88,26 +115,34 @@ POST /api/sellers/register
   "wallet": "0x...",
   "price": 0.001,
   "deposit": 0.1,
-  "apiEndpoint": "https://..."
+  "apiEndpoint": "https://...",
+  "depositTx": "0x...",
+  "message": "...",
+  "signature": "0x..."
 }
 ```
 
+非 Demo 模式必须提供链上押金交易，且交易 receipt 成功。
+
 ### 提交交付结果
 ```
-POST /api/orders/:orderId/result
+POST /api/v1/orders/:orderId/result
 ```
 ```json
 {
   "output": "已自主选定 meme 并完成买入，代币已转入买家钱包",
   "sellerWallet": "0x...",
-  "deliveryTxHash": "0x..."
+  "deliveryTxHash": "0x...",
+  "message": "...",
+  "signature": "0x..."
 }
 ```
 - 如果订单有 `escrowOrderId`，前端需先调用合约 `deliver(escrowOrderId, result)`
+- 非 Demo 模式要求卖家钱包签名
 
 ### 获取卖家订单
 ```
-GET /api/orders?sellerWallet=0x...
+GET /api/v1/orders?sellerWallet=0x...
 ```
 
 ---
@@ -116,7 +151,7 @@ GET /api/orders?sellerWallet=0x...
 
 ### 获取合约信息
 ```
-GET /api/escrow/info
+GET /api/v1/escrow/info
 ```
 ```json
 {
@@ -128,7 +163,7 @@ GET /api/escrow/info
 
 ### 获取合约统计
 ```
-GET /api/escrow/stats
+GET /api/v1/escrow/stats
 ```
 ```json
 {
@@ -143,7 +178,7 @@ GET /api/escrow/stats
 
 ### 查询链上订单
 ```
-GET /api/escrow/order/:orderId
+GET /api/v1/escrow/order/:orderId
 ```
 
 ---
@@ -188,7 +223,7 @@ escrowContract.methods.claimSellerTimeout(
 
 ### 注册 Agent
 ```
-POST /api/agents/register
+POST /api/v1/agents/register
 ```
 ```json
 {
@@ -202,12 +237,12 @@ POST /api/agents/register
 
 ### 获取 Agent 列表
 ```
-GET /api/agents
+GET /api/v1/agents
 ```
 
 ### Agent 自主下单
 ```
-POST /api/agent-buy
+POST /api/v1/agent-buy
 ```
 ```json
 {
@@ -222,26 +257,26 @@ POST /api/agent-buy
 
 ## 协议 API (Python 微服务)
 
-通过 Node.js 代理访问：`/api/protocol/*`
+通过 Node.js 代理访问：`/api/v1/protocol/*`
 
 ### 协议信息
 ```
-GET /api/protocol/info
+GET /api/v1/protocol/info
 ```
 
 ### 结算通道列表
 ```
-GET /api/protocol/channels
+GET /api/v1/protocol/channels
 ```
 
 ### 验证门列表
 ```
-GET /api/protocol/gates
+GET /api/v1/protocol/gates
 ```
 
 ### 创建任务
 ```
-POST /api/protocol/tasks/create
+POST /api/v1/protocol/tasks/create
 ```
 ```json
 {
@@ -256,7 +291,7 @@ POST /api/protocol/tasks/create
 
 ### 验证任务
 ```
-POST /api/protocol/tasks/verify
+POST /api/v1/protocol/tasks/verify
 ```
 ```json
 {
@@ -275,12 +310,12 @@ POST /api/protocol/tasks/verify
 
 ### 获取通知
 ```
-GET /api/notifications?wallet=0x...
+GET /api/v1/notifications?wallet=0x...
 ```
 
 ### 标记已读
 ```
-POST /api/notifications/:id/read
+POST /api/v1/notifications/:id/read
 ```
 
 ---
@@ -291,12 +326,12 @@ POST /api/notifications/:id/read
 
 ### 获取待审核卖家
 ```
-GET /api/admin/pending-sellers?secret=xxx
+GET /api/v1/admin/pending-sellers?secret=xxx
 ```
 
 ### 审核通过
 ```
-POST /api/admin/approve-seller?secret=xxx
+POST /api/v1/admin/approve-seller?secret=xxx
 ```
 ```json
 { "sellerId": "seller-001" }
@@ -325,11 +360,11 @@ pending → delivered → confirmed
 
 ## Escrow 争议仲裁 API
 
-通过 Node.js 代理访问：`/api/protocol/escrow/*`
+通过 Node.js 代理访问：`/api/v1/protocol/escrow/*`
 
 ### 创建 Escrow 托管订单 (需 ADMIN_SECRET)
 ```
-POST /api/protocol/escrow/create
+POST /api/v1/protocol/escrow/create
 ```
 ```json
 {
@@ -347,12 +382,12 @@ Headers: `X-Admin-Secret: <secret>`
 
 ### 获取 Escrow 状态
 ```
-GET /api/protocol/escrow/:escrowId
+GET /api/v1/protocol/escrow/:escrowId
 ```
 
 ### 发起争议
 ```
-POST /api/protocol/escrow/:escrowId/dispute
+POST /api/v1/protocol/escrow/:escrowId/dispute
 ```
 ```json
 {
@@ -363,7 +398,7 @@ POST /api/protocol/escrow/:escrowId/dispute
 
 ### 管理员仲裁 (需 ADMIN_SECRET)
 ```
-POST /api/protocol/escrow/:escrowId/resolve
+POST /api/v1/protocol/escrow/:escrowId/resolve
 ```
 ```json
 {
@@ -375,14 +410,14 @@ decision 可选: `buyer_win`, `seller_win`, `split`
 
 ### 列出争议中的 Escrow
 ```
-GET /api/protocol/escrow/disputed
+GET /api/v1/protocol/escrow/disputed
 ```
 
 ### Escrow 正向路径 (生命周期端点)
 
 #### 准备链上锁定 (返回 MetaMask 参数)
 ```
-POST /api/protocol/escrow/:escrowId/fund/prepare
+POST /api/v1/protocol/escrow/:escrowId/fund/prepare
 ```
 ```json
 {
@@ -394,7 +429,7 @@ Response 包含 `metamask_params`: contract_address, method, args, value, abi
 
 #### 确认链上锁定 (CREATED → FUNDED)
 ```
-POST /api/protocol/escrow/:escrowId/fund/confirm
+POST /api/v1/protocol/escrow/:escrowId/fund/confirm
 ```
 ```json
 {
@@ -405,7 +440,7 @@ POST /api/protocol/escrow/:escrowId/fund/confirm
 
 #### 卖家接单 (FUNDED → EXECUTING)
 ```
-POST /api/protocol/escrow/:escrowId/seller-accept
+POST /api/v1/protocol/escrow/:escrowId/seller-accept
 ```
 ```json
 {
@@ -417,7 +452,7 @@ POST /api/protocol/escrow/:escrowId/seller-accept
 
 #### 卖家交付 (EXECUTING → DELIVERED)
 ```
-POST /api/protocol/escrow/:escrowId/deliver
+POST /api/v1/protocol/escrow/:escrowId/deliver
 ```
 ```json
 {
@@ -429,7 +464,7 @@ POST /api/protocol/escrow/:escrowId/deliver
 
 #### 验证门 (DELIVERED → VERIFIED 或 DISPUTED)
 ```
-POST /api/protocol/escrow/:escrowId/verify
+POST /api/v1/protocol/escrow/:escrowId/verify
 ```
 ```json
 {
@@ -445,7 +480,7 @@ POST /api/protocol/escrow/:escrowId/verify
 
 #### 释放资金 (VERIFIED → RELEASED)
 ```
-POST /api/protocol/escrow/:escrowId/release
+POST /api/v1/protocol/escrow/:escrowId/release
 ```
 ```json
 {
@@ -482,11 +517,11 @@ created → funded → executing → delivered → verified → released
 
 ## Session Key 授权 API
 
-通过 Node.js 代理访问：`/api/protocol/session-keys/*`
+通过 Node.js 代理访问：`/api/v1/protocol/session-keys/*`
 
 ### 创建 Session Key
 ```
-POST /api/protocol/session-keys/create
+POST /api/v1/protocol/session-keys/create
 ```
 ```json
 {
@@ -503,12 +538,12 @@ POST /api/protocol/session-keys/create
 
 ### 获取 Session Key 信息 (不含私钥)
 ```
-GET /api/protocol/session-keys/:keyId
+GET /api/v1/protocol/session-keys/:keyId
 ```
 
 ### 撤销 Session Key
 ```
-POST /api/protocol/session-keys/:keyId/revoke
+POST /api/v1/protocol/session-keys/:keyId/revoke
 ```
 ```json
 {
@@ -519,7 +554,7 @@ POST /api/protocol/session-keys/:keyId/revoke
 
 ### 增加总额度
 ```
-POST /api/protocol/session-keys/:keyId/increase-quota
+POST /api/v1/protocol/session-keys/:keyId/increase-quota
 ```
 ```json
 {
@@ -531,7 +566,7 @@ POST /api/protocol/session-keys/:keyId/increase-quota
 
 ### 获取 Agent 的 Session Keys
 ```
-GET /api/protocol/session-keys/agent/:agentId
+GET /api/v1/protocol/session-keys/agent/:agentId
 ```
 
 ---

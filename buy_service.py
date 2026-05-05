@@ -6,7 +6,7 @@ from eth_account import Account
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
 
-from config import BSC_RPC, load_wallets, get_wallet_key
+from config import BSC_RPC, BSC_CHAIN_ID, load_wallets, get_wallet_key
 
 w3 = Web3(Web3.HTTPProvider(BSC_RPC))
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
@@ -43,7 +43,7 @@ tx = {
     'value': w3.to_wei(amount_bnb, 'ether'),
     'gas': 21000,
     'gasPrice': gas_price,
-    'chainId': 56,  # BSC Mainnet
+    'chainId': BSC_CHAIN_ID,
 }
 
 # 签名并发送

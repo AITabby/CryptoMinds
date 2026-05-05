@@ -12,7 +12,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { verifyBuyerActionSignature } = require('../lib/buyer_auth');
+const { verifyBuyerActionSignature, verifySellerActionSignature } = require('../lib/buyer_auth');
 
 function requireBuyerAuth(req, res, next) {
   const { action, purchaseId, buyerWallet, message, signature } = req.body;
@@ -20,6 +20,16 @@ function requireBuyerAuth(req, res, next) {
     return res.json({ ok: false, error: '买家签名验证失败' });
   }
   req.buyerWallet = (buyerWallet || '').trim().toLowerCase();
+  next();
+}
+
+function requireSellerAuth(req, res, next) {
+  const { action, sellerWallet, message, signature } = req.body;
+  const orderId = req.params.orderId || req.params.id;
+  if (!verifySellerActionSignature({ action, orderId, sellerWallet, message, signature })) {
+    return res.json({ ok: false, error: '卖家签名验证失败' });
+  }
+  req.sellerWallet = (sellerWallet || '').trim().toLowerCase();
   next();
 }
 
@@ -74,7 +84,7 @@ function createOrderRoutes({
   });
 
   // 提交订单结果
-  router.post('/orders/:orderId/result', async (req, res) => {
+  router.post('/orders/:orderId/result', requireSellerAuth, async (req, res) => {
     const { orderId } = req.params;
     const { sellerWallet, txHash, tokenAddress, tokenAmount, tokenSymbol, report } = req.body;
 
@@ -82,6 +92,10 @@ function createOrderRoutes({
       const purchase = await getPurchase(orderId);
       if (!purchase) {
         return res.json({ ok: false, error: '订单不存在' });
+      }
+      const expectedSeller = (purchase.seller_wallet || purchase.expert_wallet || '').toLowerCase();
+      if (expectedSeller && req.sellerWallet !== expectedSeller) {
+        return res.json({ ok: false, error: '只有订单卖家可以提交结果' });
       }
 
       // 更新订单状态

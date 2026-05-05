@@ -191,6 +191,9 @@ function createSellersMarketHandlers({
 
     const tx = await w3.eth.getTransaction(txHash);
     if (!tx) throw new Error('交易未找到，请确认交易已上链');
+    const receipt = await w3.eth.getTransactionReceipt(txHash);
+    if (!receipt) throw new Error('交易未确认，请稍后重试');
+    if (receipt.status !== true && receipt.status !== 1) throw new Error('押金交易执行失败');
 
     if (tx.from.toLowerCase() !== expectedFrom.toLowerCase()) {
       throw new Error(`交易发送方不一致`);
@@ -291,7 +294,7 @@ function createSellersMarketHandlers({
         } catch (e) {
           return res.json({ ok: false, error: '押金验证失败: ' + e.message });
         }
-      } else if (!demoMode && depositPoolAddress && depositPoolAddress !== '0x0000000000000000000000000000000000000000') {
+      } else if (!demoMode) {
         return res.json({ ok: false, error: '请先通过 MetaMask 缴纳押金' });
       }
 
@@ -347,9 +350,13 @@ function createSellersMarketHandlers({
   async function depositSeller(req, res) {
     const { wallet } = req.params;
     let { amount, txHash } = req.body;
+    amount = Number(amount);
 
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       return res.json({ ok: false, error: '无效金额' });
+    }
+    if (!demoMode && !txHash) {
+      return res.json({ ok: false, error: '非 Demo 模式必须提供链上押金交易哈希' });
     }
 
     try {

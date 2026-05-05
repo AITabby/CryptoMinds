@@ -9,7 +9,7 @@ import sys, json, time
 from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
 import config
-from config import BSC_RPC, DEFAULT_SLIPPAGE_BPS
+from config import BSC_RPC, BSC_CHAIN_ID, DEFAULT_SLIPPAGE_BPS
 
 w3 = Web3(Web3.HTTPProvider(BSC_RPC))
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
@@ -116,7 +116,7 @@ def buy_on_fourmeme(seller_key, seller_addr, buyer_addr, token_addr, bnb_amount)
         'gas': 300000,
         'gasPrice': w3.eth.gas_price,
         'nonce': nonce,
-        'chainId': 56,
+        'chainId': BSC_CHAIN_ID,
     })
     
     signed = w3.eth.account.sign_transaction(tx, seller_key)
@@ -154,7 +154,7 @@ def buy_on_pancakeswap(seller_key, seller_addr, buyer_addr, token_addr, bnb_amou
         'gas': 300000,
         'gasPrice': w3.eth.gas_price,
         'nonce': nonce,
-        'chainId': 56,
+        'chainId': BSC_CHAIN_ID,
     })
     
     signed = w3.eth.account.sign_transaction(tx, seller_key)
@@ -192,7 +192,7 @@ def transfer_tokens(seller_key, seller_addr, buyer_addr, token_addr, amount_raw)
         'gas': 100000,
         'gasPrice': w3.eth.gas_price,
         'nonce': nonce,
-        'chainId': 56,
+        'chainId': BSC_CHAIN_ID,
     })
     
     signed = w3.eth.account.sign_transaction(tx, seller_key)

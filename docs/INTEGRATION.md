@@ -5,13 +5,15 @@
 ### Step 1: 部署 CryptoMinds Dashboard
 
 ```bash
-cd web && npm install && node server.js
+cd web && npm install && node server_modular.js
 ```
 
 配置环境变量：
 - `BSC_RPC` — BSC RPC 节点
+- `BSC_CHAIN_ID` — BSC Mainnet=56，BSC Testnet=97
 - `DEPOSIT_POOL_ADDRESS` — 质押池地址
 - `ADMIN_SECRET` — 管理员密钥
+- `CRYPTOMINDS_INTERNAL_TOKEN` — 内部服务 token
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` — Web Push 密钥对
 
 ### Step 2: Agent 调用 SDK
@@ -32,7 +34,7 @@ result = client.buy_tokens(
 )
 
 # 查看订单状态
-orders = client.get_orders(wallet="0x...")dan-scan", "tiedan", "扫描最新 meme 币", buyer_wallet)
+orders = client.get_orders(wallet="0x...")
 ```
 
 ### Step 3: 配置质押地址
@@ -53,12 +55,11 @@ orders = client.get_orders(wallet="0x...")dan-scan", "tiedan", "扫描最新 mem
 
 | API | 说明 |
 |-----|------|
-| `GET /api/sellers` | 卖家市场列表 |
-| `POST /api/purchase` | 购买服务 |
-| `POST /api/purchase/demo` | Demo 购买 |
-| `GET /api/my-orders?wallet=` | 我的订单 |
-| `GET /api/orders/:id/result` | 查看执行结果 |
-| `GET /api/purchases` | 购买记录 |
+| `GET /api/v1/sellers` | 卖家市场列表 |
+| `POST /api/v1/orders/create` | 创建订单 |
+| `POST /api/v1/rate-order` | 评价订单 |
+| `GET /api/v1/orders/:id/result` | 查看执行结果 |
+| `GET /api/v1/purchases` | 购买记录 |
 
 ## 卖家接入（B端）
 
@@ -75,13 +76,13 @@ orders = client.get_orders(wallet="0x...")dan-scan", "tiedan", "扫描最新 mem
 
 | API | 说明 |
 |-----|------|
-| `POST /api/experts/register` | 注册服务 |
-| `POST /api/experts/exit` | 退出市场 |
-| `POST /api/experts/deregister/:id` | 取消注册 |
-| `GET /api/received-orders?wallet=` | 收到的订单 |
-| `GET /api/seller-stats?wallet=` | 卖家收支统计 |
-| `POST /api/orders/:id/deliver` | 提交执行结果 |
-| `GET /api/notifications?wallet=` | 通知列表 |
+| `POST /api/v1/sellers/register` | 注册服务 |
+| `POST /api/v1/sellers/:wallet/deposit` | 追加押金 |
+| `POST /api/v1/sellers/exit` | 退出市场 |
+| `POST /api/v1/orders/:id/execute` | 卖家执行订单 |
+| `GET /api/v1/notifications?wallet=` | 通知列表 |
+
+非 Demo 模式下，市场写接口需要 internal token、管理员密钥或钱包签名。客户端可以先提交请求并读取 `expectedMessage`，再让钱包签名后重试。
 
 ### 约束
 
@@ -94,7 +95,7 @@ orders = client.get_orders(wallet="0x...")dan-scan", "tiedan", "扫描最新 mem
 
 支持两种通知方式：
 - **Web Push**：VAPID 协议，浏览器推送
-- **轮询**：`GET /api/notifications?wallet=` 定时拉取
+- **轮询**：`GET /api/v1/notifications?wallet=` 定时拉取
 
 ```javascript
 // 订阅推送
@@ -102,19 +103,20 @@ const sub = await registration.pushManager.subscribe({
   userVisibleOnly: true,
   applicationServerKey: vapidPublicKey
 });
-await fetch('/api/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+await fetch('/api/v1/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
 ```
 
 ## 需要适配的项
 
 | 事项 | PoC 现状 | 生产环境 |
 |------|---------|---------|
-| 支付 | demo 模式 | 真实链上 `txHash` 验证 |
-| 质押 | 零地址（跳过验证） | 质押池地址 |
-| 数据存储 | JSON 文件 | 数据库 |
+| 支付 | demo / testnet | 真实链上 `txHash` 验证 |
+| 质押 | testnet tx 验证 | 质押池地址 + receipt 验证 |
+| 数据存储 | SQLite / Postgres | Postgres + 备份 |
 | Agent Runtime | 本地 Python | 远程调用 |
 | 用户身份 | 钱包地址 | 用户系统对接 |
 | 国际化 | 中英文切换 | 多语言 |
+| 信用画像 | SACRED 模拟 | 接入排序、额度和仲裁 |
 
 ## 不需要改的
 

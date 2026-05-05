@@ -31,7 +31,7 @@
 
 ### 白名单域名
 
-binance.org, bscscan.com, basescan.org, four.meme, dexscreener.com, coingecko.com, geckoterminal.com, dex.guru, etherscan.io, bsc-dataseed, mainnet.base.org
+binance.org, bnbchain.org, bscscan.com, testnet.bscscan.com, basescan.org, four.meme, dexscreener.com, coingecko.com, geckoterminal.com, dex.guru, etherscan.io, bsc-dataseed, bsc-testnet, mainnet.base.org
 
 ### CLI 使用
 
@@ -55,6 +55,8 @@ node security/scanner.js <seller-config>
 - 购买接口必须提供 `txHash`（链上支付）或显式 `paymentMode: "demo"`
 - `txHash` 防重复使用
 - 智能路由自动选择最优支付路径
+- BSC 交易签名前会校验 `BSC_RPC` 实际 chainId 与 `BSC_CHAIN_ID` 一致。测试网必须使用 `BSC_CHAIN_ID=97`。
+- 非 Demo 模式下，卖家押金必须提供链上交易哈希，且交易 receipt 必须成功。
 
 ## 质押罚没
 
@@ -80,6 +82,16 @@ Express Gateway (`3457`) 到 Python Flask (`3458`) 的代理遵循以下安全�
   - Session Key revoke/increase-quota: 需要 main_wallet 匹配验证
   - 其他写入: 需要 buyer 签名或 internal token（由客户端显式提供）
 - 浏览器不能通过前端代理绕过 Python 的 `@require_auth`
+
+## 直挂市场写接口
+
+Express 仍保留少量 `/api/v1/*` 市场写接口，方便 Dashboard 和旧客户端兼容。非 Demo 模式下，这些接口必须满足至少一种认证方式：
+
+- `X-CryptoMinds-Internal-Token`
+- `X-Admin-Secret` 或请求体 `adminSecret`
+- 钱包签名，消息格式由接口返回的 `expectedMessage` 指定
+
+覆盖接口包括卖家注册、追加押金、创建订单、卖家退出、执行订单和评价订单。读接口如 `GET /api/v1/sellers` 不需要写认证。
 
 ## Escrow 争议仲裁安全
 

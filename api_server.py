@@ -1265,7 +1265,7 @@ def _execute_chain_claim(order, action):
             'nonce': channel.w3.eth.get_transaction_count(admin_account.address),
             'gas': 100000,
             'gasPrice': channel.w3.eth.gas_price,
-            'chainId': 56,
+            'chainId': channel.chain_id,
         })
         signed = channel.w3.eth.account.sign_transaction(tx, admin_key)
         raw_tx = getattr(signed, 'raw_transaction', None) or getattr(signed, 'rawTransaction')

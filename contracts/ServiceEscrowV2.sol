@@ -123,7 +123,7 @@ contract ServiceEscrowV2 {
             require(msg.value == 0, "No BNB for ERC-20 orders");
             require(amount > 0, "Must specify ERC-20 amount > 0");
             orderAmount = amount;
-            require(IERC20(token).transferFrom(msg.sender, address(this), orderAmount), "ERC-20 transferFrom failed");
+            _safeTransferFrom(msg.sender, address(this), orderAmount);
         }
 
         uint256 buyerTimeout = buyerTimeoutSeconds > 0 ? buyerTimeoutSeconds : defaultTimeout;
@@ -255,8 +255,22 @@ contract ServiceEscrowV2 {
             (bool ok, ) = payable(to).call{value: amount}("");
             require(ok, "BNB transfer failed");
         } else {
-            require(IERC20(token).transfer(to, amount), "ERC-20 transfer failed");
+            _safeTransfer(to, amount);
         }
+    }
+
+    function _safeTransfer(address to, uint256 amount) internal {
+        (bool ok, bytes memory data) = token.call(
+            abi.encodeWithSelector(IERC20.transfer.selector, to, amount)
+        );
+        require(ok && (data.length == 0 || abi.decode(data, (bool))), "ERC-20 transfer failed");
+    }
+
+    function _safeTransferFrom(address from, address to, uint256 amount) internal {
+        (bool ok, bytes memory data) = token.call(
+            abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, amount)
+        );
+        require(ok && (data.length == 0 || abi.decode(data, (bool))), "ERC-20 transferFrom failed");
     }
 
     function getOrder(bytes32 orderId) external view returns (

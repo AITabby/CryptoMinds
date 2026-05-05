@@ -21,7 +21,7 @@ from pathlib import Path
 
 import requests as req
 
-from config import load_wallets, get_wallet_key
+from config import BSC_CHAIN_ID, load_wallets, get_wallet_key
 
 DIR = str(Path(__file__).parent)
 MARKET_URL = os.getenv("CRYPTOMINDS_MARKET", "http://localhost:3457")
@@ -178,7 +178,7 @@ def pay_seller(buyer_name, seller_wallet, amount_bnb, service_id):
             'gas': 25000,
             'gasPrice': w3.eth.gas_price,
             'nonce': nonce,
-            'chainId': 56,
+            'chainId': BSC_CHAIN_ID,
         }
         signed = account.sign_transaction(tx)
         tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction).hex()

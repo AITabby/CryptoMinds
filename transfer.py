@@ -7,7 +7,7 @@ from web3 import Web3
 from web3.middleware import ExtraDataToPOAMiddleware
 
 # BSC 主网 RPC
-from config import BSC_RPC, load_wallets, get_wallet_key
+from config import BSC_RPC, BSC_CHAIN_ID, load_wallets, get_wallet_key
 
 w3 = Web3(Web3.HTTPProvider(BSC_RPC))
 w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
@@ -61,7 +61,7 @@ def transfer(from_name, to_name, amount_bnb):
         'value': bnb_amount,
         'gas': 21000,
         'gasPrice': w3.eth.gas_price,
-        'chainId': 56,
+        'chainId': BSC_CHAIN_ID,
     }
 
     # 签名并发送

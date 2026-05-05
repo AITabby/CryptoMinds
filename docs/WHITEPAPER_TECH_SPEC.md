@@ -1056,30 +1056,42 @@ Escrow 托管改变了买卖双方的博弈结构：
 
 ## 15. 未来方向
 
-### 15.1 近期 (生产上线)
+### 15.1 近期 (BSC 测试网)
 
 | 项 | 优先级 | 说明 |
 |----|--------|------|
 | TLS/SSL 终止 | P0 | HTTPS 加密传输 |
-| timing-safe admin 比较 | P0 | Python 端修复 |
+| chainId/RPC 校验 | P0 | 测试网交易必须使用 `BSC_CHAIN_ID=97` |
+| 写接口认证 | P0 | internal token、管理员密钥或钱包签名 |
+| 押金链上验证 | P0 | deposit tx + receipt success |
+| timing-safe admin 比较 | P0 | 管理员密钥比较 |
 | 私钥保护 | P0 | 加密存储或 HSM |
 | Docker 进程管理 | P0 | 前台运行 + 健康检查 |
 | 监控告警 | P1 | Prometheus + Grafana |
-| Flask 生产服务器 | P1 | gunicorn/gevent |
-| 数据库备份 | P1 | SQLite 定期备份 |
+| 数据库备份 | P1 | PostgreSQL volume 备份 |
 
-### 15.2 中期 (生态扩展)
+### 15.2 中期 (SACRED 信用分)
 
 | 项 | 说明 |
 |----|------|
-| 更多链支持 | Polygon, Arbitrum, Base (ERC20 扩展) |
-| 合约升级 | partial release, ERC-20 支持 |
+| 五维信用画像 | Stability / Activity / Creditworthiness / Reliability / Ecosystem |
+| 冷启动保护 | 新 Agent 初始分、快速通道、退出冷启动阈值 |
+| 授权查询 | Agent 授权第三方查看信用档案 |
+| 排行榜与画像页 | 历史趋势、同行对比、风险提示 |
+| 小流量接入 | 先影响排序，再影响额度、押金折扣和仲裁权重 |
+
+### 15.3 中远期 (生态扩展)
+
+| 项 | 说明 |
+|----|------|
+| 更多链支持 | Polygon, Arbitrum, Base |
+| 合约升级 | partial release, ERC-20 托管 |
 | 多签仲裁 | DAO 投票替代单管理员 |
 | SPL Token 转账 | Solana 代币交互 |
-| 看 门狗 Agent | 自动监控超时订单 |
+| 看门狗 Agent | 自动监控超时订单 |
 | Web UI 完善 | Escrow/Voucher 全流程可视化 |
 
-### 15.3 远期 (Agent 经济体)
+### 15.4 远期 (Agent 经济体)
 
 | 项 | 说明 |
 |----|------|
@@ -1094,8 +1106,8 @@ Escrow 托管改变了买卖双方的博弈结构：
 
 | 类型 | 数量 | 覆盖 |
 |------|------|------|
-| pytest 单元测试 | 635 passed, 1 skipped | 70.75% 代码覆盖, 70% 门槛 |
-| E2E 测试 | 23 | 全正向路径 + 争议 + 安全 |
+| pytest 单元测试 | 777 passed, 1 skipped | 73.11% 代码覆盖, 70% 门槛 |
+| E2E 测试 | 覆盖协议正向路径、争议与安全回归 | 随 pytest / node:test 运行 |
 | node:test | 10 | SQLite + API + 端口 |
 
 ## 附录 B: 数据层 Schema
@@ -1114,8 +1126,10 @@ Escrow 托管改变了买卖双方的博弈结构：
 
 | 变量 | 说明 | 默认值 |
 |------|------|---------|
-| BSC_RPC | BSC RPC 端点 | https://bsc-dataseed1.binance.org |
+| BSC_RPC | BSC RPC 端点 | 测试网建议 `https://bsc-testnet-dataseed.bnbchain.org` |
+| BSC_CHAIN_ID | BSC chainId | 测试网 97，主网 56 |
 | ESCROW_CONTRACT_ADDRESS | 合约部署地址 | — |
+| DATABASE_URL | PostgreSQL 连接串 | Compose 默认指向 postgres |
 | CRYPTOMINDS_DB_PATH | SQLite 数据库路径 | web/cryptominds.db |
 | CRYPTOMINDS_INTERNAL_TOKEN | Python API 认证 token | — |
 | ADMIN_SECRET | 管理员密钥 | — |
@@ -1128,4 +1142,4 @@ Escrow 托管改变了买卖双方的博弈结构：
 
 **联系方式**: GitHub Issues
 
-**版本历史**: v2.4 — 完整 Escrow + Session Key + Voucher + 多链 SDK + CI/CD
+**版本历史**: v2.5 — BSC Testnet hardening + SACRED credit-score roadmap

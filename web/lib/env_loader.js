@@ -13,16 +13,20 @@ const ENVIRONMENTS_DIR = path.join(PROJECT_ROOT, 'environments');
 const REQUIRED_PROD = ['CRYPTOMINDS_INTERNAL_TOKEN', 'ADMIN_SECRET', 'BSC_RPC', 'DEPOSIT_POOL_ADDRESS'];
 const REQUIRED_STAGING = ['CRYPTOMINDS_INTERNAL_TOKEN', 'ADMIN_SECRET', 'BSC_RPC'];
 
-function loadEnvFile(filePath) {
+function loadEnvFile(filePath, { override = false, protectedKeys = new Set() } = {}) {
   if (!fs.existsSync(filePath)) return false;
   const content = fs.readFileSync(filePath, 'utf-8');
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
     const [key, ...rest] = trimmed.split('=');
-    const value = rest.join('=').trim();
-    if (key.trim() && !process.env[key.trim()]) {
-      process.env[key.trim()] = value;
+    const normalizedKey = key.trim();
+    const value = rest.join('=').trim().replace(/^['"]|['"]$/g, '');
+    if (!normalizedKey || protectedKeys.has(normalizedKey)) {
+      continue;
+    }
+    if (override || !process.env[normalizedKey]) {
+      process.env[normalizedKey] = value;
     }
   }
   return true;
@@ -31,12 +35,13 @@ function loadEnvFile(filePath) {
 function loadEnvironment() {
   const envName = (process.env.CRYPTOMINDS_ENV || process.env.NODE_ENV || 'dev').toLowerCase();
 
-  // 1. Load base .env
+  // 1. Load base .env as local defaults; real shell/container env wins.
+  const explicitEnvKeys = new Set(Object.keys(process.env));
   loadEnvFile(path.join(PROJECT_ROOT, '.env'));
 
-  // 2. Load environment-specific file
+  // 2. Load environment-specific file over base .env, but not over real env.
   const envFile = path.join(ENVIRONMENTS_DIR, `.env.${envName}`);
-  const loaded = loadEnvFile(envFile);
+  const loaded = loadEnvFile(envFile, { override: true, protectedKeys: explicitEnvKeys });
   if (!loaded && envName !== 'dev') {
     console.warn(`[ENV] Environment file ${envFile} not found`);
   }
@@ -57,6 +62,7 @@ function loadEnvironment() {
   const config = readConfig(envName);
   console.log(`[ENV-OK] Environment: ${envName}`);
   console.log(`  BSC_RPC=${config.BSC_RPC}`);
+  console.log(`  BSC_CHAIN_ID=${config.BSC_CHAIN_ID}`);
   console.log(`  DEMO_MODE=${config.DEMO_MODE}`);
   console.log(`  LOG_JSON=${config.LOG_JSON}`);
   console.log(`  INTERNAL_TOKEN=${config.INTERNAL_TOKEN ? '<set>' : '<empty>'}`);
@@ -87,6 +93,7 @@ function readConfig(envName) {
   return {
     env: envName,
     BSC_RPC: process.env.BSC_RPC || 'https://bsc-dataseed1.binance.org/',
+    BSC_CHAIN_ID: parseInt(process.env.BSC_CHAIN_ID || '56', 10),
     DEMO_MODE: (process.env.DEMO_MODE || 'false').toLowerCase() === 'true',
     DEBUG: (process.env.CRYPTOMINDS_DEBUG || 'false').toLowerCase() === 'true',
     LOG_LEVEL: (process.env.CRYPTOMINDS_LOG_LEVEL || 'INFO').toUpperCase(),

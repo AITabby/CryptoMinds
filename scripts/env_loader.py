@@ -29,24 +29,22 @@ REQUIRED_STAGING_VARS = [
 ]
 
 
-def _load_env_file(env_path: Path):
+def _load_env_file(env_path: Path, override: bool = False, protected_keys: set = None):
     """Load a .env file into os.environ (python-dotenv if available, else manual)."""
     if not env_path.exists():
         return False
-    try:
-        from dotenv import load_dotenv
-        load_dotenv(env_path, override=False)
-    except ImportError:
-        # Manual fallback: parse KEY=VALUE lines
-        for line in env_path.read_text().splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip()
-            if key and key not in os.environ:
-                os.environ[key] = value
+    protected_keys = protected_keys or set()
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if not key or key in protected_keys:
+            continue
+        if override or key not in os.environ:
+            os.environ[key] = value
     return True
 
 
@@ -55,12 +53,13 @@ def load_env():
     # 1. Determine environment
     env_name = os.getenv("CRYPTOMINDS_ENV", "dev").lower()
 
-    # 2. Load base .env (project root, override=False so explicit env vars win)
-    _load_env_file(PROJECT_ROOT / ".env")
+    # 2. Load base .env as local defaults only; real shell/container env wins.
+    explicit_env_keys = set(os.environ)
+    _load_env_file(PROJECT_ROOT / ".env", override=False)
 
-    # 3. Load environment-specific file (overrides base for that env)
+    # 3. Load environment-specific file. It overrides base .env, but not real env vars.
     env_file = ENVIRONMENTS_DIR / f".env.{env_name}"
-    loaded = _load_env_file(env_file)
+    loaded = _load_env_file(env_file, override=True, protected_keys=explicit_env_keys)
     if not loaded and env_name != "dev":
         logger.warning(f"Environment file {env_file} not found, using base .env only")
 
@@ -68,6 +67,7 @@ def load_env():
     config = {
         "env": env_name,
         "BSC_RPC": os.getenv("BSC_RPC", "https://bsc-dataseed1.binance.org/"),
+        "BSC_CHAIN_ID": int(os.getenv("BSC_CHAIN_ID", "56")),
         "DEMO_MODE": os.getenv("DEMO_MODE", "false").lower() in ("1", "true", "yes"),
         "DEBUG": os.getenv("CRYPTOMINDS_DEBUG", "false").lower() in ("1", "true", "yes"),
         "API_PORT": int(os.getenv("CRYPTOMINDS_API_PORT", "3458")),
@@ -91,6 +91,7 @@ def load_env():
     # 6. Print config summary (no secrets)
     logger.info(f"[ENV-OK] Environment: {env_name}")
     logger.info(f"  BSC_RPC={config['BSC_RPC']}")
+    logger.info(f"  BSC_CHAIN_ID={config['BSC_CHAIN_ID']}")
     logger.info(f"  DEMO_MODE={config['DEMO_MODE']}")
     logger.info(f"  DEBUG={config['DEBUG']}")
     logger.info(f"  API_PORT={config['API_PORT']}")

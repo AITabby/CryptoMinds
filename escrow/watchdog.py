@@ -214,7 +214,7 @@ class EscrowWatchdog:
                 'nonce': channel.w3.eth.get_transaction_count(admin_account.address),
                 'gas': 100000,
                 'gasPrice': channel.w3.eth.gas_price,
-                'chainId': 56,
+                'chainId': channel.chain_id,
             })
 
             signed = channel.w3.eth.account.sign_transaction(tx, admin_key)

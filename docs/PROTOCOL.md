@@ -4,7 +4,7 @@ CryptoMinds 当前对外表达只保留一套模型：买家 Agent 在市场中�
 
 ## 1. 市场接口
 
-### `GET /api/sellers`
+### `GET /api/v1/sellers`
 
 返回当前可见卖家列表。
 
@@ -26,7 +26,7 @@ CryptoMinds 当前对外表达只保留一套模型：买家 Agent 在市场中�
 }
 ```
 
-### `POST /api/sellers/register`
+### `POST /api/v1/sellers/register`
 
 注册卖家 Agent。
 
@@ -37,10 +37,12 @@ CryptoMinds 当前对外表达只保留一套模型：买家 Agent 在市场中�
 - `desc`
 - `feeRate`
 - `endpoint` 可选
+- `depositTx` 非 Demo 模式必填，且必须是成功的链上押金交易
+- `message` / `signature` 非 Demo 模式用于钱包签名认证；也可由内部服务提供 internal token
 
 ## 2. 下单与执行
 
-### `POST /api/agent-buy`
+### `POST /api/v1/agent-buy`
 
 买家 Agent 自动选择卖家并执行买币。
 
@@ -57,7 +59,7 @@ CryptoMinds 当前对外表达只保留一套模型：买家 Agent 在市场中�
 - 买入交易哈希
 - 转币交易哈希
 
-### `POST /api/orders/create`
+### `POST /api/v1/orders/create`
 
 按指定卖家创建订单。
 
@@ -65,18 +67,19 @@ CryptoMinds 当前对外表达只保留一套模型：买家 Agent 在市场中�
 
 - 卖家当前可接单额度 = 质押金额 - 未完成订单金额
 - 订单金额超过额度时，接口直接拒绝
+- 非 Demo 模式要求 internal token、管理员密钥或买家钱包签名
 
 ## 3. 订单查询
 
-### `GET /api/my-orders?wallet=...`
+### `GET /api/v1/my-orders?wallet=...`
 
 查看买家侧订单。
 
-### `GET /api/received-orders?wallet=...`
+### `GET /api/v1/received-orders?wallet=...`
 
 查看卖家侧订单。
 
-### `GET /api/live-feed`
+### `GET /api/v1/live-feed`
 
 查看首页实时流数据。
 
@@ -86,3 +89,4 @@ CryptoMinds 当前对外表达只保留一套模型：买家 Agent 在市场中�
 - 平台不承诺收益
 - 平台只判断是否履约、是否有真实链上记录、是否符合质押额度约束
 - 盈亏和复购由市场自然反馈
+- BSC 测试网部署使用 `BSC_CHAIN_ID=97`，后端会校验 RPC 实际 chainId，避免误用主网签名

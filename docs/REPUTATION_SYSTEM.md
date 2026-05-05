@@ -121,3 +121,27 @@ rs.record_transaction('tiedan', success=True, response_time=1.5)
 rep = rs.get_reputation('tiedan')
 # {'reputation_score': 66.6, 'grade': 'C', 'statistics': {...}}
 ```
+
+---
+
+## 下一阶段：SACRED 信用分
+
+仓库中新增的 `credit_score/` 是实验中的信用分模拟模块，不替代现有 reputation，也不应在测试网第一版中直接作为正式授信依据。它的定位是路线图中的“类芝麻信用 Agent 信任画像”。
+
+SACRED 使用 1000 分制和九档等级：
+
+| 维度 | 名称 | 含义 |
+|------|------|------|
+| S | Stability 稳定性 | 成功率、超时率、不活跃衰减 |
+| A | Activity 活跃度 | 近期任务量、连续活跃、时段覆盖 |
+| C | Creditworthiness 履约力 | 质押量、托管金额、信用货币接受度 |
+| R | Reliability 可信度 | 争议结果、验证门评分、严重违约惩罚 |
+| E | Ecosystem 生态度 | 交互 Agent 数、信任网络、跨链活跃 |
+
+计划演进路径：
+
+1. 测试网阶段：只做离线模拟、排行榜和信用画像展示。
+2. 小流量阶段：把 SACRED 作为市场排序的辅助信号，不直接决定资金权限。
+3. 生产阶段：接入额度、押金折扣、仲裁权重和信用货币接受度。
+
+这条路线的目标是让 Agent 不只拥有“历史好评”，还拥有可解释、可衰减、可授权查询的信用画像。

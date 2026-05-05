@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CryptoMinds SACRED 信用分</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0b1e; color: #e0e0e0; }
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+h1 { text-align: center; font-size: 28px; margin: 20px 0; color: #fff; }
+h1 span { color: #6c5ce7; }
+.subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+
+/* 输入区 */
+.search-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; }
+.search-bar input { padding: 10px 16px; border-radius: 8px; border: 1px solid #333; background: #1a1b2e; color: #fff; width: 300px; font-size: 14px; }
+.search-bar button { padding: 10px 20px; border-radius: 8px; border: none; background: #6c5ce7; color: #fff; cursor: pointer; font-size: 14px; }
+.search-bar button:hover { background: #5a4bd1; }
+
+/* 信用分卡片 */
+.score-card { background: #1a1b2e; border-radius: 16px; padding: 30px; margin-bottom: 20px; text-align: center; display: none; }
+.score-card.visible { display: block; }
+.score-number { font-size: 72px; font-weight: bold; margin: 10px 0; }
+.score-number.aaa { color: #ffd700; }
+.score-number.aa { color: #ff9f43; }
+.score-number.a { color: #00d2d3; }
+.score-number.bbb { color: #54a0ff; }
+.score-number.bb { color: #5f27cd; }
+.score-number.b { color: #c8d6e5; }
+.score-number.ccc { color: #ee5a24; }
+.score-number.cc, .score-number.c { color: #b33939; }
+.score-grade { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+.score-wallet { color: #888; font-size: 12px; }
+.score-trend { margin-top: 8px; font-size: 14px; }
+.score-trend.rising { color: #00d2d3; }
+.score-trend.declining { color: #ee5a24; }
+.score-trend.stable { color: #888; }
+
+/* 五维雷达图 */
+.radar-section { background: #1a1b2e; border-radius: 16px; padding: 30px; margin-bottom: 20px; display: none; }
+.radar-section.visible { display: block; }
+.radar-section h2 { margin-bottom: 15px; font-size: 18px; }
+#radarCanvas { display: block; margin: 0 auto; }
+
+/* 维度详情 */
+.dimensions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 20px; }
+.dim-card { background: #22233a; border-radius: 10px; padding: 15px; text-align: center; }
+.dim-card .dim-letter { font-size: 24px; font-weight: bold; color: #6c5ce7; }
+.dim-card .dim-name { font-size: 12px; color: #888; margin: 4px 0; }
+.dim-card .dim-score { font-size: 20px; font-weight: bold; }
+.dim-bar { height: 6px; background: #333; border-radius: 3px; margin-top: 8px; }
+.dim-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #6c5ce7, #00d2d3); }
+
+/* 风险提示 */
+.warnings { background: #1a1b2e; border-radius: 16px; padding: 20px; margin-bottom: 20px; display: none; }
+.warnings.visible { display: block; }
+.warnings h2 { font-size: 18px; margin-bottom: 10px; }
+.warning-item { padding: 10px; margin: 5px 0; border-radius: 8px; font-size: 14px; }
+.warning-item.high { background: rgba(238, 90, 36, 0.15); border-left: 3px solid #ee5a24; }
+.warning-item.medium { background: rgba(255, 159, 67, 0.15); border-left: 3px solid #ff9f43; }
+
+/* 同行对比 */
+.peer-section { background: #1a1b2e; border-radius: 16px; padding: 20px; margin-bottom: 20px; display: none; }
+.peer-section.visible { display: block; }
+.peer-section h2 { font-size: 18px; margin-bottom: 10px; }
+.peer-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+.peer-stat { text-align: center; }
+.peer-stat .label { font-size: 12px; color: #888; }
+.peer-stat .value { font-size: 20px; font-weight: bold; color: #6c5ce7; }
+
+/* 排行榜 */
+.leaderboard { background: #1a1b2e; border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+.leaderboard h2 { font-size: 18px; margin-bottom: 15px; }
+.lb-table { width: 100%; border-collapse: collapse; }
+.lb-table th { text-align: left; padding: 8px; color: #888; font-size: 12px; border-bottom: 1px solid #333; }
+.lb-table td { padding: 8px; font-size: 14px; border-bottom: 1px solid #222; }
+.lb-table tr:hover { background: #22233a; }
+.lb-rank { color: #6c5ce7; font-weight: bold; }
+.lb-grade { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+.lb-grade.aaa { background: #ffd700; color: #000; }
+.lb-grade.aa { background: #ff9f43; color: #000; }
+.lb-grade.a { background: #00d2d3; color: #000; }
+.lb-grade.bbb { background: #54a0ff; color: #000; }
+.lb-grade.bb { background: #5f27cd; color: #fff; }
+.lb-grade.b { background: #555; color: #fff; }
+.lb-grade.ccc { background: #ee5a24; color: #fff; }
+.lb-grade.cc, .lb-grade.c { background: #b33939; color: #fff; }
+
+/* 等级分布 */
+.grade-dist { margin-top: 15px; display: flex; gap: 8px; align-items: flex-end; justify-content: center; }
+.grade-bar-wrap { text-align: center; }
+.grade-bar { width: 40px; background: linear-gradient(180deg, #6c5ce7, #00d2d3); border-radius: 4px 4px 0 0; min-height: 2px; }
+.grade-bar-label { font-size: 11px; color: #888; margin-top: 4px; }
+.grade-bar-count { font-size: 11px; color: #aaa; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>CryptoMinds <span>SACRED</span> 信用分</h1>
+  <p class="subtitle">Agent 芝麻信用 — 五维评分体系</p>
+
+  <div class="search-bar">
+    <input type="text" id="agentId" placeholder="输入 Agent ID（如 sim-agent-001）">
+    <button onclick="queryScore()">查询</button>
+  </div>
+
+  <div class="score-card" id="scoreCard">
+    <div class="score-grade" id="scoreGrade"></div>
+    <div class="score-number" id="scoreNumber"></div>
+    <div class="score-wallet" id="scoreWallet"></div>
+    <div class="score-trend" id="scoreTrend"></div>
+  </div>
+
+  <div class="radar-section" id="radarSection">
+    <h2>五维评分</h2>
+    <canvas id="radarCanvas" width="400" height="400"></canvas>
+    <div class="dimensions" id="dimCards"></div>
+  </div>
+
+  <div class="warnings" id="warningsSection">
+    <h2>风险提示</h2>
+    <div id="warningsList"></div>
+  </div>
+
+  <div class="peer-section" id="peerSection">
+    <h2>同行对比</h2>
+    <div class="peer-stats" id="peerStats"></div>
+    <div class="grade-dist" id="gradeDist"></div>
+  </div>
+
+  <div class="leaderboard">
+    <h2>排行榜</h2>
+    <table class="lb-table">
+      <thead><tr><th>排名</th><th>Agent</th><th>分数</th><th>等级</th></tr></thead>
+      <tbody id="lbBody"></tbody>
+    </table>
+    <div id="lbNav" style="display:flex;gap:12px;justify-content:center;margin-top:8px;"></div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '/api/v1/credit-score';
+
+async function queryScore() {
+  const agentId = document.getElementById('agentId').value.trim();
+  if (!agentId) return;
+
+  try {
+    const resp = await fetch(`${API_BASE}/${agentId}/profile`);
+    if (!resp.ok) { alert('Agent 未找到'); return; }
+    const data = await resp.json();
+    renderProfile(data);
+  } catch (e) {
+    alert('查询失败: ' + e.message);
+  }
+}
+
+function renderProfile(data) {
+  // 信用分卡片
+  const card = document.getElementById('scoreCard');
+  card.classList.add('visible');
+  document.getElementById('scoreGrade').textContent = data.grade;
+  const numEl = document.getElementById('scoreNumber');
+  numEl.textContent = data.total_score;
+  numEl.className = 'score-number ' + data.grade.toLowerCase();
+  document.getElementById('scoreWallet').textContent = data.wallet;
+
+  const trendEl = document.getElementById('scoreTrend');
+  const trendMap = { rising: '↑ 上升趋势', declining: '↓ 下降趋势', stable: '— 稳定' };
+  trendEl.textContent = trendMap[data.trend] || '— 稳定';
+  trendEl.className = 'score-trend ' + (data.trend || 'stable');
+
+  // 雷达图
+  document.getElementById('radarSection').classList.add('visible');
+  drawRadar(data.dimensions);
+  renderDimCards(data.dimensions);
+
+  // 风险提示
+  const warnSec = document.getElementById('warningsSection');
+  const warnList = document.getElementById('warningsList');
+  if (data.warnings && data.warnings.length > 0) {
+    warnSec.classList.add('visible');
+    warnList.innerHTML = data.warnings.map(w =>
+      `<div class="warning-item ${w.level}">[${w.name}] ${w.message}</div>`
+    ).join('');
+  } else {
+    warnSec.classList.remove('visible');
+  }
+
+  // 同行对比
+  if (data.peer_comparison && data.peer_comparison.total_agents > 0) {
+    document.getElementById('peerSection').classList.add('visible');
+    const pc = data.peer_comparison;
+    document.getElementById('peerStats').innerHTML = `
+      <div class="peer-stat"><div class="label">超过</div><div class="value">${pc.beat_percent}%</div><div class="label">的 Agent</div></div>
+      <div class="peer-stat"><div class="label">平均分</div><div class="value">${pc.avg_score}</div></div>
+      <div class="peer-stat"><div class="label">中位数</div><div class="value">${pc.median_score}</div></div>
+    `;
+    // 等级分布柱状图
+    const grades = ['AAA','AA','A','BBB','BB','B','CCC','CC','C'];
+    const maxCount = Math.max(...grades.map(g => pc.grade_distribution[g] || 0), 1);
+    document.getElementById('gradeDist').innerHTML = grades.map(g => {
+      const count = pc.grade_distribution[g] || 0;
+      const height = Math.max(2, (count / maxCount) * 80);
+      return `<div class="grade-bar-wrap"><div class="grade-bar-count">${count || ''}</div><div class="grade-bar" style="height:${height}px"></div><div class="grade-bar-label">${g}</div></div>`;
+    }).join('');
+  }
+}
+
+function drawRadar(dimensions) {
+  const canvas = document.getElementById('radarCanvas');
+  const ctx = canvas.getContext('2d');
+  const cx = 200, cy = 200, maxR = 150;
+  ctx.clearRect(0, 0, 400, 400);
+
+  const dims = [
+    { key: 'S', label: '稳定性' },
+    { key: 'A', label: '活跃度' },
+    { key: 'C', label: '履约力' },
+    { key: 'R', label: '可信度' },
+    { key: 'E', label: '生态度' },
+  ];
+  const n = dims.length;
+  const angleStep = (2 * Math.PI) / n;
+  const startAngle = -Math.PI / 2;
+
+  // 网格
+  for (let ring = 1; ring <= 4; ring++) {
+    const r = maxR * ring / 4;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const angle = startAngle + i * angleStep;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#333';
+    ctx.stroke();
+  }
+
+  // 轴线和标签
+  for (let i = 0; i < n; i++) {
+    const angle = startAngle + i * angleStep;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + maxR * Math.cos(angle), cy + maxR * Math.sin(angle));
+    ctx.strokeStyle = '#444';
+    ctx.stroke();
+
+    const lx = cx + (maxR + 20) * Math.cos(angle);
+    const ly = cy + (maxR + 20) * Math.sin(angle);
+    ctx.fillStyle = '#888';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(dims[i].label + ' ' + (dimensions[dims[i].key] ? dimensions[dims[i].key].score : 0), lx, ly);
+  }
+
+  // 数据区域
+  ctx.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const idx = i % n;
+    const dim = dimensions[dims[idx].key];
+    const val = dim ? dim.score / 200 : 0;
+    const r = maxR * Math.max(0.05, val);
+    const angle = startAngle + idx * angleStep;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.fillStyle = 'rgba(108, 92, 231, 0.3)';
+  ctx.fill();
+  ctx.strokeStyle = '#6c5ce7';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // 数据点
+  for (let i = 0; i < n; i++) {
+    const dim = dimensions[dims[i].key];
+    const val = dim ? dim.score / 200 : 0;
+    const r = maxR * Math.max(0.05, val);
+    const angle = startAngle + i * angleStep;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, 2 * Math.PI);
+    ctx.fillStyle = '#6c5ce7';
+    ctx.fill();
+  }
+}
+
+function renderDimCards(dimensions) {
+  const container = document.getElementById('dimCards');
+  const dims = [
+    { key: 'S', label: 'Stability' },
+    { key: 'A', label: 'Activity' },
+    { key: 'C', label: 'Creditworthiness' },
+    { key: 'R', label: 'Reliability' },
+    { key: 'E', label: 'Ecosystem' },
+  ];
+  container.innerHTML = dims.map(d => {
+    const dim = dimensions[d.key] || {};
+    const score = dim.score || 0;
+    const pct = (score / 200 * 100).toFixed(0);
+    return `<div class="dim-card">
+      <div class="dim-letter">${d.key}</div>
+      <div class="dim-name">${d.label}</div>
+      <div class="dim-score">${score}</div>
+      <div class="dim-bar"><div class="dim-bar-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// 加载排行榜
+let lbPage = 1;
+const LB_PAGE_SIZE = 50;
+
+async function loadLeaderboard(page) {
+  page = page || lbPage;
+  lbPage = page;
+  try {
+    const offset = (page - 1) * LB_PAGE_SIZE;
+    const resp = await fetch(`${API_BASE}/leaderboard?limit=${LB_PAGE_SIZE}`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const tbody = document.getElementById('lbBody');
+    tbody.innerHTML = data.leaderboard.map(e =>
+      `<tr>
+        <td class="lb-rank">${e.rank}</td>
+        <td>${e.agent_id}</td>
+        <td>${e.total_score}</td>
+        <td><span class="lb-grade ${e.grade.toLowerCase()}">${e.grade}</span></td>
+      </tr>`
+    ).join('');
+
+    const nav = document.getElementById('lbNav');
+    if (nav) {
+      nav.innerHTML = `<button onclick="loadLeaderboard(${page - 1})" ${page <= 1 ? 'disabled' : ''}>&lt;</button>
+        <span>Page ${page}</span>
+        <button onclick="loadLeaderboard(${page + 1})" ${data.leaderboard.length < LB_PAGE_SIZE ? 'disabled' : ''}>&gt;</button>`;
+    }
+  } catch (e) {}
+}
+
+loadLeaderboard();
+
+// 回车查询
+document.getElementById('agentId').addEventListener('keypress', e => {
+  if (e.key === 'Enter') queryScore();
+});
+</script>
+</body>
+</html>

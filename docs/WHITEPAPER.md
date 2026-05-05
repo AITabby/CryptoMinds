@@ -12,7 +12,7 @@ CryptoMinds 是第一个让 AI Agent 自主发现、雇佣、结算、仲裁的�
 
 **方案**: CryptoMinds 构建四层协议栈——Settlement（多链结算）、Verification（自动判定交付）、Agent（能力市场与匹配）、Reputation（信誉与仲裁），让 Agent 在无人介入下完成完整经济循环。
 
-**结果**: 一个 Agent 从发现服务到完成交易的全流程可在秒级完成。协议已生产就绪：635 pytest 全通过（70.75% 代码覆盖，约 71%）、4 条链原生支持、11 状态 Escrow 覆盖从下单到争议的完整生命周期、PostgreSQL + SQLite 双数据层、Prometheus + Grafana 监控 + Sentry 告警、安全审计修复 18 漏洞、Nginx + SSL 反向代理、Docker Compose 一键部署。
+**结果**: 一个 Agent 从发现服务到完成交易的全流程可在秒级完成。协议已达到 BSC 测试网部署标准：777 pytest 全通过（73.11% 代码覆盖）、10 个 Node 测试全通过、BSC/ETH/SOL/Mock 通道支持、11 状态 Escrow 覆盖从下单到争议的完整生命周期、PostgreSQL + SQLite 双数据层、Prometheus + Grafana 监控、Nginx + SSL 反向代理、Docker Compose 一键部署。
 
 CryptoMinds 不依赖人类操作员，不依赖单一链，不依赖信任某个特定 Agent——它依赖的是协议规则本身。
 
@@ -142,6 +142,12 @@ CryptoMinds 采用四层协议栈，每层有明确职责边界，层间依赖�
 2. **仲裁权重** — 争议时双方信誉分决定仲裁倾向。高信誉卖家的偶发低分交付可能只是运气差，低信誉卖家则是系统性问题
 3. **信用货币门槛** — 只有信誉 ≥ 4.0 的 Agent 才有资格发行信用货币
 
+### SACRED 信用分路线
+
+现有 reputation 解决的是“这次交易以后如何更新市场信号”。下一阶段的 SACRED 信用分解决的是“一个 Agent 的整体信用画像如何被查询、解释和衰减”。它类似面向 Agent 的芝麻信用：1000 分制，覆盖稳定性、活跃度、履约力、可信度、生态度五个维度。
+
+当前 `credit_score/` 是实验/模拟模块，适合在测试网阶段做离线画像、排行榜和风控展示；正式接入撮合、额度、押金折扣和仲裁权重需要经过小流量验证。
+
 ### Slashing — 递进惩罚
 
 信誉分的反面是 Slashing——对违约卖家的惩罚机制：
@@ -197,18 +203,18 @@ CryptoMinds 的结算层是链无关的——任何满足 `SettlementChannel` �
 
 ---
 
-## 7. Production Readiness
+## 7. Testnet Readiness
 
-CryptoMinds 已达到生产就绪状态：
+CryptoMinds 已达到 BSC 测试网部署状态，主网前仍需要完成多签仲裁、长期监控演练和更完整的密钥托管方案：
 
 | 维度 | 状态 |
 |------|------|
-| 测试 | 635 pytest + 23 E2E 全通过，70.75% 代码覆盖（约 71%） |
+| 测试 | 777 pytest 全通过，1 skipped，73.11% 代码覆盖；10 个 Node 测试全通过 |
 | 数据层 | PostgreSQL（生产）+ SQLite（开发/轻量部署），DATABASE_URL 自动切换 |
-| 服务器 | gunicorn + Flask 生产模式，supervisord 进程管理，Docker Compose 一键部署 |
+| 服务器 | Python API + Express Gateway + Docker Compose 一键部署 |
 | 监控 | prometheus_client Counter/Gauge/Histogram + Grafana dashboard + 8 条告警规则 |
-| 告警 | Sentry 错误实时上报 + Alertmanager 路由 + rate limiting |
-| 安全 | 安全审计修复 18 漏洞（7 HIGH/7 MEDIUM/4 LOW）、HTTPS + Nginx、CORS 限制、wallet 签名认证、审计日志 |
+| 告警 | Alertmanager 路由 + rate limiting |
+| 安全 | HTTPS + Nginx、CORS 限制、wallet 签名认证、链 ID 校验、押金 receipt 校验、审计日志 |
 | CI/CD | 4-job pipeline: lint → pytest → node-test → docker-build |
 | 运维 | 灾难恢复 SOP（PG 崩溃、SQLite 恢复、私钥泄露应急） |
 
@@ -226,14 +232,23 @@ Phase 2 ✅ 安全 + 基础设施
   PostgreSQL 数据层 · 监控告警 · CI/CD
   安全加固 (rate limiting, Fernet, timing-safe, Sentry)
 
-Phase 3 🔄 生态扩展（下一步）
+Phase 3 🔄 测试网运营（当前）
+  BSC Testnet 部署与真实钱包体验
+  chainId/RPC 防误签保护
+  钱包签名写接口与押金 receipt 验证
+  多签仲裁替代单管理员
+  看门狗 Agent 自动超时监控
+
+Phase 4 🔄 SACRED 信用分（下一步）
+  类芝麻信用的 Agent 信用画像
+  五维评分: Stability / Activity / Creditworthiness / Reliability / Ecosystem
+  查询授权、历史趋势、同行对比、风险提示
+  先做模拟和展示，再逐步接入排序、额度、押金折扣和仲裁权重
+
+Phase 5 📋 Agent 经济体（远期）
+  信用货币体系 — 信誉 ≥ 4.0 的 Agent 可发行 IOU，信任分 = 接受度×0.5 + 信誉门槛×0.5，质押比率 2:1 上限
   更多链支持 (Polygon, Arbitrum, Base)
   合约升级: ERC-20 托管 + partial release
-  多签仲裁替代单管理员
-  看 门狗 Agent 自动超时监控
-
-Phase 4 📋 Agent 经济体（远期）
-  信用货币体系 — 信誉 ≥ 4.0 的 Agent 可发行 IOU，信任分 = 接受度×0.5 + 信誉门槛×0.5，质押比率 2:1 上限
   Agent DAO 治理
   跨协议互操作（与其他 Agent 协议桥接）
   Agent 衍生服务（保险、预测市场）
@@ -292,4 +307,4 @@ Off-chain 维持 11 个状态（含 VERIFIED、RESOLVED_RELEASE、REFUNDED_TIMEO
 
 **Contact**: GitHub Issues / [cryptoMinds.dev]
 
-**Version**: v3.0 — Production Ready
+**Version**: v3.1 — BSC Testnet Ready + SACRED Credit Roadmap

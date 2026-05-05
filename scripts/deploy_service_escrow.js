@@ -11,8 +11,35 @@ const BIN_PATH = path.join(BUILD_DIR, 'contracts_ServiceEscrow_sol_ServiceEscrow
 const WALLETS_PATH = path.join(ROOT, 'wallets.json');
 const OUT_PATH = path.join(ROOT, 'escrow_deployment.json');
 
+function getRequiredRpc() {
+  const rpc = process.env.BSC_RPC;
+  if (!rpc) {
+    throw new Error('BSC_RPC is required. Refusing to use a default mainnet RPC for deployment.');
+  }
+  return rpc;
+}
+
+function networkName(chainId) {
+  if (chainId === 56) return 'BSC Mainnet';
+  if (chainId === 97) return 'BSC Testnet';
+  return `Chain ${chainId}`;
+}
+
+function validateChainId(chainId) {
+  const expected = Number(process.env.BSC_CHAIN_ID || process.env.EXPECTED_CHAIN_ID || 97);
+  if (!Number.isFinite(expected) || expected <= 0) {
+    throw new Error('BSC_CHAIN_ID/EXPECTED_CHAIN_ID must be a positive number');
+  }
+  if (chainId !== expected) {
+    throw new Error(`RPC chainId mismatch: expected ${expected}, got ${chainId}`);
+  }
+  if (chainId === 56 && process.env.ALLOW_MAINNET_DEPLOY !== 'true') {
+    throw new Error('Refusing mainnet deployment. Set ALLOW_MAINNET_DEPLOY=true to proceed intentionally.');
+  }
+}
+
 async function main() {
-  const rpc = process.env.BSC_RPC || 'https://bsc-dataseed1.binance.org/';
+  const rpc = getRequiredRpc();
   const buyerTimeout = Number(process.env.ESCROW_BUYER_TIMEOUT || 86400);    // 24h
   const sellerTimeout = Number(process.env.ESCROW_SELLER_TIMEOUT || 1800);    // 30min
   if (!Number.isFinite(buyerTimeout) || buyerTimeout <= 0) {
@@ -42,6 +69,7 @@ async function main() {
   }
 
   const chainId = Number(await w3.eth.getChainId());
+  validateChainId(chainId);
   const nonce = await w3.eth.getTransactionCount(account.address, 'pending');
   const contract = new w3.eth.Contract(abi);
   const deployTx = contract.deploy({
@@ -65,9 +93,10 @@ async function main() {
 
   const output = {
     contractAddress: receipt.contractAddress,
+    address: receipt.contractAddress,
     txHash: receipt.transactionHash,
     deployer: account.address,
-    network: chainId === 56 ? 'BSC Mainnet' : `Chain ${chainId}`,
+    network: networkName(chainId),
     chainId,
     deployedAt: new Date().toISOString(),
     buyerTimeoutSeconds: buyerTimeout,

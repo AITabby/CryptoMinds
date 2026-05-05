@@ -13,6 +13,7 @@ WALLETS_FILE = PROJECT_ROOT / "wallets.json"
 
 # ── BSC RPC ──────────────────────────────────────────────
 BSC_RPC = os.getenv("BSC_RPC", "https://bsc-dataseed1.binance.org/")
+BSC_CHAIN_ID = int(os.getenv("BSC_CHAIN_ID", "56"))
 BSC_RPC_FALLBACKS = os.getenv("BSC_RPC_FALLBACKS", "https://bsc-dataseed2.binance.org,https://bsc-dataseed3.binance.org,https://bsc-dataseed4.binance.org").split(",")
 RPC_TIMEOUT_SECONDS = int(os.getenv("RPC_TIMEOUT_SECONDS", "5"))
 RPC_MAX_RETRIES = int(os.getenv("RPC_MAX_RETRIES", "3"))

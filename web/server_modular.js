@@ -15,6 +15,7 @@ const express = require('express');
 const { Web3 } = require('web3');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const webpush = require('web-push');
 const morgan = require('morgan');
@@ -208,6 +209,70 @@ const adminLimiter = rateLimit({
 app.use(globalLimiter);
 // Admin routes get stricter limits (applied in route handlers via requireAdmin)
 
+function timingSafeEqualString(a, b) {
+  const aBuf = Buffer.from(String(a || ''), 'utf8');
+  const bBuf = Buffer.from(String(b || ''), 'utf8');
+  return aBuf.length === bBuf.length && crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+function hasInternalToken(req) {
+  const expected = process.env.CRYPTOMINDS_INTERNAL_TOKEN || '';
+  const supplied = req.headers['x-cryptominds-internal-token'] || '';
+  return Boolean(expected && supplied && timingSafeEqualString(supplied, expected));
+}
+
+function hasAdminSecret(req) {
+  const expected = process.env.ADMIN_SECRET || '';
+  const supplied = req.headers['x-admin-secret'] || req.body?.adminSecret || '';
+  return Boolean(expected && supplied && timingSafeEqualString(supplied, expected));
+}
+
+function normalizeWallet(wallet) {
+  return String(wallet || '').trim().toLowerCase();
+}
+
+function directActionMessage(action, target, wallet) {
+  return [
+    'CryptoMinds direct action',
+    `Action: ${action}`,
+    `Target: ${target}`,
+    `Wallet: ${normalizeWallet(wallet)}`,
+  ].join('\n');
+}
+
+function verifyDirectWalletSignature(req, wallet, action, target) {
+  const expectedWallet = normalizeWallet(wallet);
+  const message = req.body?.message || '';
+  const signature = req.body?.signature || '';
+  if (!expectedWallet || !message || !signature) return false;
+  if (message !== directActionMessage(action, target, expectedWallet)) return false;
+  try {
+    const recovered = w3.eth.accounts.recover(message, signature);
+    return normalizeWallet(recovered) === expectedWallet;
+  } catch {
+    return false;
+  }
+}
+
+function requireDirectWriteAuth({ action, target, wallet } = {}) {
+  return (req, res, next) => {
+    if (DEMO_MODE || hasInternalToken(req) || hasAdminSecret(req)) {
+      return next();
+    }
+    const resolvedAction = typeof action === 'function' ? action(req) : action;
+    const resolvedTarget = typeof target === 'function' ? target(req) : target;
+    const resolvedWallet = typeof wallet === 'function' ? wallet(req) : wallet;
+    if (verifyDirectWalletSignature(req, resolvedWallet, resolvedAction, resolvedTarget)) {
+      return next();
+    }
+    return res.status(403).json({
+      ok: false,
+      error: '需要 internal token、管理员密钥或钱包签名',
+      expectedMessage: directActionMessage(resolvedAction, resolvedTarget, resolvedWallet),
+    });
+  };
+}
+
 // ── 路由注册 ─────────────────────────────────────
 
 async function setupRoutes() {
@@ -310,12 +375,36 @@ async function setupRoutes() {
   });
 
   app.get('/api/v1/sellers', sellersMarketHandlers.listSellers);
-  app.post('/api/v1/sellers/register', sellersMarketHandlers.registerSeller);
-  app.post('/api/v1/sellers/:wallet/deposit', sellersMarketHandlers.depositSeller);
-  app.post('/api/v1/orders/create', sellersMarketHandlers.createOrder);
-  app.post('/api/v1/sellers/exit', sellersMarketHandlers.exitSeller);
-  app.post('/api/v1/orders/:id/execute', sellersMarketHandlers.executeOrder);
-  app.post('/api/v1/rate-order', sellersMarketHandlers.rateOrder);
+  app.post('/api/v1/sellers/register', requireDirectWriteAuth({
+    action: 'seller_register',
+    target: (req) => req.body.wallet || '',
+    wallet: (req) => req.body.wallet || '',
+  }), sellersMarketHandlers.registerSeller);
+  app.post('/api/v1/sellers/:wallet/deposit', requireDirectWriteAuth({
+    action: 'seller_deposit',
+    target: (req) => req.params.wallet,
+    wallet: (req) => req.params.wallet,
+  }), sellersMarketHandlers.depositSeller);
+  app.post('/api/v1/orders/create', requireDirectWriteAuth({
+    action: 'order_create',
+    target: (req) => `${req.body.buyerWallet || ''}:${req.body.sellerWallet || ''}:${req.body.amount || ''}`,
+    wallet: (req) => req.body.buyerWallet || '',
+  }), sellersMarketHandlers.createOrder);
+  app.post('/api/v1/sellers/exit', requireDirectWriteAuth({
+    action: 'seller_exit',
+    target: (req) => req.body.wallet || '',
+    wallet: (req) => req.body.wallet || '',
+  }), sellersMarketHandlers.exitSeller);
+  app.post('/api/v1/orders/:id/execute', requireDirectWriteAuth({
+    action: 'order_execute',
+    target: (req) => req.params.id,
+    wallet: (req) => req.body.sellerWallet || '',
+  }), sellersMarketHandlers.executeOrder);
+  app.post('/api/v1/rate-order', requireDirectWriteAuth({
+    action: 'rate_order',
+    target: (req) => req.body.orderId || '',
+    wallet: (req) => req.body.buyerWallet || req.body.wallet || '',
+  }), sellersMarketHandlers.rateOrder);
 
   // Agent 自主下单（从 agent_buy.js）
   const { pickSellerHandler, agentBuyHandler } = createAgentBuyHandlers({

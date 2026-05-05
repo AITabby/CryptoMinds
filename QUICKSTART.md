@@ -65,6 +65,7 @@ service.stop()
 验证门: token_delivery, data_delivery, compute_result, signal_stream, content_delivery
 任务闭环: 执行 → 验证 → 结算 → 履约 → 信誉
 信用货币: 发行 → 转账 → 支付
+SACRED 信用分: 实验模拟模块，计划演进为类芝麻信用的 Agent 信任画像
 ```
 
 ## 核心文件

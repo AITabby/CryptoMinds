@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "CryptoMinds API",
-    "version": "3.0.0",
-    "description": "Agent自治经济体协议 API — 结算层、验证层、Agent层、信誉层、Escrow争议、Session Key授权"
+    "version": "3.1.0",
+    "description": "Agent自治经济体协议 API — BSC Testnet-ready, 结算层、验证层、Agent层、信誉层、Escrow争议、Session Key授权；SACRED 信用分为路线图/实验模块"
   },
   "servers": [
     { "url": "http://localhost:3457/api/v1", "description": "Express Gateway" },
@@ -470,6 +470,12 @@
         "in": "header",
         "name": "X-Admin-Secret",
         "description": "管理员密钥认证 (ADMIN_SECRET 环境变量)"
+      },
+      "wallet_signature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Wallet-Signature",
+        "description": "市场直挂写接口也可在请求体中提交 message + signature；服务端会返回 expectedMessage"
       }
     },
     "schemas": {

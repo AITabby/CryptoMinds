@@ -18,7 +18,7 @@ from ..base import SettlementChannel, PaymentRequest, PaymentResult, EscrowResul
 
 # 配置
 BSC_RPC = os.getenv("BSC_RPC", "https://bsc-dataseed1.binance.org")
-BSC_CHAIN_ID = 56
+BSC_CHAIN_ID = int(os.getenv("BSC_CHAIN_ID", "56"))
 TEST_MODE = os.getenv("SETTLEMENT_TEST_MODE", "false").lower() == "true"
 
 
@@ -40,6 +40,7 @@ class BSCNativeChannel(SettlementChannel):
     def __init__(self, rpc_url: str = None, test_mode: bool = None):
         self.rpc_url = rpc_url or BSC_RPC
         self.test_mode = test_mode if test_mode is not None else TEST_MODE
+        self.expected_chain_id = int(os.getenv("BSC_CHAIN_ID", str(BSC_CHAIN_ID)))
         self._w3 = None
 
     @property
@@ -51,6 +52,19 @@ class BSCNativeChannel(SettlementChannel):
             self._w3 = Web3(Web3.HTTPProvider(self.rpc_url))
             self._w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
         return self._w3
+
+    @property
+    def chain_id(self) -> int:
+        """Return the configured chain id after checking the connected RPC."""
+        if self.test_mode:
+            return self.expected_chain_id
+        actual_chain_id = int(self.w3.eth.chain_id)
+        if actual_chain_id != self.expected_chain_id:
+            raise RuntimeError(
+                f"BSC_RPC chainId mismatch: expected {self.expected_chain_id}, got {actual_chain_id}. "
+                "Set BSC_CHAIN_ID to the target network before signing transactions."
+            )
+        return actual_chain_id
 
     # ── 查询 ─────────────────────────────────────────
 
@@ -136,7 +150,7 @@ class BSCNativeChannel(SettlementChannel):
             nonce = self.w3.eth.get_transaction_count(request.from_address)
 
             tx = {
-                'chainId': BSC_CHAIN_ID,
+                'chainId': self.chain_id,
                 'to': Web3.to_checksum_address(request.to_address),
                 'value': amount_wei,
                 'gas': 21000,
@@ -273,7 +287,7 @@ class BSCNativeChannel(SettlementChannel):
             deploy_path = Path(__file__).parent.parent.parent / "escrow_deployment_v2.json"
             if deploy_path.exists():
                 deploy_data = json.loads(deploy_path.read_text())
-                return deploy_data.get("contractAddress", "")
+                return deploy_data.get("contractAddress") or deploy_data.get("address", "")
             return ""
         # V1 (default)
         env_addr = os.getenv("ESCROW_CONTRACT_ADDRESS", "")
@@ -282,7 +296,7 @@ class BSCNativeChannel(SettlementChannel):
         deploy_path = Path(__file__).parent.parent.parent / "escrow_deployment.json"
         if deploy_path.exists():
             deploy_data = json.loads(deploy_path.read_text())
-            return deploy_data.get("address", "")
+            return deploy_data.get("contractAddress") or deploy_data.get("address", "")
         return ""
 
     def escrow_prepare_contract_call(
@@ -404,7 +418,7 @@ class BSCNativeChannel(SettlementChannel):
                 'nonce': nonce,
                 'gas': 100000,
                 'gasPrice': self.w3.eth.gas_price,
-                'chainId': BSC_CHAIN_ID,
+                'chainId': self.chain_id,
             })
 
             signed = self.w3.eth.account.sign_transaction(tx, admin_private_key)
@@ -451,7 +465,7 @@ class BSCNativeChannel(SettlementChannel):
                 'nonce': nonce,
                 'gas': 100000,
                 'gasPrice': self.w3.eth.gas_price,
-                'chainId': BSC_CHAIN_ID,
+                'chainId': self.chain_id,
             })
 
             signed = self.w3.eth.account.sign_transaction(tx, admin_private_key)
