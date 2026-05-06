@@ -1,7 +1,0 @@
-{
-  "address": "0x1A81a18dFC26676AC30f95f4659Fe4c0b4355EC3",
-  "network": "BSC Mainnet",
-  "chainId": 56,
-  "buyerTimeoutSeconds": 86400,
-  "sellerTimeoutSeconds": 1800
-}
