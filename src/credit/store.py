@@ -10,7 +10,8 @@ import time
 from typing import Dict, List, Optional
 
 from .config import DEFAULT_DB_PATH
-from .models import SacredScore, DimensionScore, QueryAuthorization, ScoreHistoryEntry
+from .models import (SacredScore, DimensionScore, QueryAuthorization,
+                     ScoreHistoryEntry, PerformanceRecord)
 
 
 class CreditScoreStore:
@@ -94,6 +95,35 @@ class CreditScoreStore:
 
                 CREATE INDEX IF NOT EXISTS idx_violation_agent ON severe_violations(agent_id);
                 CREATE INDEX IF NOT EXISTS idx_violation_wallet ON severe_violations(wallet);
+
+                CREATE TABLE IF NOT EXISTS performance_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    record_id TEXT UNIQUE NOT NULL,
+                    task_id TEXT NOT NULL,
+                    task_type TEXT NOT NULL,
+                    buyer_wallet TEXT NOT NULL,
+                    seller_wallet TEXT NOT NULL,
+                    seller_agent_id TEXT NOT NULL,
+                    chain TEXT NOT NULL,
+                    amount TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    success INTEGER DEFAULT 0,
+                    score REAL DEFAULT 0,
+                    created_at INTEGER NOT NULL,
+                    completed_at INTEGER DEFAULT 0,
+                    response_time_ms INTEGER DEFAULT 0,
+                    payment_tx TEXT DEFAULT '',
+                    payment_amount TEXT DEFAULT '0',
+                    evidence TEXT DEFAULT '',
+                    disputed INTEGER DEFAULT 0,
+                    dispute_reason TEXT DEFAULT '',
+                    resolution TEXT DEFAULT ''
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_perf_seller ON performance_records(seller_agent_id);
+                CREATE INDEX IF NOT EXISTS idx_perf_buyer ON performance_records(buyer_wallet);
+                CREATE INDEX IF NOT EXISTS idx_perf_status ON performance_records(status);
+                CREATE INDEX IF NOT EXISTS idx_perf_created ON performance_records(created_at);
             """)
             conn.commit()
         finally:
@@ -406,6 +436,99 @@ class CreditScoreStore:
             return [dict(r) for r in rows]
         finally:
             conn.close()
+
+    # ── 履约记录 ──────────────────────────────────────
+
+    def save_performance_record(self, record: PerformanceRecord) -> None:
+        """保存履约记录"""
+        conn = self._connect()
+        try:
+            conn.execute(
+                """INSERT OR REPLACE INTO performance_records
+                   (record_id, task_id, task_type, buyer_wallet, seller_wallet,
+                    seller_agent_id, chain, amount, status, success, score,
+                    created_at, completed_at, response_time_ms, payment_tx,
+                    payment_amount, evidence, disputed, dispute_reason, resolution)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    record.record_id, record.task_id, record.task_type,
+                    record.buyer_wallet, record.seller_wallet, record.seller_agent_id,
+                    record.chain, record.amount, record.status.value,
+                    1 if record.success else 0, record.score,
+                    record.created_at, record.completed_at, record.response_time_ms,
+                    record.payment_tx, record.payment_amount, record.evidence,
+                    1 if record.disputed else 0, record.dispute_reason, record.resolution,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_performance_records(
+        self,
+        agent_id: str = None,
+        wallet: str = None,
+        limit: int = 1000,
+    ) -> List[PerformanceRecord]:
+        """
+        获取履约记录
+
+        Args:
+            agent_id: Agent ID（seller_agent_id）
+            wallet: 钱包地址（seller_wallet 或 buyer_wallet）
+            limit: 最大记录数
+        """
+        conn = self._connect()
+        try:
+            if agent_id:
+                rows = conn.execute(
+                    "SELECT * FROM performance_records WHERE seller_agent_id = ? "
+                    "ORDER BY created_at DESC LIMIT ?",
+                    (agent_id, limit),
+                ).fetchall()
+            elif wallet:
+                rows = conn.execute(
+                    "SELECT * FROM performance_records "
+                    "WHERE seller_wallet = ? OR buyer_wallet = ? "
+                    "ORDER BY created_at DESC LIMIT ?",
+                    (wallet, wallet, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM performance_records "
+                    "ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+
+            return [self._row_to_performance_record(r) for r in rows]
+        finally:
+            conn.close()
+
+    def _row_to_performance_record(self, row) -> PerformanceRecord:
+        """数据库行转 PerformanceRecord"""
+        from .models import TaskStatus
+        return PerformanceRecord(
+            record_id=row["record_id"],
+            task_id=row["task_id"],
+            task_type=row["task_type"],
+            buyer_wallet=row["buyer_wallet"],
+            seller_wallet=row["seller_wallet"],
+            seller_agent_id=row["seller_agent_id"],
+            chain=row["chain"],
+            amount=row["amount"],
+            status=TaskStatus.from_value(row["status"]),
+            success=bool(row["success"]),
+            score=row["score"],
+            created_at=row["created_at"],
+            completed_at=row["completed_at"],
+            response_time_ms=row["response_time_ms"],
+            payment_tx=row["payment_tx"],
+            payment_amount=row["payment_amount"],
+            evidence=row["evidence"],
+            disputed=bool(row["disputed"]),
+            dispute_reason=row["dispute_reason"],
+            resolution=row["resolution"],
+        )
 
     def close(self) -> None:
         pass  # SQLite connections are per-call, no persistent connection to close
