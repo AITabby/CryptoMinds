@@ -1,47 +1,40 @@
-# Dependencies
-node_modules/
-web/node_modules/
 
-# Secrets
-wallets.json
-.env
-environments/.env.prod
-environments/.env.staging
-
-# Runtime data
-orders.json
-deposits.json
-push_subs.json
-services.json.backup*
-tx-log.json
-purchases.json
-sellers.json.bak*
-
-# Agent runtime cache
-agent_events.json
-
-# Python
 __pycache__/
-**/__pycache__/
-*.pyc
-.pytest_cache/
-
-# Test coverage
 .coverage
-htmlcov/
-
-# SQLite runtime data
+.DS_Store
+.env
+.pytest_cache/
 *.db
 *.db-shm
 *.db-wal
-agents_registry.json
-
-# OS
-.DS_Store
-
-# Logs
 *.log
-
+*.pyc
+**/__pycache__/
+# Agent runtime cache
+# Dependencies
 # Local backups
-web/server.js.bak.before-deliverymode
+# Logs
+# OS
+# Python
+# Runtime data
+# Secrets
+# SQLite runtime data
+# Test coverage
+agent_events.json
+agents_registry.json
+data/installed-skills/
+deposits.json
+environments/.env.prod
+environments/.env.staging
+htmlcov/
+node_modules/
+orders.json
+purchases.json
+push_subs.json
+sellers.json.bak*
+services.json.backup*
+tx-log.json
+wallets.json
 web.bak.*/
+web/node_modules/
+web/server.js.bak.before-deliverymode
