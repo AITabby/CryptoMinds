@@ -30,7 +30,6 @@ class CapabilitySpec:
     #     "bsc": {
     #         "max_amount_bnb": 1.0,
     #         "can_pick_token": true,
-    #         "exchanges": ["four.meme", "pancakeswap"]
     #     },
     #     "sol": {
     #         "max_amount_sol": 10.0,

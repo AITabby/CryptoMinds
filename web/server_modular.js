@@ -65,7 +65,7 @@ const w3 = new Web3(BSC_RPC);
 
 // Web Push 配置
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails('mailto:cryptominds@four.meme', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  webpush.setVapidDetails('mailto:cryptominds@cryptominds.cc', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 }
 
 // App
@@ -154,7 +154,6 @@ const MANAGED_AGENT_META = {
   choudan: { name: 'Dip Hunter', role: '低吸策略', icon: '🎯' },
   pidan: { name: 'Risk Sentinel', role: '风控策略', icon: '🛡️' },
   ludan: { name: 'Flow Surfer', role: '流动性策略', icon: '🌊' },
-  four_meme: { name: 'Settlement Engine', role: '结算节点', icon: '⚙️' },
 };
 
 function getManagedAgents() {

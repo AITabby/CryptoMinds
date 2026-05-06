@@ -31,7 +31,7 @@
 
 ### 白名单域名
 
-binance.org, bnbchain.org, bscscan.com, testnet.bscscan.com, basescan.org, four.meme, dexscreener.com, coingecko.com, geckoterminal.com, dex.guru, etherscan.io, bsc-dataseed, bsc-testnet, mainnet.base.org
+binance.org, bnbchain.org, bscscan.com, testnet.bscscan.com, basescan.org, dexscreener.com, coingecko.com, geckoterminal.com, dex.guru, etherscan.io, bsc-dataseed, bsc-testnet, mainnet.base.org
 
 ### CLI 使用
 

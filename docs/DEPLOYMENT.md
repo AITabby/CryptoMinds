@@ -118,7 +118,7 @@ make compile-contracts
 
 ### 2. 准备部署钱包
 
-部署脚本读取 `wallets.json` 里的 `four_meme` 钱包。该钱包必须是测试网专用钱包，并准备少量 `tBNB`。
+部署脚本读取 `wallets.json` 里的部署钱包。该钱包必须是测试网专用钱包，并准备少量 `tBNB`。
 
 ```bash
 chmod 600 wallets.json
@@ -254,4 +254,3 @@ A: Demo 模式会跳过支付验证，检查后端日志确认。
 ## 联系方式
 
 - GitHub: https://github.com/AITabby/CryptoMinds
-- 黑客松: Four.meme AI Sprint 2026

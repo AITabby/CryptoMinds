@@ -33,11 +33,5 @@ module.exports = {
       env: { CRYPTOMINDS_DEMO: '0' },
     },
     {
-      name: 'agent-four-meme',
-      script: 'agents/agent_server.py',
-      interpreter: 'python3',
-      args: '--agent four_meme --port 5004',
-      env: { CRYPTOMINDS_DEMO: '0' },
-    },
   ],
 };

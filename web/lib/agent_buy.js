@@ -107,7 +107,7 @@ function createAgentBuyHandlers({
   // 平台代执行：选币+买币（Demo兜底模式）
   async function platformPickToken(seller) {
     const tokens = ['0x3518D7aEE5248b9307b8A82B7c3Fa49e073c4444'];
-    const tokenList = tokens.map((t, i) => `${i + 1}. AIBT (${t}) - four.meme已毕业, PancakeSwap V2可买`).join('\n');
+    const tokenList = tokens.map((t, i) => `${i + 1}. AIBT (${t}) - 已上线, PancakeSwap V2可买`).join('\n');
 
     const prompt = `你是卖家「${seller.name}」，策略是「${seller.strategy}」。你要在 BSC 链上帮买家买一个代币。\n\n当前可买：\n${tokenList}\n\n根据策略选一个，只返回编号。`;
     const idx = await chooseWithMiniMax(prompt);

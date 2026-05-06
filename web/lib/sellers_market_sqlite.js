@@ -427,7 +427,7 @@ function createSellersMarketHandlers({
               amount: order.amount,
               currency: 'BNB',
               market: 'bsc-meme',
-              venues: ['four.meme', 'pancakeswap'],
+              venues: ['pancakeswap'],
             }),
             signal: AbortSignal.timeout(180000),
           });

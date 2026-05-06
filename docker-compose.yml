@@ -76,7 +76,6 @@ services:
       - WALLET_KEY_CHOUDAN=${WALLET_KEY_CHOUDAN:-}
       - WALLET_KEY_PIDAN=${WALLET_KEY_PIDAN:-}
       - WALLET_KEY_LUDAN=${WALLET_KEY_LUDAN:-}
-      - WALLET_KEY_FOUR_MEME=${WALLET_KEY_FOUR_MEME:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
     volumes:
       - ./web/cryptominds.db:/app/web/cryptominds.db
@@ -122,7 +121,6 @@ services:
       - WALLET_KEY_CHOUDAN=${WALLET_KEY_CHOUDAN:-}
       - WALLET_KEY_PIDAN=${WALLET_KEY_PIDAN:-}
       - WALLET_KEY_LUDAN=${WALLET_KEY_LUDAN:-}
-      - WALLET_KEY_FOUR_MEME=${WALLET_KEY_FOUR_MEME:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
     volumes:
       - ./.env:/app/.env:ro
@@ -195,23 +193,6 @@ services:
           memory: 256M
           cpus: "0.5"
 
-  agent-four-meme:
-    build: .
-    container_name: cryptominds-four-meme
-    restart: always
-    expose:
-      - "5004"
-    environment:
-      - CRYPTOMINDS_ENV=${CRYPTOMINDS_ENV:-prod}
-      - CRYPTOMINDS_DEMO=${CRYPTOMINDS_DEMO:-0}
-      - DEMO_MODE=${DEMO_MODE:-false}
-      - WALLET_KEY_FOUR_MEME=${WALLET_KEY_FOUR_MEME:-}
-    command: ["python3", "agents/agent_server.py", "--agent", "four_meme", "--port", "5004"]
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
 
 volumes:
   pgdata:
