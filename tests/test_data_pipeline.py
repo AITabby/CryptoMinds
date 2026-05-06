@@ -9,9 +9,8 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.collector.mock_data import MockDataGenerator
-from src.credit.calculator import SacredCalculator
-from src.credit.store import CreditScoreStore
+from src.collector.mock_data import MockDataGenerator  # noqa: E402
+from src.credit.calculator import SacredCalculator  # noqa: E402
 
 
 def test_score_differentiation():
