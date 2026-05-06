@@ -11,7 +11,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 os.environ["CRYPTOMINDS_INTERNAL_TOKEN"] = "test-token"
 os.environ["CRYPTOMINDS_DEBUG"] = "true"
 
-import pytest
+import pytest  # noqa: E402
 
 
 @pytest.fixture

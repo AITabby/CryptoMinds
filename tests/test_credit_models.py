@@ -2,7 +2,6 @@
 测试信用分模型
 """
 
-import pytest
 from src.credit.models import SacredScore, DimensionScore, CreditGrade
 
 

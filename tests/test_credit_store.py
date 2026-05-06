@@ -28,7 +28,8 @@ class TestCreditScoreStore:
             wallet="0x1234567890123456789012345678901234567890",
             stability=DimensionScore("S", "Stability", raw_score=90, weighted_score=180),
             activity=DimensionScore("A", "Activity", raw_score=85, weighted_score=170),
-            creditworthiness=DimensionScore("C", "Creditworthiness", raw_score=80, weighted_score=160),
+            creditworthiness=DimensionScore("C", "Creditworthiness",
+                                            raw_score=80, weighted_score=160),
             reliability=DimensionScore("R", "Reliability", raw_score=88, weighted_score=176),
             ecosystem=DimensionScore("E", "Ecosystem", raw_score=82, weighted_score=164),
         )

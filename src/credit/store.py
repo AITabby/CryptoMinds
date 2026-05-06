@@ -9,7 +9,7 @@ import sqlite3
 import time
 from typing import Dict, List, Optional
 
-from .config import DEFAULT_DB_PATH, AUTHORIZATION_TTL
+from .config import DEFAULT_DB_PATH
 from .models import SacredScore, DimensionScore, QueryAuthorization, ScoreHistoryEntry
 
 
@@ -125,7 +125,8 @@ class CreditScoreStore:
             for dim_code, dim in score.dimensions.items():
                 conn.execute(
                     """INSERT INTO dimension_details
-                       (agent_id, calculated_at, dimension, raw_score, weighted_score, components_json)
+                       (agent_id, calculated_at, dimension, raw_score,
+                        weighted_score, components_json)
                        VALUES (?, ?, ?, ?, ?, ?)""",
                     (
                         score.agent_id, score.calculated_at, dim_code,
@@ -143,7 +144,8 @@ class CreditScoreStore:
         conn = self._connect()
         try:
             row = conn.execute(
-                "SELECT * FROM sacred_scores WHERE agent_id = ? ORDER BY calculated_at DESC LIMIT 1",
+                "SELECT * FROM sacred_scores WHERE agent_id = ? "
+                "ORDER BY calculated_at DESC LIMIT 1",
                 (agent_id,),
             ).fetchone()
             if not row:
@@ -159,7 +161,8 @@ class CreditScoreStore:
             for d in dims:
                 dim_map[d["dimension"]] = DimensionScore(
                     dimension=d["dimension"],
-                    name={"S": "Stability", "A": "Activity", "C": "Creditworthiness", "R": "Reliability", "E": "Ecosystem"}.get(d["dimension"], ""),
+                    name={"S": "Stability", "A": "Activity", "C": "Creditworthiness",
+                          "R": "Reliability", "E": "Ecosystem"}.get(d["dimension"], ""),
                     raw_score=d["raw_score"],
                     weighted_score=d["weighted_score"],
                     components=json.loads(d["components_json"]),
@@ -190,7 +193,8 @@ class CreditScoreStore:
             rows = conn.execute(
                 """SELECT s.*, GROUP_CONCAT(d.dimension || ':' || d.weighted_score) as dim_scores
                    FROM sacred_scores s
-                   LEFT JOIN dimension_details d ON s.agent_id = d.agent_id AND s.calculated_at = d.calculated_at
+                   LEFT JOIN dimension_details d
+                       ON s.agent_id = d.agent_id AND s.calculated_at = d.calculated_at
                    WHERE s.agent_id = ?
                    GROUP BY s.calculated_at
                    ORDER BY s.calculated_at DESC
@@ -274,7 +278,8 @@ class CreditScoreStore:
                 """INSERT OR REPLACE INTO query_authorizations
                    (auth_id, agent_id, querier_id, signature, expires_at, created_at, revoked)
                    VALUES (?, ?, ?, ?, ?, ?, 0)""",
-                (auth.auth_id, auth.agent_id, auth.querier_id, auth.signature, auth.expires_at, auth.created_at),
+                (auth.auth_id, auth.agent_id, auth.querier_id,
+                 auth.signature, auth.expires_at, auth.created_at),
             )
             conn.commit()
         finally:
@@ -285,7 +290,8 @@ class CreditScoreStore:
         conn = self._connect()
         try:
             row = conn.execute(
-                "SELECT * FROM query_authorizations WHERE auth_id = ? AND querier_id = ? AND revoked = 0",
+                "SELECT * FROM query_authorizations "
+                "WHERE auth_id = ? AND querier_id = ? AND revoked = 0",
                 (auth_id, querier_id),
             ).fetchone()
             if not row:
@@ -299,7 +305,8 @@ class CreditScoreStore:
         conn = self._connect()
         try:
             rows = conn.execute(
-                "SELECT * FROM query_authorizations WHERE agent_id = ? AND revoked = 0 ORDER BY created_at DESC",
+                "SELECT * FROM query_authorizations "
+                "WHERE agent_id = ? AND revoked = 0 ORDER BY created_at DESC",
                 (agent_id,),
             ).fetchall()
             return [QueryAuthorization(
@@ -371,15 +378,18 @@ class CreditScoreStore:
     # ── 严重违约 ────────────────────────────────────
 
     def record_severe_violation(self, agent_id: str, wallet: str, record_id: str,
-                                 violation_type: str, penalty_points: float, occurred_at: int) -> None:
+                                violation_type: str, penalty_points: float,
+                                occurred_at: int) -> None:
         """记录严重违约"""
         conn = self._connect()
         try:
             conn.execute(
                 """INSERT INTO severe_violations
-                   (agent_id, wallet, record_id, violation_type, penalty_points, occurred_at, decay_exempt)
+                   (agent_id, wallet, record_id, violation_type,
+                    penalty_points, occurred_at, decay_exempt)
                    VALUES (?, ?, ?, ?, ?, ?, 1)""",
-                (agent_id, wallet, record_id, violation_type, penalty_points, occurred_at),
+                (agent_id, wallet, record_id, violation_type,
+                 penalty_points, occurred_at),
             )
             conn.commit()
         finally:

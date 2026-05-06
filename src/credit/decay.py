@@ -2,10 +2,9 @@
 时间衰减函数
 """
 
-import math
 from typing import List, Tuple
 
-from .config import SHORT_HALF_LIFE, LONG_HALF_LIFE, SEVERE_VIOLATION_TYPES
+from .config import LONG_HALF_LIFE, SEVERE_VIOLATION_TYPES
 
 
 def time_decay(days_ago: float, half_life: float) -> float:

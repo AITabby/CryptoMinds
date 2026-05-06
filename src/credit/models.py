@@ -4,7 +4,7 @@ SACRED 信用分数据模型
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict
 import hashlib
 import json
 import time
@@ -144,7 +144,9 @@ class SacredScore:
 
     stability: DimensionScore = field(default_factory=lambda: DimensionScore("S", "Stability"))
     activity: DimensionScore = field(default_factory=lambda: DimensionScore("A", "Activity"))
-    creditworthiness: DimensionScore = field(default_factory=lambda: DimensionScore("C", "Creditworthiness"))
+    creditworthiness: DimensionScore = field(
+        default_factory=lambda: DimensionScore("C", "Creditworthiness")
+    )
     reliability: DimensionScore = field(default_factory=lambda: DimensionScore("R", "Reliability"))
     ecosystem: DimensionScore = field(default_factory=lambda: DimensionScore("E", "Ecosystem"))
 

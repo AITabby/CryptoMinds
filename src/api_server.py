@@ -13,14 +13,13 @@ import sys
 # 添加 src 目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from flask import Flask, jsonify, request
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from flask import Flask, jsonify, request  # noqa: E402
+from flask_limiter import Limiter  # noqa: E402
+from flask_limiter.util import get_remote_address  # noqa: E402
 
-# 导入核心模块
-from credit.api import credit_bp
-from escrow.store import EscrowStore
-from escrow.arbitration_store import ArbitrationStore
+from credit.api import credit_bp  # noqa: E402
+from escrow.store import EscrowStore  # noqa: E402
+from escrow.arbitration_store import ArbitrationStore  # noqa: E402
 
 # 创建 Flask 应用
 app = Flask(__name__)
@@ -195,7 +194,7 @@ def start_api(port=None, debug=None):
 
     if not debug:
         try:
-            from gunicorn.app.base import BaseApplication
+            from gunicorn.app.base import BaseApplication  # noqa: E402
 
             class StandaloneApplication(BaseApplication):
                 def __init__(self, app_obj, options=None):

@@ -43,7 +43,7 @@ def get_score(address: str):
 
     # 没有历史数据，返回冷启动默认分
     # 新 Agent 基础分 250，等级 CCC
-    from .models import SacredScore, DimensionScore, CreditGrade
+    from .models import SacredScore, CreditGrade
     from .config import COLD_START_SCORE
 
     score = SacredScore(

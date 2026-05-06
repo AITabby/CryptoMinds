@@ -10,13 +10,13 @@ E - Ecosystem 生态度: 交互Agent数 80 + 信任网络 60 + 跨链活跃 60
 
 import math
 import time
-from typing import Dict, List, Optional
+from typing import Dict
 
 from .config import (
-    DIMENSION_MAX, SHORT_HALF_LIFE, LONG_HALF_LIFE,
-    SEVERE_VIOLATION_PENALTY, SEVERE_VIOLATION_TYPES,
+    DIMENSION_MAX, LONG_HALF_LIFE,
+    SEVERE_VIOLATION_PENALTY,
 )
-from .models import SacredScore, DimensionScore, CreditGrade
+from .models import SacredScore, DimensionScore
 from .decay import time_decay, days_between, no_decay_violation
 from .cold_start import ColdStartManager
 
@@ -184,7 +184,8 @@ class SacredCalculator:
 
     # ── C 维：履约力 ─────────────────────────────────
 
-    def _calc_creditworthiness(self, records: list, credit_data: Dict, agent_info: Dict) -> DimensionScore:
+    def _calc_creditworthiness(self, records: list, credit_data: Dict,
+                               agent_info: Dict) -> DimensionScore:
         """履约力 0-200
 
         - 质押量 80 分
@@ -214,7 +215,8 @@ class SacredCalculator:
         raw = staked_score + escrow_score + acceptance_score
         weighted = min(DIMENSION_MAX, max(0.0, raw))
 
-        return DimensionScore("C", "Creditworthiness", round(raw, 1), round(weighted, 1), components)
+        return DimensionScore("C", "Creditworthiness", round(raw, 1),
+                              round(weighted, 1), components)
 
     # ── R 维：可信度 ─────────────────────────────────
 
@@ -233,14 +235,6 @@ class SacredCalculator:
         # 1. 争议赢率 -> 70 分
         disputed_records = [r for r in records if r.disputed]
         if disputed_records:
-            won_count = len([r for r in disputed_records if r.resolution == "buyer_win"])
-            # seller_win = Agent输了; buyer_win = Agent赢了(作为seller时)
-            # 这里从 seller 视角: seller_win = 输了, buyer_win = 赢了
-            # 修正: resolution 从 seller 视角
-            # buyer_win = 买家赢 = seller输, seller_win = 卖家赢 = seller输(严重)
-            # 重新定义: 对seller来说, resolution=buyer_win=输, seller_win=赢
-            # 但在现有代码中 seller_win 意味着卖家赢了仲裁 = 对卖家有利
-            # 所以: seller 赢 = resolution 不是 buyer_win
             seller_won = len([r for r in disputed_records if r.resolution != "buyer_win"])
             dispute_win_rate = seller_won / len(disputed_records)
         else:
