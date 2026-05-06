@@ -16,30 +16,53 @@ def test_config_imports():
     assert BSC_USDC
 
 
-def test_orchestrator_sdk_imports():
-    from orchestrator import discover_skills, get_installed_skills, purchase_skill, run_skill
+def test_protocol_imports():
+    from protocol import get_protocol_info, AgentRegistry, ChannelRegistry, GateRegistry
 
-    assert callable(discover_skills)
-    assert callable(get_installed_skills)
-    assert callable(purchase_skill)
-    assert callable(run_skill)
-
-
-def test_agent_runtimes_registered():
-    from agent_runtimes import RUNTIMES
-
-    assert "tiedan" in RUNTIMES
-    assert "choudan" in RUNTIMES
-    assert "ludan" in RUNTIMES
-    assert "four_meme" in RUNTIMES
+    assert callable(get_protocol_info)
+    assert AgentRegistry is not None
+    assert ChannelRegistry is not None
+    assert GateRegistry is not None
 
 
-def test_x402_pay_imports():
-    from x402_pay import get_usdc_balance, verify_x402_payment, x402_pay
+def test_settlement_imports():
+    from settlement import ChannelRegistry, init_default_channels
+    from settlement.base import PaymentResult
 
-    assert callable(x402_pay)
-    assert callable(verify_x402_payment)
-    assert callable(get_usdc_balance)
+    assert callable(init_default_channels)
+
+
+def test_escrow_imports():
+    from escrow import EscrowState, EscrowOrder, ArbitrationEngine
+    from settlement.escrow_state import EscrowStateMachine
+
+    assert EscrowStateMachine is not None
+
+
+def test_verification_imports():
+    from verification import GateRegistry, init_default_gates
+    from verification.base import VerificationResult
+
+    assert callable(init_default_gates)
+
+
+def test_agent_registry_imports():
+    from agent import AgentRegistry, AgentCapability, CapabilitySpec
+
+    assert AgentRegistry is not None
+
+
+def test_reputation_imports():
+    from reputation import RecordStore, ReputationCalculator, CreditRegistry
+    from reputation.record import PerformanceRecord, TaskStatus
+
+    assert ReputationCalculator is not None
+
+
+def test_voucher_imports():
+    from voucher import VoucherState, VoucherStateMachine, Voucher, VoucherChainVerifier, UsageRecord
+
+    assert VoucherState is not None
 
 
 def test_wallets_fixture_when_present():
@@ -53,26 +76,22 @@ def test_wallets_fixture_when_present():
     assert "choudan" in wallets
 
 
-def test_agent_server_imports():
-    from agents.agent_server import AGENT_PORTS, AgentHandler
+def test_credit_score_imports():
+    from credit_score.calculator import SacredCalculator
+    from credit_score.models import SacredScore, DimensionScore
 
-    assert AgentHandler is not None
-    assert "tiedan" in AGENT_PORTS
-
-
-def test_reputation_system_imports():
-    from agents.agent_reputation import get_reputation_system
-
-    assert get_reputation_system() is not None
+    assert SacredCalculator is not None
 
 
-def test_smart_router_imports():
-    from agentpay_sdk.smart_router import SmartRouter
+def test_data_store_imports():
+    from data.sqlite_store import SqliteEscrowStore, SqliteRecordStore
 
-    assert SmartRouter() is not None
+    assert SqliteEscrowStore is not None
+    assert SqliteRecordStore is not None
 
 
-def test_multi_chain_wallet_imports():
-    from agentpay_sdk.multi_chain_wallet import MultiChainWallet
+def test_api_app_creation():
+    from api import create_app
 
-    assert MultiChainWallet() is not None
+    app = create_app()
+    assert app is not None
