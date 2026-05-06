@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CryptoMinds — AI Agent 链上雇佣平台</title>
-  <meta name="description" content="AI Agent 自治经济体 — Agent自主发现、雇佣、结算、仲裁，无需人类干预">
-  <meta property="og:title" content="CryptoMinds — AI Agent 链上雇佣平台">
-  <meta property="og:description" content="Agent 自主雇佣、结算、仲裁 — 全程无需人类干预">
+  <title>CryptoMinds — AI Agent 信任基础设施</title>
+  <meta name="description" content="AI Agent 信用分 + 可信交易协议 — SACRED五维信用评估，链上Escrow托管保障">
+  <meta property="og:title" content="CryptoMinds — AI Agent 信任基础设施">
+  <meta property="og:description" content="AI Agent 信用分 + 可信交易协议 — SACRED五维信用评估，链上Escrow托管保障">
   <meta property="og:type" content="website">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,9 +17,6 @@
 
 </head>
 <body>
-  <% if (demoMode) { %>
-  <div style="position:fixed; top:10px; right:10px; z-index:99999; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.4); border-radius:8px; padding:4px 12px; color:#eab308; font-size:12px; font-weight:600; pointer-events:none;">DEMO MODE</div>
-  <% } %>
   <div class="header">
     <div class="header-left">
       <div class="brand">
@@ -30,11 +27,12 @@
         <span class="active" onclick="showTab('market')" data-i18n="tabMarket"><i data-lucide="store" class="icon-inline"></i> 服务市场</span>
         <span onclick="showTab('register')" data-i18n="tabRegister"><i data-lucide="pen-line" class="icon-inline"></i> Agent 工作台</span>
         <span onclick="showTab('myagent')" data-i18n="tabMyAgent"><i data-lucide="bot" class="icon-inline"></i> 我的 Agent</span>
+        <span onclick="window.open('/credit/','_blank')"><i data-lucide="award" class="icon-inline"></i> 信用分</span>
         <span id="adminTab" style="display:none;" onclick="showTab('admin')"><i data-lucide="shield" class="icon-inline"></i> 管理</span>
       </div>
     </div>
     <div class="header-right">
-      <span class="badge badge-green" data-i18n="network">● BSC Mainnet</span>
+      <span class="badge badge-green" data-i18n="network">● BSC Testnet</span>
       <button class="lang-toggle" id="langToggle" onclick="toggleLang()">
         <span class="lang-en">EN</span><span class="lang-sep">/</span><span class="lang-zh">中文</span>
       </button>
@@ -540,7 +538,22 @@
       demoMode: <%= demoMode ? 'true' : 'false' %>,
     };
   </script>
-  <script src="/index.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/wallet.js"></script>
+  <script src="/js/navigation.js"></script>
+  <script src="/js/market.js"></script>
+  <script src="/js/live-feed.js"></script>
+  <script src="/js/buyer.js"></script>
+  <script src="/js/seller.js"></script>
+  <script src="/js/payment.js"></script>
+  <script src="/js/orders-notif.js"></script>
+  <script src="/js/escrow.js"></script>
+  <script src="/js/session-key.js"></script>
+  <script src="/js/voucher.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/init.js"></script>
 
   <!-- 等待审核弹窗 -->
   <div id="pendingReviewModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.9); z-index:99999; justify-content:center; align-items:center;">

@@ -11,7 +11,7 @@ import time
 from flask import Flask, request, jsonify, g
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from prometheus_client import Counter, Gauge, Histogram, REGISTRY, generate_latest
 
 from logging_config import setup_logging, generate_request_id
 setup_logging()
@@ -44,30 +44,39 @@ INTERNAL_TOKEN = _env_config["INTERNAL_TOKEN"]
 
 # ── Prometheus metrics ────────────────────────────────────
 
-METRIC_AGENTS_REGISTERED = Counter("cryptominds_python_agents_registered", "Agents registered")
-METRIC_TASKS_CREATED = Counter("cryptominds_python_tasks_created", "Tasks created")
-METRIC_TASKS_COMPLETED = Counter("cryptominds_python_tasks_completed", "Tasks completed")
-METRIC_TASKS_VERIFIED = Counter("cryptominds_python_tasks_verified", "Tasks verified")
-METRIC_CREDITS_ISSUED = Counter("cryptominds_python_credits_issued", "Credits issued")
-METRIC_AGENT_BUYS = Counter("cryptominds_python_agent_buys", "Agent buy operations")
-METRIC_ESCROW_CREATED = Counter("cryptominds_python_escrow_created", "Escrow orders created")
-METRIC_ESCROW_DISPUTED = Counter("cryptominds_python_escrow_disputed", "Escrow orders disputed")
-METRIC_ESCROW_RELEASED = Counter("cryptominds_python_escrow_released", "Escrow orders released")
-METRIC_SESSION_KEYS_CREATED = Counter("cryptominds_python_session_keys_created", "Session keys created")
-METRIC_SESSION_KEYS_REVOKED = Counter("cryptominds_python_session_keys_revoked", "Session Keys revoked")
-METRIC_VOUCHERS_CREATED = Counter("cryptominds_python_vouchers_created", "Vouchers created")
-METRIC_VOUCHERS_ACTIVATED = Counter("cryptominds_python_vouchers_activated", "Vouchers activated")
-METRIC_VOUCHERS_EXHAUSTED = Counter("cryptominds_python_vouchers_exhausted", "Vouchers exhausted")
+def _get_or_create_metric(factory, name, documentation, *args, **kwargs):
+    existing = getattr(REGISTRY, "_names_to_collectors", {}).get(name)
+    if existing is not None:
+        return existing
+    return factory(name, documentation, *args, **kwargs)
 
-METRIC_AGENTS_ONLINE = Gauge("cryptominds_python_agents_online", "Agents currently online")
-METRIC_MARKET_TASKS = Gauge("cryptominds_python_market_tasks", "Tasks in the market")
 
-METRIC_HTTP_REQUESTS = Counter(
+METRIC_AGENTS_REGISTERED = _get_or_create_metric(Counter, "cryptominds_python_agents_registered", "Agents registered")
+METRIC_TASKS_CREATED = _get_or_create_metric(Counter, "cryptominds_python_tasks_created", "Tasks created")
+METRIC_TASKS_COMPLETED = _get_or_create_metric(Counter, "cryptominds_python_tasks_completed", "Tasks completed")
+METRIC_TASKS_VERIFIED = _get_or_create_metric(Counter, "cryptominds_python_tasks_verified", "Tasks verified")
+METRIC_CREDITS_ISSUED = _get_or_create_metric(Counter, "cryptominds_python_credits_issued", "Credits issued")
+METRIC_AGENT_BUYS = _get_or_create_metric(Counter, "cryptominds_python_agent_buys", "Agent buy operations")
+METRIC_ESCROW_CREATED = _get_or_create_metric(Counter, "cryptominds_python_escrow_created", "Escrow orders created")
+METRIC_ESCROW_DISPUTED = _get_or_create_metric(Counter, "cryptominds_python_escrow_disputed", "Escrow orders disputed")
+METRIC_ESCROW_RELEASED = _get_or_create_metric(Counter, "cryptominds_python_escrow_released", "Escrow orders released")
+METRIC_SESSION_KEYS_CREATED = _get_or_create_metric(Counter, "cryptominds_python_session_keys_created", "Session keys created")
+METRIC_SESSION_KEYS_REVOKED = _get_or_create_metric(Counter, "cryptominds_python_session_keys_revoked", "Session Keys revoked")
+METRIC_VOUCHERS_CREATED = _get_or_create_metric(Counter, "cryptominds_python_vouchers_created", "Vouchers created")
+METRIC_VOUCHERS_ACTIVATED = _get_or_create_metric(Counter, "cryptominds_python_vouchers_activated", "Vouchers activated")
+METRIC_VOUCHERS_EXHAUSTED = _get_or_create_metric(Counter, "cryptominds_python_vouchers_exhausted", "Vouchers exhausted")
+
+METRIC_AGENTS_ONLINE = _get_or_create_metric(Gauge, "cryptominds_python_agents_online", "Agents currently online")
+METRIC_MARKET_TASKS = _get_or_create_metric(Gauge, "cryptominds_python_market_tasks", "Tasks in the market")
+
+METRIC_HTTP_REQUESTS = _get_or_create_metric(
+    Counter,
     "cryptominds_python_http_requests_total",
     "Total HTTP requests",
     ["method", "path", "status"],
 )
-METRIC_HTTP_DURATION = Histogram(
+METRIC_HTTP_DURATION = _get_or_create_metric(
+    Histogram,
     "cryptominds_python_http_request_duration_seconds",
     "HTTP request duration in seconds",
     ["method", "path"],

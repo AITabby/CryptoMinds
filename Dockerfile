@@ -18,7 +18,7 @@ FROM node:18-slim
 
 # Install Python from system packages
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 python3-pip python3-venv && \
+    apt-get install -y --no-install-recommends python3 python3-pip python3-venv curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Create venv and install Python deps

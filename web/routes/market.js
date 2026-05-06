@@ -19,6 +19,7 @@ function createMarketRoutes({
   addTx,
   getEscrowAddress,
   getEscrowStats,
+  getEscrowOrders,
   w3,
   fetchBnbPrice,
 }) {
@@ -75,11 +76,46 @@ function createMarketRoutes({
     }
   });
 
-  // 交易记录
+  // 交易记录（包含 Escrow 订单）
   router.get('/txs', async (req, res) => {
     try {
       const txs = await getTxs();
-      res.json(txs);
+      if (txs.length > 0) {
+        // Add camelCase aliases for frontend compatibility
+        return res.json(txs.map(t => ({
+          ...t,
+          from: t.from_name || t.from_wallet,
+          to: t.to_name || t.to_wallet,
+          fromWallet: t.from_wallet,
+          toWallet: t.to_wallet,
+          time: t.timestamp,
+        })));
+      }
+      // tx_logs 为空时，从 escrow_orders 生成交易记录
+      if (getEscrowOrders) {
+        const orders = await getEscrowOrders();
+        const escrowTxs = orders.map(o => ({
+          tx: o.on_chain_order_id || o.escrow_id,
+          from_wallet: o.buyer_wallet,
+          from_name: 'Buyer',
+          from: 'Buyer',
+          to_wallet: o.seller_wallet,
+          to_name: o.seller_agent_id || 'Seller',
+          to: o.seller_agent_id || 'Seller',
+          amount: parseFloat(o.amount) || 0,
+          reason: `Escrow · ${o.state}${o.channel_id === 'bsc-native' ? ' (BSC Testnet)' : ''}`,
+          verified: o.state === 'released' ? 1 : 0,
+          timestamp: o.created_at ? new Date(o.created_at * 1000).toISOString() : new Date().toISOString(),
+          time: o.created_at ? new Date(o.created_at * 1000).toISOString() : new Date().toISOString(),
+          _type: 'escrow',
+          state: o.state,
+          escrow_id: o.escrow_id,
+          chain: o.chain,
+          channel_id: o.channel_id,
+        }));
+        return res.json(escrowTxs);
+      }
+      res.json([]);
     } catch (err) {
       res.json([]);
     }
@@ -178,8 +214,43 @@ function createMarketRoutes({
   // 实时数据流
   router.get('/live-feed', async (req, res) => {
     try {
-      const txs = (await getTxs()).map(t => ({ ...t, _type: 'tx' }));
-      res.json(txs.slice(0, 50));
+      const txs = (await getTxs()).map(t => ({
+        ...t,
+        _type: 'tx',
+        from: t.from_name || t.from_wallet,
+        to: t.to_name || t.to_wallet,
+        fromWallet: t.from_wallet,
+        toWallet: t.to_wallet,
+        time: t.timestamp,
+      }));
+      if (txs.length > 0) {
+        return res.json(txs.slice(0, 50));
+      }
+      // tx_logs 为空时，从 escrow_orders 生成
+      if (getEscrowOrders) {
+        const orders = await getEscrowOrders(50);
+        const escrowTxs = orders.map(o => ({
+          tx: o.on_chain_order_id || o.escrow_id,
+          from_wallet: o.buyer_wallet,
+          from_name: 'Buyer',
+          from: 'Buyer',
+          to_wallet: o.seller_wallet,
+          to_name: o.seller_agent_id || 'Seller',
+          to: o.seller_agent_id || 'Seller',
+          amount: parseFloat(o.amount) || 0,
+          reason: `Escrow · ${o.state}${o.channel_id === 'bsc-native' ? ' (BSC Testnet)' : ''}`,
+          verified: o.state === 'released' ? 1 : 0,
+          timestamp: o.created_at ? new Date(o.created_at * 1000).toISOString() : new Date().toISOString(),
+          time: o.created_at ? new Date(o.created_at * 1000).toISOString() : new Date().toISOString(),
+          _type: 'escrow',
+          state: o.state,
+          escrow_id: o.escrow_id,
+          chain: o.chain,
+          channel_id: o.channel_id,
+        }));
+        return res.json(escrowTxs.slice(0, 50));
+      }
+      res.json([]);
     } catch (err) {
       res.json([]);
     }

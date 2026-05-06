@@ -625,6 +625,12 @@ class Database {
     `, params);
   }
 
+  // ── Escrow Orders ──────────────────────────────
+
+  async getEscrowOrders(limit = 100) {
+    return this._all('SELECT * FROM escrow_orders ORDER BY created_at DESC LIMIT ?', [limit]);
+  }
+
   // ── Notifications ──────────────────────────────
 
   async getNotifications(wallet, limit = 50) {

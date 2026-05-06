@@ -111,6 +111,12 @@ class DataStore {
     await this.db.saveTxLog(log);
   }
 
+  // ── Escrow Orders ──────────────────────────────
+
+  async getEscrowOrders(limit = 100) {
+    return this.db.getEscrowOrders(limit);
+  }
+
   // ── Notifications ──────────────────────────────
 
   async getNotifications(wallet, limit = 50) {

@@ -3,14 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CryptoMinds SACRED 信用分</title>
+<title>CryptoMinds — AI Agent 信任基础设施</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0b1e; color: #e0e0e0; }
 .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 h1 { text-align: center; font-size: 28px; margin: 20px 0; color: #fff; }
 h1 span { color: #6c5ce7; }
-.subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+.subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 15px; }
+
+/* 标签切换 */
+.tabs { display: flex; justify-content: center; gap: 4px; margin-bottom: 25px; background: #1a1b2e; border-radius: 10px; padding: 4px; max-width: 600px; margin-left: auto; margin-right: auto; }
+.tab { flex: 1; padding: 10px 16px; border: none; border-radius: 8px; background: transparent; color: #888; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+.tab.active { background: #6c5ce7; color: #fff; }
+.tab:hover:not(.active) { color: #ccc; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
 /* 输入区 */
 .search-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; }
@@ -93,59 +101,266 @@ h1 span { color: #6c5ce7; }
 .grade-bar { width: 40px; background: linear-gradient(180deg, #6c5ce7, #00d2d3); border-radius: 4px 4px 0 0; min-height: 2px; }
 .grade-bar-label { font-size: 11px; color: #888; margin-top: 4px; }
 .grade-bar-count { font-size: 11px; color: #aaa; margin-bottom: 2px; }
+
+/* ===== Escrow 状态机 ===== */
+.flow-section { background: #1a1b2e; border-radius: 16px; padding: 25px; margin-bottom: 20px; }
+.flow-section h2 { font-size: 18px; margin-bottom: 20px; text-align: center; }
+
+.flow-diagram { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; margin-bottom: 25px; }
+.flow-node { background: #22233a; border: 2px solid #333; border-radius: 10px; padding: 8px 14px; text-align: center; min-width: 80px; font-size: 13px; transition: all 0.3s; }
+.flow-node.active { border-color: #6c5ce7; background: #2a2454; color: #fff; }
+.flow-node.success { border-color: #00d2d3; background: #0d2a2a; }
+.flow-node.fail { border-color: #ee5a24; background: #2a1510; }
+.flow-arrow { color: #555; font-size: 18px; }
+
+.flow-branches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; }
+.flow-branch { background: #22233a; border-radius: 10px; padding: 15px; text-align: center; }
+.flow-branch .branch-title { font-size: 14px; font-weight: bold; margin-bottom: 8px; }
+.flow-branch.success .branch-title { color: #00d2d3; }
+.flow-branch.dispute .branch-title { color: #ff9f43; }
+.flow-branch.timeout .branch-title { color: #ee5a24; }
+.flow-branch .branch-steps { font-size: 12px; color: #999; line-height: 1.8; }
+
+/* 链上交易记录 */
+.onchain-section { background: #1a1b2e; border-radius: 16px; padding: 25px; margin-bottom: 20px; }
+.onchain-section h2 { font-size: 18px; margin-bottom: 15px; }
+.onchain-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.onchain-stat { background: #22233a; border-radius: 10px; padding: 15px; text-align: center; }
+.onchain-stat .stat-label { font-size: 12px; color: #888; }
+.onchain-stat .stat-value { font-size: 22px; font-weight: bold; color: #6c5ce7; margin-top: 4px; }
+
+.tx-table { width: 100%; border-collapse: collapse; }
+.tx-table th { text-align: left; padding: 8px; color: #888; font-size: 12px; border-bottom: 1px solid #333; }
+.tx-table td { padding: 8px; font-size: 13px; border-bottom: 1px solid #222; }
+.tx-table tr:hover { background: #22233a; }
+.tx-status { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+.tx-status.confirmed { background: rgba(0,210,211,0.2); color: #00d2d3; }
+.tx-status.refunded { background: rgba(238,90,36,0.2); color: #ee5a24; }
+.tx-status.disputed { background: rgba(255,159,67,0.2); color: #ff9f43; }
+.tx-status.pending { background: rgba(108,92,231,0.2); color: #6c5ce7; }
+
+.bscscan-link { display: inline-block; margin-top: 12px; color: #6c5ce7; text-decoration: none; font-size: 14px; }
+.bscscan-link:hover { text-decoration: underline; }
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .dimensions { grid-template-columns: repeat(3, 1fr); }
+  .onchain-stats { grid-template-columns: repeat(2, 1fr); }
+  .flow-branches { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>CryptoMinds <span>SACRED</span> 信用分</h1>
-  <p class="subtitle">Agent 芝麻信用 — 五维评分体系</p>
+  <h1>CryptoMinds <span>SACRED</span></h1>
+  <p class="subtitle">AI Agent 信任基础设施 — 信用分 + 可信交易协议</p>
 
-  <div class="search-bar">
-    <input type="text" id="agentId" placeholder="输入 Agent ID（如 sim-agent-001）">
-    <button onclick="queryScore()">查询</button>
+  <!-- 标签切换 -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('credit')">信用分</button>
+    <button class="tab" onclick="switchTab('escrow')">Escrow 协议</button>
+    <button class="tab" onclick="switchTab('onchain')">链上数据</button>
   </div>
 
-  <div class="score-card" id="scoreCard">
-    <div class="score-grade" id="scoreGrade"></div>
-    <div class="score-number" id="scoreNumber"></div>
-    <div class="score-wallet" id="scoreWallet"></div>
-    <div class="score-trend" id="scoreTrend"></div>
+  <!-- ===== 信用分面板 ===== -->
+  <div class="tab-panel active" id="panel-credit">
+    <div class="search-bar">
+      <input type="text" id="agentId" placeholder="输入 Agent ID（如 sim-agent-001）">
+      <button onclick="queryScore()">查询</button>
+    </div>
+
+    <div class="score-card" id="scoreCard">
+      <div class="score-grade" id="scoreGrade"></div>
+      <div class="score-number" id="scoreNumber"></div>
+      <div class="score-wallet" id="scoreWallet"></div>
+      <div class="score-trend" id="scoreTrend"></div>
+    </div>
+
+    <div class="radar-section" id="radarSection">
+      <h2>五维评分</h2>
+      <canvas id="radarCanvas" width="400" height="400"></canvas>
+      <div class="dimensions" id="dimCards"></div>
+    </div>
+
+    <div class="warnings" id="warningsSection">
+      <h2>风险提示</h2>
+      <div id="warningsList"></div>
+    </div>
+
+    <div class="peer-section" id="peerSection">
+      <h2>同行对比</h2>
+      <div class="peer-stats" id="peerStats"></div>
+      <div class="grade-dist" id="gradeDist"></div>
+    </div>
+
+    <div class="leaderboard">
+      <h2>排行榜</h2>
+      <table class="lb-table">
+        <thead><tr><th>排名</th><th>Agent</th><th>分数</th><th>等级</th></tr></thead>
+        <tbody id="lbBody"></tbody>
+      </table>
+      <div id="lbNav" style="display:flex;gap:12px;justify-content:center;margin-top:8px;"></div>
+    </div>
   </div>
 
-  <div class="radar-section" id="radarSection">
-    <h2>五维评分</h2>
-    <canvas id="radarCanvas" width="400" height="400"></canvas>
-    <div class="dimensions" id="dimCards"></div>
+  <!-- ===== Escrow 协议面板 ===== -->
+  <div class="tab-panel" id="panel-escrow">
+    <div class="flow-section">
+      <h2>Escrow 状态机 — 11态全流程</h2>
+      <div class="flow-diagram">
+        <div class="flow-node active">创建订单</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node active">BNB 锁入</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node active">卖家接单</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node active">交付结果</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node success">确认放款</div>
+      </div>
+
+      <div class="flow-branches">
+        <div class="flow-branch success">
+          <div class="branch-title">正常完成</div>
+          <div class="branch-steps">
+            买家确认收货<br>
+            BNB 释放给卖家<br>
+            信用分 +1 记录
+          </div>
+        </div>
+        <div class="flow-branch dispute">
+          <div class="branch-title">争议仲裁</div>
+          <div class="branch-steps">
+            买家发起争议<br>
+            信誉加权仲裁<br>
+            退款 或 放款
+          </div>
+        </div>
+        <div class="flow-branch timeout">
+          <div class="branch-title">超时处理</div>
+          <div class="branch-steps">
+            卖家超时 → 自动退款<br>
+            买家超时 → 自动放款<br>
+            无需人工干预
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-section">
+      <h2>信用分如何驱动 Escrow</h2>
+      <div class="flow-branches">
+        <div class="flow-branch success">
+          <div class="branch-title">交易前：信用门槛</div>
+          <div class="branch-steps">
+            BBB 以下 Agent<br>
+            无法参与大额 Escrow<br>
+            事前过滤欺诈风险
+          </div>
+        </div>
+        <div class="flow-branch dispute">
+          <div class="branch-title">争议中：信誉加权</div>
+          <div class="branch-steps">
+            信用分高的 Agent<br>
+            仲裁权重更大<br>
+            让可信方更有话语权
+          </div>
+        </div>
+        <div class="flow-branch timeout">
+          <div class="branch-title">违规后：Slashing</div>
+          <div class="branch-steps">
+            恶意行为自动惩罚<br>
+            信用分越低惩罚越重<br>
+            信用分实时下降
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="warnings" id="warningsSection">
-    <h2>风险提示</h2>
-    <div id="warningsList"></div>
-  </div>
+  <!-- ===== 链上面板 ===== -->
+  <div class="tab-panel" id="panel-onchain">
+    <div class="onchain-section">
+      <h2>BSC 测试网 — 链上数据</h2>
 
-  <div class="peer-section" id="peerSection">
-    <h2>同行对比</h2>
-    <div class="peer-stats" id="peerStats"></div>
-    <div class="grade-dist" id="gradeDist"></div>
-  </div>
+      <div class="onchain-stats" id="onchainStats">
+        <div class="onchain-stat">
+          <div class="stat-label">总订单</div>
+          <div class="stat-value" id="statOrders">3</div>
+        </div>
+        <div class="onchain-stat">
+          <div class="stat-label">累计托管</div>
+          <div class="stat-value" id="statEscrowed">0.03 BNB</div>
+        </div>
+        <div class="onchain-stat">
+          <div class="stat-label">已释放</div>
+          <div class="stat-value" id="statReleased">0.01 BNB</div>
+        </div>
+        <div class="onchain-stat">
+          <div class="stat-label">争议数</div>
+          <div class="stat-value" id="statDisputed">1</div>
+        </div>
+      </div>
 
-  <div class="leaderboard">
-    <h2>排行榜</h2>
-    <table class="lb-table">
-      <thead><tr><th>排名</th><th>Agent</th><th>分数</th><th>等级</th></tr></thead>
-      <tbody id="lbBody"></tbody>
-    </table>
-    <div id="lbNav" style="display:flex;gap:12px;justify-content:center;margin-top:8px;"></div>
+      <h3 style="font-size:15px;margin-bottom:10px;">演示交易</h3>
+      <table class="tx-table">
+        <thead><tr><th>#</th><th>服务</th><th>金额</th><th>状态</th><th>场景</th></tr></thead>
+        <tbody id="txBody">
+          <tr>
+            <td>1</td>
+            <td>ai-agent-data-delivery-001</td>
+            <td>0.01 BNB</td>
+            <td><span class="tx-status confirmed">Confirmed</span></td>
+            <td>正常完成</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>ai-agent-compute-task-002</td>
+            <td>0.01 BNB</td>
+            <td><span class="tx-status refunded">Refunded</span></td>
+            <td>争议 → 仲裁退款</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>ai-agent-oracle-query-003</td>
+            <td>0.01 BNB</td>
+            <td><span class="tx-status refunded">Refunded</span></td>
+            <td>卖家超时 → 自动退款</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <a class="bscan-link" href="https://testnet.bscscan.com/address/0xe9C878845F7299C00Ff6465B02f43De2a1b49b62" target="_blank">
+        在 BSCscan 上查看合约 →
+      </a>
+    </div>
+
+    <div class="onchain-section">
+      <h2>合约信息</h2>
+      <div style="font-size:14px;line-height:2;color:#aaa;">
+        <div><strong style="color:#e0e0e0">合约地址：</strong>0xe9C878845F7299C00Ff6465B02f43De2a1b49b62</div>
+        <div><strong style="color:#e0e0e0">网络：</strong>BSC Testnet (Chain ID: 97)</div>
+        <div><strong style="color:#e0e0e0">买家确认超时：</strong>3 天</div>
+        <div><strong style="color:#e0e0e0">卖家交付超时：</strong>1 天</div>
+        <div><strong style="color:#e0e0e0">功能：</strong>createOrder / deliver / confirm / dispute / arbitrateRefund / arbitrateRelease / claimBuyerTimeout / claimSellerTimeout</div>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
 const API_BASE = '/api/v1/credit-score';
 
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${name}')"]`).classList.add('active');
+  document.getElementById(`panel-${name}`).classList.add('active');
+}
+
 async function queryScore() {
   const agentId = document.getElementById('agentId').value.trim();
   if (!agentId) return;
-
   try {
     const resp = await fetch(`${API_BASE}/${agentId}/profile`);
     if (!resp.ok) { alert('Agent 未找到'); return; }
@@ -157,7 +372,6 @@ async function queryScore() {
 }
 
 function renderProfile(data) {
-  // 信用分卡片
   const card = document.getElementById('scoreCard');
   card.classList.add('visible');
   document.getElementById('scoreGrade').textContent = data.grade;
@@ -171,12 +385,10 @@ function renderProfile(data) {
   trendEl.textContent = trendMap[data.trend] || '— 稳定';
   trendEl.className = 'score-trend ' + (data.trend || 'stable');
 
-  // 雷达图
   document.getElementById('radarSection').classList.add('visible');
   drawRadar(data.dimensions);
   renderDimCards(data.dimensions);
 
-  // 风险提示
   const warnSec = document.getElementById('warningsSection');
   const warnList = document.getElementById('warningsList');
   if (data.warnings && data.warnings.length > 0) {
@@ -188,7 +400,6 @@ function renderProfile(data) {
     warnSec.classList.remove('visible');
   }
 
-  // 同行对比
   if (data.peer_comparison && data.peer_comparison.total_agents > 0) {
     document.getElementById('peerSection').classList.add('visible');
     const pc = data.peer_comparison;
@@ -197,7 +408,6 @@ function renderProfile(data) {
       <div class="peer-stat"><div class="label">平均分</div><div class="value">${pc.avg_score}</div></div>
       <div class="peer-stat"><div class="label">中位数</div><div class="value">${pc.median_score}</div></div>
     `;
-    // 等级分布柱状图
     const grades = ['AAA','AA','A','BBB','BB','B','CCC','CC','C'];
     const maxCount = Math.max(...grades.map(g => pc.grade_distribution[g] || 0), 1);
     document.getElementById('gradeDist').innerHTML = grades.map(g => {
@@ -213,7 +423,6 @@ function drawRadar(dimensions) {
   const ctx = canvas.getContext('2d');
   const cx = 200, cy = 200, maxR = 150;
   ctx.clearRect(0, 0, 400, 400);
-
   const dims = [
     { key: 'S', label: '稳定性' },
     { key: 'A', label: '活跃度' },
@@ -224,8 +433,6 @@ function drawRadar(dimensions) {
   const n = dims.length;
   const angleStep = (2 * Math.PI) / n;
   const startAngle = -Math.PI / 2;
-
-  // 网格
   for (let ring = 1; ring <= 4; ring++) {
     const r = maxR * ring / 4;
     ctx.beginPath();
@@ -238,8 +445,6 @@ function drawRadar(dimensions) {
     ctx.strokeStyle = '#333';
     ctx.stroke();
   }
-
-  // 轴线和标签
   for (let i = 0; i < n; i++) {
     const angle = startAngle + i * angleStep;
     ctx.beginPath();
@@ -247,7 +452,6 @@ function drawRadar(dimensions) {
     ctx.lineTo(cx + maxR * Math.cos(angle), cy + maxR * Math.sin(angle));
     ctx.strokeStyle = '#444';
     ctx.stroke();
-
     const lx = cx + (maxR + 20) * Math.cos(angle);
     const ly = cy + (maxR + 20) * Math.sin(angle);
     ctx.fillStyle = '#888';
@@ -256,8 +460,6 @@ function drawRadar(dimensions) {
     ctx.textBaseline = 'middle';
     ctx.fillText(dims[i].label + ' ' + (dimensions[dims[i].key] ? dimensions[dims[i].key].score : 0), lx, ly);
   }
-
-  // 数据区域
   ctx.beginPath();
   for (let i = 0; i <= n; i++) {
     const idx = i % n;
@@ -274,8 +476,6 @@ function drawRadar(dimensions) {
   ctx.strokeStyle = '#6c5ce7';
   ctx.lineWidth = 2;
   ctx.stroke();
-
-  // 数据点
   for (let i = 0; i < n; i++) {
     const dim = dimensions[dims[i].key];
     const val = dim ? dim.score / 200 : 0;
@@ -312,7 +512,6 @@ function renderDimCards(dimensions) {
   }).join('');
 }
 
-// 加载排行榜
 let lbPage = 1;
 const LB_PAGE_SIZE = 50;
 
@@ -320,7 +519,6 @@ async function loadLeaderboard(page) {
   page = page || lbPage;
   lbPage = page;
   try {
-    const offset = (page - 1) * LB_PAGE_SIZE;
     const resp = await fetch(`${API_BASE}/leaderboard?limit=${LB_PAGE_SIZE}`);
     if (!resp.ok) return;
     const data = await resp.json();
@@ -333,7 +531,6 @@ async function loadLeaderboard(page) {
         <td><span class="lb-grade ${e.grade.toLowerCase()}">${e.grade}</span></td>
       </tr>`
     ).join('');
-
     const nav = document.getElementById('lbNav');
     if (nav) {
       nav.innerHTML = `<button onclick="loadLeaderboard(${page - 1})" ${page <= 1 ? 'disabled' : ''}>&lt;</button>
@@ -345,7 +542,6 @@ async function loadLeaderboard(page) {
 
 loadLeaderboard();
 
-// 回车查询
 document.getElementById('agentId').addEventListener('keypress', e => {
   if (e.key === 'Enter') queryScore();
 });

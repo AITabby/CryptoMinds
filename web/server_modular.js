@@ -96,20 +96,47 @@ async function fetchBnbPrice() {
 
 function getWallets() {
   const walletsFile = path.join(__dirname, '..', 'wallets.json');
+  const safe = {};
+  for (const [envKey, value] of Object.entries(process.env)) {
+    if (!envKey.startsWith('WALLET_KEY_') || !value) continue;
+    const name = envKey.slice('WALLET_KEY_'.length).toLowerCase();
+    let privateKey = value.startsWith('0x') ? value : `0x${value}`;
+    let address = process.env[`WALLET_ADDR_${name.toUpperCase()}`] || '';
+    if (!address) {
+      try {
+        address = w3.eth.accounts.privateKeyToAccount(privateKey).address;
+      } catch (e) {
+        console.warn(`[wallet] failed to derive address for ${name}: ${e.message}`);
+      }
+    }
+    if (address) safe[name] = { address };
+  }
   try {
     if (fs.existsSync(walletsFile)) {
       const raw = JSON.parse(fs.readFileSync(walletsFile, 'utf8'));
-      const safe = {};
       for (const [name, info] of Object.entries(raw)) {
+        if (safe[name]) continue;
         safe[name] = { address: info.address };
       }
-      return safe;
     }
   } catch (e) {}
-  return {};
+  return safe;
 }
 
 function getWalletForSigning(name) {
+  const envKey = process.env[`WALLET_KEY_${String(name || '').toUpperCase()}`];
+  if (envKey) {
+    let privateKey = envKey.startsWith('0x') ? envKey : `0x${envKey}`;
+    let address = process.env[`WALLET_ADDR_${String(name || '').toUpperCase()}`] || '';
+    if (!address) {
+      try {
+        address = w3.eth.accounts.privateKeyToAccount(privateKey).address;
+      } catch (e) {
+        return null;
+      }
+    }
+    return { address, private_key: privateKey };
+  }
   const walletsFile = path.join(__dirname, '..', 'wallets.json');
   try {
     const raw = JSON.parse(fs.readFileSync(walletsFile, 'utf8'));
@@ -287,6 +314,7 @@ async function setupRoutes() {
     getPurchases: () => store.getPurchases(),
     getTxs: () => store.getTxLogs(),
     addTx: (tx) => store.saveTxLog(tx),
+    getEscrowOrders: () => store.getEscrowOrders(),
     getEscrowAddress,
     getEscrowStats,
     w3,
