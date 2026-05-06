@@ -124,6 +124,30 @@ class CreditScoreStore:
                 CREATE INDEX IF NOT EXISTS idx_perf_buyer ON performance_records(buyer_wallet);
                 CREATE INDEX IF NOT EXISTS idx_perf_status ON performance_records(status);
                 CREATE INDEX IF NOT EXISTS idx_perf_created ON performance_records(created_at);
+
+                CREATE TABLE IF NOT EXISTS escrow_states (
+                    escrow_id TEXT PRIMARY KEY NOT NULL,
+                    buyer TEXT NOT NULL,
+                    seller TEXT NOT NULL,
+                    amount TEXT NOT NULL,
+                    token TEXT DEFAULT '',
+                    status TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    funded_at INTEGER DEFAULT 0,
+                    delivered_at INTEGER DEFAULT 0,
+                    completed_at INTEGER DEFAULT 0,
+                    fund_tx TEXT DEFAULT '',
+                    evidence TEXT DEFAULT '',
+                    disputed INTEGER DEFAULT 0,
+                    disputed_at INTEGER DEFAULT 0,
+                    dispute_reason TEXT DEFAULT '',
+                    resolution TEXT DEFAULT '',
+                    block_number INTEGER DEFAULT 0
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_escrow_seller ON escrow_states(seller);
+                CREATE INDEX IF NOT EXISTS idx_escrow_buyer ON escrow_states(buyer);
+                CREATE INDEX IF NOT EXISTS idx_escrow_status ON escrow_states(status);
             """)
             conn.commit()
         finally:
@@ -529,6 +553,127 @@ class CreditScoreStore:
             dispute_reason=row["dispute_reason"],
             resolution=row["resolution"],
         )
+
+    # ── 托管状态 ──────────────────────────────────────
+
+    def save_escrow_state(self, escrow: Dict) -> None:
+        """
+        保存托管状态
+
+        Args:
+            escrow: 托管状态字典
+        """
+        conn = self._connect()
+        try:
+            conn.execute(
+                """INSERT OR REPLACE INTO escrow_states
+                   (escrow_id, buyer, seller, amount, token, status,
+                    created_at, funded_at, delivered_at, completed_at,
+                    fund_tx, evidence, disputed, disputed_at,
+                    dispute_reason, resolution, block_number)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    escrow["escrow_id"], escrow["buyer"], escrow["seller"],
+                    escrow["amount"], escrow.get("token", ""), escrow["status"],
+                    escrow["created_at"], escrow.get("funded_at", 0),
+                    escrow.get("delivered_at", 0), escrow.get("completed_at", 0),
+                    escrow.get("fund_tx", ""), escrow.get("evidence", ""),
+                    1 if escrow.get("disputed") else 0,
+                    escrow.get("disputed_at", 0), escrow.get("dispute_reason", ""),
+                    escrow.get("resolution", ""), escrow.get("block_number", 0),
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_escrow_state(self, escrow_id: str) -> Optional[Dict]:
+        """
+        获取托管状态
+
+        Args:
+            escrow_id: 托管 ID
+
+        Returns:
+            托管状态字典，不存在返回 None
+        """
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT * FROM escrow_states WHERE escrow_id = ?",
+                (escrow_id,),
+            ).fetchone()
+            if not row:
+                return None
+
+            return {
+                "escrow_id": row["escrow_id"],
+                "buyer": row["buyer"],
+                "seller": row["seller"],
+                "amount": row["amount"],
+                "token": row["token"],
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "funded_at": row["funded_at"],
+                "delivered_at": row["delivered_at"],
+                "completed_at": row["completed_at"],
+                "fund_tx": row["fund_tx"],
+                "evidence": row["evidence"],
+                "disputed": bool(row["disputed"]),
+                "disputed_at": row["disputed_at"],
+                "dispute_reason": row["dispute_reason"],
+                "resolution": row["resolution"],
+                "block_number": row["block_number"],
+            }
+        finally:
+            conn.close()
+
+    def get_active_escrows(self, seller: str = None, buyer: str = None) -> List[Dict]:
+        """
+        获取进行中的托管
+
+        Args:
+            seller: 卖家地址
+            buyer: 买家地址
+
+        Returns:
+            托管状态列表
+        """
+        conn = self._connect()
+        try:
+            # 进行中的状态
+            active_statuses = ("pending", "funded", "delivered", "disputed")
+
+            if seller:
+                rows = conn.execute(
+                    "SELECT * FROM escrow_states WHERE seller = ? AND status IN (?, ?, ?, ?)",
+                    (seller, *active_statuses),
+                ).fetchall()
+            elif buyer:
+                rows = conn.execute(
+                    "SELECT * FROM escrow_states WHERE buyer = ? AND status IN (?, ?, ?, ?)",
+                    (buyer, *active_statuses),
+                ).fetchall()
+            else:
+                placeholders = ",".join("?" * len(active_statuses))
+                rows = conn.execute(
+                    f"SELECT * FROM escrow_states WHERE status IN ({placeholders})",
+                    active_statuses,
+                ).fetchall()
+
+            result = []
+            for row in rows:
+                result.append({
+                    "escrow_id": row["escrow_id"],
+                    "buyer": row["buyer"],
+                    "seller": row["seller"],
+                    "amount": row["amount"],
+                    "status": row["status"],
+                    "created_at": row["created_at"],
+                })
+            return result
+        finally:
+            conn.close()
 
     def close(self) -> None:
         pass  # SQLite connections are per-call, no persistent connection to close

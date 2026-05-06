@@ -137,20 +137,11 @@ class PerformanceSyncer:
 
     def _load_escrow(self, escrow_id: str) -> Optional[Dict]:
         """从数据库加载托管状态"""
-        # 使用专门的托管状态表（简化：复用 performance_records）
-        # 实际应该有独立的 escrow_states 表
-        # 这里用内存缓存 + 数据库 fallback
-        return self._escrows_cache.get(escrow_id)
+        return self.store.get_escrow_state(escrow_id)
 
     def _save_escrow(self, escrow: Dict):
         """保存托管状态到数据库"""
-        # 缓存到内存
-        self._escrows_cache[escrow["escrow_id"]] = escrow
-
-        # TODO: 持久化到独立的 escrow_states 表
-
-    # 内存缓存（进程重启后需要从数据库恢复）
-    _escrows_cache: Dict[str, Dict] = {}
+        self.store.save_escrow_state(escrow)
 
     def _create_and_save_record(
         self,
