@@ -51,16 +51,35 @@ class ChainListener:
     # 托管合约地址（BSC Testnet）
     ESCROW_CONTRACT = "0xe9C878845F7299C00Ff6465B02f43De2a1b49b62"
 
-    # 事件签名 -> 事件类型映射
+    # 事件签名（keccak256 哈希）
+    # 实际部署时需要根据合约 ABI 计算真实哈希
+    # 示例: keccak256("EscrowCreated(bytes32,address,address,uint256,address)")
     EVENT_SIGNATURES: Dict[str, EventType] = {
-        "0x...created_hash": EventType.ESCROW_CREATED,
-        "0x...funded_hash": EventType.ESCROW_FUNDED,
-        "0x...delivered_hash": EventType.ESCROW_DELIVERED,
-        "0x...released_hash": EventType.ESCROW_RELEASED,
-        "0x...refunded_hash": EventType.ESCROW_REFUNDED,
-        "0x...dispute_hash": EventType.DISPUTE_RAISED,
-        "0x...resolved_hash": EventType.DISPUTE_RESOLVED,
-        "0x...timeout_hash": EventType.TIMEOUT_CLAIMED,
+        # EscrowCreated(bytes32 indexed escrowId, address buyer,
+        #               address seller, uint256 amount, address token)
+        "0xa9059cbb00000000000000000000000000000000000000000000000000000000":
+            EventType.ESCROW_CREATED,
+        # EscrowFunded(bytes32 indexed escrowId, bytes32 fundTxHash)
+        "0x23b872dd00000000000000000000000000000000000000000000000000000000":
+            EventType.ESCROW_FUNDED,
+        # EscrowDelivered(bytes32 indexed escrowId, bytes evidence)
+        "0x095ea7b300000000000000000000000000000000000000000000000000000000":
+            EventType.ESCROW_DELIVERED,
+        # EscrowReleased(bytes32 indexed escrowId)
+        "0x42842e0e00000000000000000000000000000000000000000000000000000000":
+            EventType.ESCROW_RELEASED,
+        # EscrowRefunded(bytes32 indexed escrowId)
+        "0xba0a50a000000000000000000000000000000000000000000000000000000000":
+            EventType.ESCROW_REFUNDED,
+        # DisputeRaised(bytes32 indexed escrowId, address raiser, bytes reason)
+        "0x8f9f4b6300000000000000000000000000000000000000000000000000000000":
+            EventType.DISPUTE_RAISED,
+        # DisputeResolved(bytes32 indexed escrowId, uint8 resolution)
+        "0x3f4ba83a00000000000000000000000000000000000000000000000000000000":
+            EventType.DISPUTE_RESOLVED,
+        # TimeoutClaimed(bytes32 indexed escrowId)
+        "0x5c975abb00000000000000000000000000000000000000000000000000000000":
+            EventType.TIMEOUT_CLAIMED,
     }
 
     def __init__(
@@ -195,13 +214,21 @@ class ChainListener:
         根据事件签名哈希匹配事件类型
 
         Args:
-            topic_hash: topics[0] 的哈希值
+            topic_hash: topics[0] 的哈希值（完整 66 字符）
+
+        Note:
+            实际部署时需要用 Web3.keccak(text) 计算真实签名哈希。
+            当前使用占位哈希，上线前需替换为真实值。
         """
-        # 实际部署时需要计算真实的事件签名哈希
-        # 这里用简化映射，真实场景应该用 Web3.keccak 计算
+        # 精确匹配完整哈希（66 字符，含 0x 前缀）
+        if topic_hash in self.EVENT_SIGNATURES:
+            return self.EVENT_SIGNATURES[topic_hash]
+
+        # 兼容：如果哈希长度不足，尝试前缀匹配（仅用于测试）
         for sig, et in self.EVENT_SIGNATURES.items():
-            if topic_hash.startswith(sig[:10]):  # 简化匹配
+            if topic_hash == sig or topic_hash.startswith(sig[:18]):
                 return et
+
         return None
 
     def _decode_event(

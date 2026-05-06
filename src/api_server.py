@@ -9,11 +9,12 @@ AI Agent 信任基础设施 API
 
 import os
 import sys
+import hashlib
 
 # 添加 src 目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from flask import Flask, jsonify, request  # noqa: E402
+from flask import Flask, jsonify, request, g  # noqa: E402
 from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
 
@@ -34,8 +35,59 @@ limiter = Limiter(
 DEBUG_MODE = os.getenv("CRYPTOMINDS_DEBUG", "false").lower() in ("1", "true", "yes")
 API_PORT = int(os.getenv("CRYPTOMINDS_API_PORT", "3458"))
 
+# API 认证配置
+API_KEY = os.getenv("CRYPTOMINDS_API_KEY", "")
+INTERNAL_TOKEN = os.getenv("CRYPTOMINDS_INTERNAL_TOKEN", "")
+REQUIRE_AUTH = os.getenv("CRYPTOMINDS_REQUIRE_AUTH", "false").lower() in ("1", "true", "yes")
+
 # 初始化统一存储
 store = UnifiedStore()
+
+
+# ── 认证中间件 ──
+
+def check_auth():
+    """检查 API 认证"""
+    if not REQUIRE_AUTH:
+        return None
+
+    # 优先检查内部令牌
+    internal_token = request.headers.get("X-CryptoMinds-Internal-Token")
+    if internal_token and INTERNAL_TOKEN:
+        expected = hashlib.sha256(INTERNAL_TOKEN.encode()).hexdigest()
+        provided = hashlib.sha256(internal_token.encode()).hexdigest()
+        if provided == expected:
+            g.auth_type = "internal"
+            return None
+
+    # 检查 API Key
+    api_key = request.headers.get("X-CryptoMinds-API-Key")
+    if api_key and API_KEY:
+        expected = hashlib.sha256(API_KEY.encode()).hexdigest()
+        provided = hashlib.sha256(api_key.encode()).hexdigest()
+        if provided == expected:
+            g.auth_type = "api_key"
+            return None
+
+    # 检查签名（Agent 钱包签名）
+    signature = request.headers.get("X-CryptoMinds-Signature")
+    if signature:
+        # TODO: 验证钱包签名
+        g.auth_type = "signature"
+        return None
+
+    return jsonify({"error": "未授权访问，请提供有效的认证信息"}), 401
+
+
+@app.before_request
+def before_request():
+    """请求前中间件"""
+    # 跳过健康检查
+    if request.path in ("/health", "/api/v1/info"):
+        return None
+
+    # 检查认证
+    return check_auth()
 
 
 # ── 健康检查 ──

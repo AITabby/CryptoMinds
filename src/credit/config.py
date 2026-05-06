@@ -35,4 +35,4 @@ DEFAULT_DB_PATH = "credit_score/credit_score.db"
 
 # API
 API_HOST = "127.0.0.1"
-API_PORT = 3459
+API_PORT = 3458
