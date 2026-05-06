@@ -1,15 +1,18 @@
 """
 履约记录同步器
 
-将链上事件转换为履约记录，持久化存储到信用分数据库。
+将链上事件转换为履约记录，持久化存储到统一数据库。
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import List, Optional
 
-from ..credit.models import PerformanceRecord, TaskStatus
-from ..credit.store import CreditScoreStore
-from .chain_listener import ChainListener, ChainEvent, EventType
+try:
+    from credit.models import PerformanceRecord, TaskStatus
+    from collector.chain_listener import ChainListener, ChainEvent, EventType
+except ImportError:
+    from ..credit.models import PerformanceRecord, TaskStatus
+    from .chain_listener import ChainListener, ChainEvent, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -24,20 +27,25 @@ class PerformanceSyncer:
     def __init__(
         self,
         listener: ChainListener = None,
-        store: CreditScoreStore = None,
+        store=None,
     ):
         """
         初始化同步器
 
         Args:
             listener: 链上监听器
-            store: 信用分存储
+            store: 统一存储实例
         """
         self.listener = listener or ChainListener(mock_mode=True)
-        self.store = store or CreditScoreStore()
+        self.store = store or self._default_store()
 
         # 注册回调
         self.listener.register_callback(self._on_event)
+
+    def _default_store(self):
+        """获取默认存储"""
+        from store import UnifiedStore
+        return UnifiedStore()
 
     def start(self):
         """启动同步"""
@@ -55,7 +63,7 @@ class PerformanceSyncer:
         escrow_id = event.escrow_id
 
         # 从数据库加载托管状态
-        escrow = self._load_escrow(escrow_id)
+        escrow = self.store.get_escrow(escrow_id)
 
         if event.event_type == EventType.ESCROW_CREATED:
             # 创建托管
@@ -65,122 +73,132 @@ class PerformanceSyncer:
                 "seller": event.seller,
                 "amount": event.amount,
                 "token": event.token,
-                "created_at": event.timestamp,
                 "status": "pending",
-                "tx_hash": event.tx_hash,
-                "block_number": event.block_number,
+                "created_at": event.timestamp,
+                "fund_tx": event.tx_hash,
             }
-            self._save_escrow(escrow)
+            self.store.update_escrow_status(escrow_id, "pending")
 
         elif event.event_type == EventType.ESCROW_FUNDED:
             # 资金托管
             if escrow:
-                escrow["status"] = "funded"
-                escrow["fund_tx"] = event.tx_hash
-                self._save_escrow(escrow)
+                self.store.update_escrow_status(
+                    escrow_id, "funded",
+                    fund_tx=event.tx_hash,
+                    funded_at=event.timestamp,
+                )
 
         elif event.event_type == EventType.ESCROW_DELIVERED:
             # 提交交付
             if escrow:
-                escrow["status"] = "delivered"
-                escrow["evidence"] = event.evidence
-                escrow["delivered_at"] = event.timestamp
-                self._save_escrow(escrow)
+                self.store.update_escrow_status(
+                    escrow_id, "delivered",
+                    evidence=event.evidence,
+                    delivered_at=event.timestamp,
+                )
 
         elif event.event_type == EventType.ESCROW_RELEASED:
             # 释放资金（成功）
             if escrow:
-                escrow["status"] = "settled"
-                escrow["completed_at"] = event.timestamp
-                self._save_escrow(escrow)
-                self._create_and_save_record(escrow, TaskStatus.SETTLED)
+                self.store.update_escrow_status(
+                    escrow_id, "settled",
+                    completed_at=event.timestamp,
+                )
+                self._create_and_save_record(escrow_id, TaskStatus.SETTLED)
 
         elif event.event_type == EventType.ESCROW_REFUNDED:
             # 退款
             if escrow:
-                escrow["status"] = "refunded"
-                escrow["completed_at"] = event.timestamp
-                self._save_escrow(escrow)
-                self._create_and_save_record(escrow, TaskStatus.REFUNDED)
+                self.store.update_escrow_status(
+                    escrow_id, "refunded",
+                    completed_at=event.timestamp,
+                )
+                self._create_and_save_record(escrow_id, TaskStatus.REFUNDED)
 
         elif event.event_type == EventType.DISPUTE_RAISED:
             # 争议
             if escrow:
-                escrow["status"] = "disputed"
-                escrow["disputed"] = True
-                escrow["disputed_at"] = event.timestamp
-                self._save_escrow(escrow)
+                self.store.update_escrow_status(
+                    escrow_id, "disputed",
+                    disputed=True,
+                    dispute_reason=event.evidence,
+                )
 
         elif event.event_type == EventType.DISPUTE_RESOLVED:
             # 争议解决
             if escrow:
                 resolution = event.resolution
-                escrow["resolution"] = resolution
-                escrow["completed_at"] = event.timestamp
-
                 if resolution == "buyer_win":
-                    escrow["status"] = "refunded"
-                    self._save_escrow(escrow)
-                    self._create_and_save_record(escrow, TaskStatus.SETTLEMENT_FAILED)
+                    self.store.update_escrow_status(
+                        escrow_id, "refunded",
+                        resolution="buyer_win",
+                        completed_at=event.timestamp,
+                    )
+                    self._create_and_save_record(escrow_id, TaskStatus.SETTLEMENT_FAILED)
                 else:
-                    escrow["status"] = "settled"
-                    self._save_escrow(escrow)
-                    self._create_and_save_record(escrow, TaskStatus.SETTLED)
+                    self.store.update_escrow_status(
+                        escrow_id, "settled",
+                        resolution="seller_win",
+                        completed_at=event.timestamp,
+                    )
+                    self._create_and_save_record(escrow_id, TaskStatus.SETTLED)
 
         elif event.event_type == EventType.TIMEOUT_CLAIMED:
             # 超时
             if escrow:
-                escrow["status"] = "timeout"
-                escrow["completed_at"] = event.timestamp
-                self._save_escrow(escrow)
-                self._create_and_save_record(escrow, TaskStatus.TIMEOUT)
-
-    def _load_escrow(self, escrow_id: str) -> Optional[Dict]:
-        """从数据库加载托管状态"""
-        return self.store.get_escrow_state(escrow_id)
-
-    def _save_escrow(self, escrow: Dict):
-        """保存托管状态到数据库"""
-        self.store.save_escrow_state(escrow)
+                self.store.update_escrow_status(
+                    escrow_id, "timeout",
+                    completed_at=event.timestamp,
+                )
+                self._create_and_save_record(escrow_id, TaskStatus.TIMEOUT)
 
     def _create_and_save_record(
         self,
-        escrow: Dict,
+        escrow_id: str,
         status: TaskStatus,
     ) -> Optional[PerformanceRecord]:
         """
         创建并保存履约记录
 
         Args:
-            escrow: 托管状态
+            escrow_id: 托管 ID
             status: 最终状态
 
         Returns:
             创建的履约记录
         """
+        escrow = self.store.get_escrow(escrow_id)
+        if not escrow:
+            return None
+
+        # 计算响应时间
+        response_time = 0
+        if escrow.get("delivered_at") and escrow.get("created_at"):
+            response_time = (escrow["delivered_at"] - escrow["created_at"]) * 1000
+
         record = PerformanceRecord(
-            record_id=f"perf_{escrow['escrow_id']}",
-            task_id=escrow["escrow_id"],
+            record_id=f"perf_{escrow_id}",
+            task_id=escrow_id,
             task_type="escrow",
             buyer_wallet=escrow["buyer"],
             seller_wallet=escrow["seller"],
-            seller_agent_id=escrow["seller"],  # 简化：用钱包地址
+            seller_agent_id=escrow["seller"],
             chain="bsc",
             amount=escrow["amount"],
             status=status,
             success=status == TaskStatus.SETTLED,
             created_at=escrow["created_at"],
             completed_at=escrow.get("completed_at", 0),
-            response_time_ms=self._calc_response_time(escrow),
+            response_time_ms=response_time,
             payment_tx=escrow.get("fund_tx", ""),
             payment_amount=escrow["amount"],
             evidence=escrow.get("evidence", ""),
             disputed=escrow.get("disputed", False),
             dispute_reason=escrow.get("dispute_reason", ""),
             resolution=escrow.get("resolution", ""),
-            # score 字段：链上事件没有，需要后续补充
-            # 可以通过验证门评分或买家评价来补充
-            score=0.0,  # 待补充
+            # score: 链上事件无此字段，默认 0.5（中性）
+            # 后续可通过验证门评分或买家评价补充
+            score=0.5,
         )
 
         # 持久化存储
@@ -188,14 +206,6 @@ class PerformanceSyncer:
         logger.info(f"Saved performance record: {record.record_id}")
 
         return record
-
-    def _calc_response_time(self, escrow: Dict) -> int:
-        """计算响应时间（毫秒）"""
-        created = escrow.get("created_at", 0)
-        delivered = escrow.get("delivered_at", 0)
-        if created and delivered:
-            return (delivered - created) * 1000
-        return 0
 
     def sync_history(self, from_block: int = None, limit: int = 1000):
         """

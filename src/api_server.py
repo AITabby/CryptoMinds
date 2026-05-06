@@ -18,8 +18,7 @@ from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
 
 from credit.api import credit_bp  # noqa: E402
-from escrow.store import EscrowStore  # noqa: E402
-from escrow.arbitration_store import ArbitrationStore  # noqa: E402
+from store import UnifiedStore  # noqa: E402
 
 # 创建 Flask 应用
 app = Flask(__name__)
@@ -35,9 +34,8 @@ limiter = Limiter(
 DEBUG_MODE = os.getenv("CRYPTOMINDS_DEBUG", "false").lower() in ("1", "true", "yes")
 API_PORT = int(os.getenv("CRYPTOMINDS_API_PORT", "3458"))
 
-# 初始化存储
-escrow_store = EscrowStore()
-arbitration_store = ArbitrationStore()
+# 初始化统一存储
+store = UnifiedStore()
 
 
 # ── 健康检查 ──
@@ -72,7 +70,7 @@ def escrow_create():
     if not all(k in data for k in required):
         return jsonify({"error": "缺少必要参数"}), 400
 
-    escrow = escrow_store.create(
+    escrow = store.create_escrow(
         buyer=data["buyer"],
         seller=data["seller"],
         amount=float(data["amount"]),
@@ -86,7 +84,7 @@ def escrow_create():
 @app.route("/api/v1/escrow/<escrow_id>", methods=["GET"])
 def escrow_get(escrow_id):
     """查询托管状态"""
-    escrow = escrow_store.get(escrow_id)
+    escrow = store.get_escrow(escrow_id)
     if not escrow:
         return jsonify({"error": "托管不存在"}), 404
     return jsonify(escrow)
@@ -100,9 +98,15 @@ def escrow_fund(escrow_id):
     if not tx_hash:
         return jsonify({"error": "缺少交易哈希"}), 400
 
-    escrow = escrow_store.fund(escrow_id, tx_hash)
-    if not escrow:
+    escrow = store.get_escrow(escrow_id)
+    if not escrow or escrow["status"] != "pending":
         return jsonify({"error": "托管不存在或状态不允许"}), 400
+
+    escrow = store.update_escrow_status(
+        escrow_id, "funded",
+        fund_tx=tx_hash,
+        funded_at=int(__import__("time").time()),
+    )
     return jsonify(escrow)
 
 
@@ -114,28 +118,73 @@ def escrow_deliver(escrow_id):
     if not proof:
         return jsonify({"error": "缺少交付证明"}), 400
 
-    escrow = escrow_store.deliver(escrow_id, proof)
-    if not escrow:
+    escrow = store.get_escrow(escrow_id)
+    if not escrow or escrow["status"] != "funded":
         return jsonify({"error": "托管不存在或状态不允许"}), 400
+
+    escrow = store.update_escrow_status(
+        escrow_id, "delivered",
+        delivery_proof=str(proof),
+        delivered_at=int(__import__("time").time()),
+    )
     return jsonify(escrow)
 
 
 @app.route("/api/v1/escrow/<escrow_id>/release", methods=["POST"])
 def escrow_release(escrow_id):
     """释放资金"""
-    escrow = escrow_store.release(escrow_id)
-    if not escrow:
+    escrow = store.get_escrow(escrow_id)
+    if not escrow or escrow["status"] not in ("delivered", "verified"):
         return jsonify({"error": "托管不存在或状态不允许"}), 400
+
+    escrow = store.update_escrow_status(
+        escrow_id, "settled",
+        completed_at=int(__import__("time").time()),
+    )
     return jsonify(escrow)
 
 
 @app.route("/api/v1/escrow/<escrow_id>/refund", methods=["POST"])
 def escrow_refund(escrow_id):
     """申请退款"""
-    escrow = escrow_store.refund(escrow_id)
+    escrow = store.get_escrow(escrow_id)
     if not escrow:
-        return jsonify({"error": "托管不存在或状态不允许"}), 400
+        return jsonify({"error": "托管不存在"}), 404
+
+    allowed = ("pending", "funded", "disputed", "arbitrating")
+    if escrow["status"] not in allowed:
+        return jsonify({"error": "状态不允许退款"}), 400
+
+    escrow = store.update_escrow_status(
+        escrow_id, "refunded",
+        completed_at=int(__import__("time").time()),
+    )
     return jsonify(escrow)
+
+
+@app.route("/api/v1/escrow/<escrow_id>/dispute", methods=["POST"])
+def escrow_dispute(escrow_id):
+    """发起争议"""
+    data = request.json
+    reason = data.get("reason", "")
+
+    escrow = store.get_escrow(escrow_id)
+    if not escrow or escrow["status"] not in ("delivered", "funded"):
+        return jsonify({"error": "托管不存在或状态不允许"}), 400
+
+    escrow = store.update_escrow_status(
+        escrow_id, "disputed",
+        disputed=True,
+        dispute_reason=reason,
+    )
+
+    # 创建争议记录
+    dispute = store.create_dispute(
+        escrow_id=escrow_id,
+        reason=reason,
+        evidence=data.get("evidence"),
+    )
+    return jsonify({"escrow": escrow, "dispute": dispute})
 
 
 # ── 仲裁 API ──
@@ -148,7 +197,7 @@ def arbitrate_submit():
     if not all(k in data for k in required):
         return jsonify({"error": "缺少必要参数"}), 400
 
-    dispute = arbitration_store.create(
+    dispute = store.create_dispute(
         escrow_id=data["escrow_id"],
         reason=data["reason"],
         evidence=data.get("evidence")
@@ -159,7 +208,7 @@ def arbitrate_submit():
 @app.route("/api/v1/arbitrate/<dispute_id>", methods=["GET"])
 def arbitrate_get(dispute_id):
     """查询争议状态"""
-    dispute = arbitration_store.get(dispute_id)
+    dispute = store.get_dispute(dispute_id)
     if not dispute:
         return jsonify({"error": "争议不存在"}), 404
     return jsonify(dispute)
@@ -169,7 +218,7 @@ def arbitrate_get(dispute_id):
 def arbitrate_evidence(dispute_id):
     """添加证据"""
     data = request.json
-    dispute = arbitration_store.add_evidence(dispute_id, data)
+    dispute = store.add_dispute_evidence(dispute_id, data)
     if not dispute:
         return jsonify({"error": "争议不存在"}), 404
     return jsonify(dispute)
@@ -178,8 +227,55 @@ def arbitrate_evidence(dispute_id):
 @app.route("/api/v1/arbitrate/<dispute_id>/arbitrators", methods=["GET"])
 def arbitrate_arbitrators(dispute_id):
     """查询仲裁员"""
-    arbitrators = arbitration_store.get_arbitrators(dispute_id)
-    return jsonify({"arbitrators": arbitrators})
+    dispute = store.get_dispute(dispute_id)
+    if not dispute:
+        return jsonify({"error": "争议不存在"}), 404
+    return jsonify({"arbitrators": dispute.get("arbitrators", [])})
+
+
+@app.route("/api/v1/arbitrate/<dispute_id>/vote", methods=["POST"])
+def arbitrate_vote(dispute_id):
+    """仲裁员投票"""
+    data = request.json
+    required = ["arbitrator", "vote", "weight"]
+    if not all(k in data for k in required):
+        return jsonify({"error": "缺少必要参数"}), 400
+
+    dispute = store.add_vote(
+        dispute_id=dispute_id,
+        arbitrator=data["arbitrator"],
+        vote=data["vote"],
+        weight=float(data["weight"]),
+    )
+    if not dispute:
+        return jsonify({"error": "争议不存在"}), 404
+    return jsonify(dispute)
+
+
+@app.route("/api/v1/arbitrate/<dispute_id>/resolve", methods=["POST"])
+def arbitrate_resolve(dispute_id):
+    """解决争议"""
+    data = request.json
+    result = data.get("result")
+    if not result:
+        return jsonify({"error": "缺少结果参数"}), 400
+
+    dispute = store.resolve_dispute(
+        dispute_id=dispute_id,
+        result=result,
+        reason=data.get("reason", ""),
+    )
+    if not dispute:
+        return jsonify({"error": "争议不存在"}), 404
+
+    # 更新托管状态
+    escrow_id = dispute["escrow_id"]
+    if result == "buyer_wins":
+        store.update_escrow_status(escrow_id, "refunded", resolution="buyer_win")
+    elif result == "seller_wins":
+        store.update_escrow_status(escrow_id, "settled", resolution="seller_win")
+
+    return jsonify(dispute)
 
 
 # ── 启动 ──

@@ -8,7 +8,8 @@ import os
 from flask import Blueprint, jsonify, request
 
 from .calculator import SacredCalculator
-from .store import CreditScoreStore
+from .models import SacredScore, DimensionScore, CreditGrade
+from .config import COLD_START_SCORE
 
 # 蓝图
 credit_bp = Blueprint("credit", __name__)
@@ -21,10 +22,49 @@ _calculator = None
 def _ensure_initialized():
     global _store, _calculator
     if _store is None:
-        db_path = os.getenv("CREDIT_SCORE_DB_PATH", "credit_score.db")
-        _store = CreditScoreStore(db_path=db_path)
+        # 使用统一存储
+        from store import UnifiedStore
+        db_path = os.getenv("CREDIT_SCORE_DB_PATH", "cryptominds.db")
+        _store = UnifiedStore(db_path=db_path)
     if _calculator is None:
         _calculator = SacredCalculator()
+
+
+def _cold_start_score(address: str) -> SacredScore:
+    """
+    创建冷启动信用分
+
+    每个维度 50 分，总分 250，等级 CCC。
+    """
+    now = int(__import__("time").time())
+    score = SacredScore(
+        agent_id=address,
+        wallet=address,
+        is_cold_start=True,
+        calculated_at=now,
+    )
+
+    # 每维 50 分（250/5）
+    base_score = COLD_START_SCORE / 5
+    for dim, name in [
+        ("S", "Stability"),
+        ("A", "Activity"),
+        ("C", "Creditworthiness"),
+        ("R", "Reliability"),
+        ("E", "Ecosystem"),
+    ]:
+        setattr(score, dim.lower(), DimensionScore(
+            dimension=dim,
+            name=name,
+            raw_score=base_score,
+            weighted_score=base_score,
+            components={"cold_start": base_score},
+        ))
+
+    score.total_score = COLD_START_SCORE
+    score.grade = CreditGrade.CCC.value
+    score.compute_hash()
+    return score
 
 
 @credit_bp.route("/<address>", methods=["GET"])
@@ -36,22 +76,18 @@ def get_score(address: str):
     """
     _ensure_initialized()
 
-    # 先从存储查询
-    score = _store.get_latest_score(address)
-    if score is not None:
-        return jsonify(score.to_dict())
+    # 从履约记录计算
+    records = _store.get_performance_records(agent_id=address)
 
-    # 没有历史数据，返回冷启动默认分
-    # 新 Agent 基础分 250，等级 CCC
-    from .models import SacredScore, CreditGrade
-    from .config import COLD_START_SCORE
+    if not records:
+        # 冷启动
+        return jsonify(_cold_start_score(address).to_dict())
 
-    score = SacredScore(
+    # 计算信用分
+    score = _calculator.calculate(
         agent_id=address,
         wallet=address,
-        total_score=COLD_START_SCORE,
-        grade=CreditGrade.CCC.value,
-        is_cold_start=True,
+        records=records,
     )
 
     return jsonify(score.to_dict())
@@ -65,10 +101,10 @@ def get_history(address: str):
     limit = request.args.get("limit", 10, type=int)
     limit = min(limit, 100)
 
-    history = _store.get_score_history(address, limit=limit)
+    # TODO: 从 sacred_scores 表查询历史
     return jsonify({
         "address": address,
-        "history": [h.to_dict() for h in history]
+        "history": []
     })
 
 
@@ -80,10 +116,10 @@ def get_ranking():
     limit = request.args.get("limit", 100, type=int)
     limit = min(limit, 200)
 
-    ranking = _store.get_leaderboard(limit=limit)
+    # TODO: 从 sacred_scores 表查询排行榜
     return jsonify({
-        "ranking": ranking,
-        "total": len(ranking)
+        "ranking": [],
+        "total": 0
     })
 
 
@@ -110,5 +146,5 @@ def refresh_score(address: str):
         agent_info=agent_info,
     )
 
-    _store.save_score(score)
+    # TODO: 保存到 sacred_scores 表
     return jsonify(score.to_dict())
