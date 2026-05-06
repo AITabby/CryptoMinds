@@ -4,13 +4,11 @@
 
 import sys
 import os
+import unittest
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-
-import unittest
-from unittest.mock import patch, MagicMock
 
 
 class TestMockDataGenerator(unittest.TestCase):
@@ -169,15 +167,13 @@ class TestPerformanceSyncer(unittest.TestCase):
         """测试获取空记录"""
         from src.collector.performance_sync import PerformanceSyncer
         from src.collector.chain_listener import ChainListener
+        from src.store import UnifiedStore
 
-        # 使用临时数据库
-        import tempfile
         temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         db_path = temp_db.name
         temp_db.close()
 
         try:
-            from src.store import UnifiedStore
             store = UnifiedStore(db_path=db_path)
 
             listener = ChainListener(mock_mode=True)
@@ -186,11 +182,7 @@ class TestPerformanceSyncer(unittest.TestCase):
             records = syncer.get_records_for_agent("nonexistent")
             self.assertEqual(len(records), 0)
         finally:
-            import os
-            try:
-                os.unlink(db_path)
-            except:
-                pass
+            os.unlink(db_path)
 
 
 if __name__ == "__main__":

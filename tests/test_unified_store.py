@@ -5,11 +5,10 @@
 import sys
 import os
 import tempfile
+import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-
-import unittest
 
 
 class TestUnifiedStore(unittest.TestCase):
@@ -26,10 +25,9 @@ class TestUnifiedStore(unittest.TestCase):
 
     def tearDown(self):
         """清理临时数据库"""
-        import os
         try:
             os.unlink(self.db_path)
-        except:
+        except OSError:
             pass
 
     def test_create_and_get_escrow(self):

@@ -355,12 +355,14 @@ def arbitrate_resolve(dispute_id):
     escrow_id = dispute["escrow_id"]
     now = int(__import__("time").time())
     if result == "buyer_wins":
-        store.update_escrow_status(escrow_id, "refunded",
-                                  resolution="buyer_win", completed_at=now)
+        store.update_escrow_status(
+            escrow_id, "refunded",
+            resolution="buyer_win", completed_at=now)
         _record_escrow_result(escrow_id, "refunded")
     elif result == "seller_wins":
-        store.update_escrow_status(escrow_id, "settled",
-                                  resolution="seller_win", completed_at=now)
+        store.update_escrow_status(
+            escrow_id, "settled",
+            resolution="seller_win", completed_at=now)
         _record_escrow_result(escrow_id, "settled")
 
     return jsonify(dispute)

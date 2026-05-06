@@ -5,11 +5,10 @@
 import sys
 import os
 import tempfile
+import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-
-import unittest
 
 
 class TestCreditAPI(unittest.TestCase):
@@ -35,13 +34,11 @@ class TestCreditAPI(unittest.TestCase):
         """清理"""
         try:
             os.unlink(self.db_path)
-        except:
+        except OSError:
             pass
 
     def test_credit_score_with_records(self):
         """测试有履约记录时的信用分计算"""
-        # 这个测试验证 API 能正常响应
-        # 由于数据库隔离问题，这里只测试冷启动情况
         resp = self.client.get("/api/v1/credit/0xtest_agent_new")
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
