@@ -1,0 +1,16 @@
+.git
+.github
+__pycache__
+*.pyc
+node_modules
+web/node_modules
+.pytest_cache
+.coverage
+
+.env
+.env.*
+wallets.json
+web/cryptominds.db
+*.db
+*.db-shm
+*.db-wal
