@@ -27,10 +27,10 @@ class TestEscrowFlow:
         })
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["state"] == "created"
+        assert data["status"] == "pending"
         assert data["buyer"] == "0x1111111111111111111111111111111111111111"
         assert data["seller"] == "0x2222222222222222222222222222222222222222"
-        assert data["amount"] == 1.0
+        assert float(data["amount"]) == 1.0
 
     def test_fund_escrow(self, client):
         """测试资金托管"""
@@ -48,8 +48,8 @@ class TestEscrowFlow:
         })
         assert fund_resp.status_code == 200
         data = fund_resp.get_json()
-        assert data["state"] == "funded"
-        assert data["fund_tx_hash"] == "0xabcdef1234567890"
+        assert data["status"] == "funded"
+        assert data["fund_tx"] == "0xabcdef1234567890"
 
     def test_deliver_escrow(self, client):
         """测试交付"""
@@ -73,7 +73,7 @@ class TestEscrowFlow:
         })
         assert deliver_resp.status_code == 200
         data = deliver_resp.get_json()
-        assert data["state"] == "delivered"
+        assert data["status"] == "delivered"
 
     def test_release_escrow(self, client):
         """测试释放资金"""
@@ -91,7 +91,7 @@ class TestEscrowFlow:
         release_resp = client.post(f"/api/v1/escrow/{escrow_id}/release")
         assert release_resp.status_code == 200
         data = release_resp.get_json()
-        assert data["state"] == "released"
+        assert data["status"] == "settled"
 
     def test_refund_escrow(self, client):
         """测试退款"""
@@ -108,7 +108,7 @@ class TestEscrowFlow:
         refund_resp = client.post(f"/api/v1/escrow/{escrow_id}/refund")
         assert refund_resp.status_code == 200
         data = refund_resp.get_json()
-        assert data["state"] == "refunded"
+        assert data["status"] == "refunded"
 
     def test_escrow_not_found(self, client):
         """测试查询不存在的托管"""

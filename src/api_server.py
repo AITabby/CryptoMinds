@@ -71,10 +71,33 @@ def check_auth():
 
     # 检查签名（Agent 钱包签名）
     signature = request.headers.get("X-CryptoMinds-Signature")
-    if signature:
-        # TODO: 验证钱包签名
-        g.auth_type = "signature"
-        return None
+    address = request.headers.get("X-CryptoMinds-Address")
+    timestamp = request.headers.get("X-CryptoMinds-Timestamp")
+
+    if signature and address and timestamp:
+        try:
+            timestamp_int = int(timestamp)
+        except ValueError:
+            return jsonify({"error": "无效的时间戳"}), 401
+
+        # 确定操作类型
+        action = request.path.replace("/api/v1/", "").replace("/", "_")
+
+        # 验证签名
+        from utils.signature import verify_api_signature
+        result = verify_api_signature(
+            signature=signature,
+            address=address,
+            action=action,
+            timestamp=timestamp_int,
+        )
+
+        if result.get("valid"):
+            g.auth_type = "signature"
+            g.signer_address = result.get("recovered_address", address)
+            return None
+        else:
+            return jsonify({"error": result.get("error", "签名验证失败")}), 401
 
     return jsonify({"error": "未授权访问，请提供有效的认证信息"}), 401
 
@@ -193,6 +216,10 @@ def escrow_release(escrow_id):
         escrow_id, "settled",
         completed_at=int(__import__("time").time()),
     )
+
+    # 写入履约记录
+    _record_escrow_result(escrow_id, "settled")
+
     return jsonify(escrow)
 
 
@@ -211,6 +238,10 @@ def escrow_refund(escrow_id):
         escrow_id, "refunded",
         completed_at=int(__import__("time").time()),
     )
+
+    # 写入履约记录
+    _record_escrow_result(escrow_id, "refunded")
+
     return jsonify(escrow)
 
 
@@ -320,14 +351,65 @@ def arbitrate_resolve(dispute_id):
     if not dispute:
         return jsonify({"error": "争议不存在"}), 404
 
-    # 更新托管状态
+    # 更新托管状态 + 写履约记录
     escrow_id = dispute["escrow_id"]
+    now = int(__import__("time").time())
     if result == "buyer_wins":
-        store.update_escrow_status(escrow_id, "refunded", resolution="buyer_win")
+        store.update_escrow_status(escrow_id, "refunded",
+                                  resolution="buyer_win", completed_at=now)
+        _record_escrow_result(escrow_id, "refunded")
     elif result == "seller_wins":
-        store.update_escrow_status(escrow_id, "settled", resolution="seller_win")
+        store.update_escrow_status(escrow_id, "settled",
+                                  resolution="seller_win", completed_at=now)
+        _record_escrow_result(escrow_id, "settled")
 
     return jsonify(dispute)
+
+
+# ── 辅助函数 ──
+
+def _record_escrow_result(escrow_id: str, result: str):
+    """托管结算后自动写入履约记录"""
+    from credit.models import PerformanceRecord, TaskStatus
+
+    escrow = store.get_escrow(escrow_id)
+    if not escrow:
+        return
+
+    status_map = {
+        "settled": TaskStatus.SETTLED,
+        "refunded": TaskStatus.REFUNDED,
+    }
+    task_status = status_map.get(result, TaskStatus.SETTLED)
+
+    response_time = 0
+    if escrow.get("delivered_at") and escrow.get("created_at"):
+        response_time = (escrow["delivered_at"] - escrow["created_at"]) * 1000
+
+    record = PerformanceRecord(
+        record_id=f"perf_{escrow_id}",
+        task_id=escrow_id,
+        task_type="escrow",
+        buyer_wallet=escrow["buyer"],
+        seller_wallet=escrow["seller"],
+        seller_agent_id=escrow["seller"],
+        chain="bsc",
+        amount=str(escrow["amount"]),
+        status=task_status,
+        success=task_status == TaskStatus.SETTLED,
+        score=0.5,  # 默认中性分数
+        created_at=escrow["created_at"],
+        completed_at=escrow.get("completed_at", 0),
+        response_time_ms=response_time,
+        payment_tx=escrow.get("fund_tx", ""),
+        payment_amount=escrow.get("amount", "0"),
+        evidence=escrow.get("evidence", ""),
+        disputed=escrow.get("disputed", False),
+        dispute_reason=escrow.get("dispute_reason", ""),
+        resolution=escrow.get("resolution", ""),
+    )
+
+    store.save_performance_record(record)
 
 
 # ── 启动 ──

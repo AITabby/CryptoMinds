@@ -621,6 +621,318 @@ class UnifiedStore:
             resolution=row["resolution"],
         )
 
+    # ═════════════════════════════════════════════════════
+    # 信用分操作
+    # ═════════════════════════════════════════════════════
+
+    def save_score(self, score) -> None:
+        """保存信用分快照"""
+        conn = self._connect()
+        try:
+            conn.execute(
+                """INSERT INTO sacred_scores
+                   (agent_id, wallet, total_score, grade,
+                    stability_score, activity_score, creditworthiness_score,
+                    reliability_score, ecosystem_score,
+                    is_cold_start, snapshot_hash, calculated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    score.agent_id, score.wallet, score.total_score, score.grade,
+                    score.stability.weighted_score, score.activity.weighted_score,
+                    score.creditworthiness.weighted_score,
+                    score.reliability.weighted_score, score.ecosystem.weighted_score,
+                    1 if score.is_cold_start else 0,
+                    score.snapshot_hash, score.calculated_at,
+                ),
+            )
+
+            # 保存五维明细
+            for dim_code, dim in score.dimensions.items():
+                conn.execute(
+                    """INSERT INTO dimension_details
+                       (agent_id, calculated_at, dimension, raw_score,
+                        weighted_score, components_json)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        score.agent_id, score.calculated_at, dim_code,
+                        dim.raw_score, dim.weighted_score,
+                        json.dumps(dim.components),
+                    ),
+                )
+
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_latest_score(self, agent_id: str):
+        """获取最新一次信用分"""
+        from credit.models import SacredScore, DimensionScore
+
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT * FROM sacred_scores WHERE agent_id = ? "
+                "ORDER BY calculated_at DESC LIMIT 1",
+                (agent_id,),
+            ).fetchone()
+            if not row:
+                return None
+
+            # 获取维度明细
+            dims = conn.execute(
+                "SELECT * FROM dimension_details "
+                "WHERE agent_id = ? AND calculated_at = ?",
+                (agent_id, row["calculated_at"]),
+            ).fetchall()
+
+            dim_map = {}
+            dim_names = {
+                "S": "Stability", "A": "Activity",
+                "C": "Creditworthiness", "R": "Reliability",
+                "E": "Ecosystem",
+            }
+            for d in dims:
+                dim_map[d["dimension"]] = DimensionScore(
+                    dimension=d["dimension"],
+                    name=dim_names.get(d["dimension"], ""),
+                    raw_score=d["raw_score"],
+                    weighted_score=d["weighted_score"],
+                    components=json.loads(d["components_json"]),
+                )
+
+            return SacredScore(
+                agent_id=row["agent_id"],
+                wallet=row["wallet"],
+                stability=dim_map.get("S", DimensionScore("S", "Stability")),
+                activity=dim_map.get("A", DimensionScore("A", "Activity")),
+                creditworthiness=dim_map.get("C", DimensionScore("C", "Creditworthiness")),
+                reliability=dim_map.get("R", DimensionScore("R", "Reliability")),
+                ecosystem=dim_map.get("E", DimensionScore("E", "Ecosystem")),
+                total_score=row["total_score"],
+                grade=row["grade"],
+                is_cold_start=bool(row["is_cold_start"]),
+                calculated_at=row["calculated_at"],
+                snapshot_hash=row["snapshot_hash"],
+            )
+        finally:
+            conn.close()
+
+    def get_score_history(self, agent_id: str, limit: int = 30) -> List[Dict]:
+        """获取信用分历史"""
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT s.*, GROUP_CONCAT(d.dimension || ':' || d.weighted_score) as dim_scores "
+                "FROM sacred_scores s "
+                "LEFT JOIN dimension_details d "
+                "    ON s.agent_id = d.agent_id AND s.calculated_at = d.calculated_at "
+                "WHERE s.agent_id = ? "
+                "GROUP BY s.calculated_at "
+                "ORDER BY s.calculated_at DESC LIMIT ?",
+                (agent_id, limit),
+            ).fetchall()
+
+            result = []
+            for row in rows:
+                dim_scores = {}
+                if row["dim_scores"]:
+                    for pair in row["dim_scores"].split(","):
+                        parts = pair.split(":")
+                        if len(parts) == 2:
+                            dim_scores[parts[0]] = float(parts[1])
+
+                result.append({
+                    "agent_id": agent_id,
+                    "score": row["total_score"],
+                    "grade": row["grade"],
+                    "dimension_scores": dim_scores,
+                    "calculated_at": row["calculated_at"],
+                })
+            return result
+        finally:
+            conn.close()
+
+    def get_leaderboard(self, limit: int = 50, grade: str = None) -> List[Dict]:
+        """获取信用分排行榜"""
+        conn = self._connect()
+        try:
+            # 统一用子查询：每个 agent 取最新一条
+            if grade:
+                rows = conn.execute(
+                    "SELECT s1.agent_id, s1.wallet, s1.total_score, s1.grade, s1.calculated_at "
+                    "FROM sacred_scores s1 "
+                    "INNER JOIN ("
+                    "    SELECT agent_id, MAX(calculated_at) as max_cal "
+                    "    FROM sacred_scores GROUP BY agent_id"
+                    ") s2 ON s1.agent_id = s2.agent_id AND s1.calculated_at = s2.max_cal "
+                    "WHERE s1.grade = ? "
+                    "ORDER BY s1.total_score DESC LIMIT ?",
+                    (grade, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT s1.agent_id, s1.wallet, s1.total_score, s1.grade, s1.calculated_at "
+                    "FROM sacred_scores s1 "
+                    "INNER JOIN ("
+                    "    SELECT agent_id, MAX(calculated_at) as max_cal "
+                    "    FROM sacred_scores GROUP BY agent_id"
+                    ") s2 ON s1.agent_id = s2.agent_id AND s1.calculated_at = s2.max_cal "
+                    "ORDER BY s1.total_score DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+
+            result = []
+            for i, row in enumerate(rows, 1):
+                result.append({
+                    "rank": i,
+                    "agent_id": row["agent_id"],
+                    "wallet": row["wallet"],
+                    "total_score": row["total_score"],
+                    "grade": row["grade"],
+                    "calculated_at": row["calculated_at"],
+                })
+            return result
+        finally:
+            conn.close()
+
+    # ═════════════════════════════════════════════════════
+    # 查询授权操作
+    # ═════════════════════════════════════════════════════
+
+    def save_authorization(self, auth) -> None:
+        """保存查询授权"""
+        conn = self._connect()
+        try:
+            conn.execute(
+                """INSERT OR REPLACE INTO query_authorizations
+                   (auth_id, agent_id, querier_id, signature, expires_at, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (auth.auth_id, auth.agent_id, auth.querier_id,
+                 auth.signature, auth.expires_at, auth.created_at),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def verify_authorization(self, auth_id: str, querier_id: str) -> bool:
+        """验证查询授权"""
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT * FROM query_authorizations WHERE auth_id = ? AND revoked = 0",
+                (auth_id,),
+            ).fetchone()
+            if not row:
+                return False
+            if row["querier_id"] != querier_id:
+                return False
+            if row["expires_at"] < int(time.time()):
+                return False
+            return True
+        finally:
+            conn.close()
+
+    def list_authorizations(self, agent_id: str) -> List[Dict]:
+        """列出授权"""
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT * FROM query_authorizations WHERE agent_id = ? AND revoked = 0 "
+                "ORDER BY created_at DESC",
+                (agent_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    def revoke_authorization(self, auth_id: str) -> bool:
+        """撤销授权"""
+        conn = self._connect()
+        try:
+            conn.execute(
+                "UPDATE query_authorizations SET revoked = 1 WHERE auth_id = ?",
+                (auth_id,),
+            )
+            conn.commit()
+            return conn.total_changes > 0
+        finally:
+            conn.close()
+
+    # ═════════════════════════════════════════════════════
+    # 严重违约操作
+    # ═════════════════════════════════════════════════════
+
+    def record_severe_violation(
+        self,
+        agent_id: str,
+        wallet: str,
+        record_id: str,
+        violation_type: str,
+        penalty_points: float,
+    ) -> None:
+        """记录严重违约"""
+        conn = self._connect()
+        try:
+            conn.execute(
+                """INSERT INTO severe_violations
+                   (agent_id, wallet, record_id, violation_type,
+                    penalty_points, occurred_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (agent_id, wallet, record_id, violation_type,
+                 penalty_points, int(time.time())),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_severe_violations(self, agent_id: str) -> List[Dict]:
+        """获取严重违约记录"""
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT * FROM severe_violations WHERE agent_id = ? "
+                "ORDER BY occurred_at DESC",
+                (agent_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    # ═════════════════════════════════════════════════════
+    # 托管状态（链上同步用，支持 upsert）
+    # ═════════════════════════════════════════════════════
+
+    def upsert_escrow(self, escrow: Dict) -> Dict:
+        """插入或更新托管状态（链上同步用）"""
+        conn = self._connect()
+        try:
+            conn.execute(
+                """INSERT OR REPLACE INTO escrows
+                   (escrow_id, buyer, seller, amount, token, timeout, status,
+                    created_at, funded_at, delivered_at, completed_at,
+                    fund_tx, delivery_proof, evidence, disputed,
+                    dispute_reason, resolution, metadata)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    escrow["escrow_id"], escrow.get("buyer", ""),
+                    escrow.get("seller", ""), escrow.get("amount", "0"),
+                    escrow.get("token", "BNB"), escrow.get("timeout", 86400),
+                    escrow.get("status", "pending"),
+                    escrow.get("created_at", int(time.time())),
+                    escrow.get("funded_at", 0), escrow.get("delivered_at", 0),
+                    escrow.get("completed_at", 0), escrow.get("fund_tx", ""),
+                    escrow.get("delivery_proof", ""), escrow.get("evidence", ""),
+                    1 if escrow.get("disputed") else 0,
+                    escrow.get("dispute_reason", ""),
+                    escrow.get("resolution", ""),
+                    json.dumps(escrow.get("metadata", {})),
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return self.get_escrow(escrow["escrow_id"])
+
     def close(self):
         """关闭连接（SQLite 连接是每次调用创建的，无需关闭）"""
         pass

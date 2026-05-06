@@ -22,9 +22,8 @@ _calculator = None
 def _ensure_initialized():
     global _store, _calculator
     if _store is None:
-        # 使用统一存储
         from store import UnifiedStore
-        db_path = os.getenv("CREDIT_SCORE_DB_PATH", "cryptominds.db")
+        db_path = os.getenv("CRYPTOMINDS_DB_PATH", "cryptominds.db")
         _store = UnifiedStore(db_path=db_path)
     if _calculator is None:
         _calculator = SacredCalculator()
@@ -36,7 +35,8 @@ def _cold_start_score(address: str) -> SacredScore:
 
     每个维度 50 分，总分 250，等级 CCC。
     """
-    now = int(__import__("time").time())
+    import time as _time
+    now = int(_time.time())
     score = SacredScore(
         agent_id=address,
         wallet=address,
@@ -46,14 +46,14 @@ def _cold_start_score(address: str) -> SacredScore:
 
     # 每维 50 分（250/5）
     base_score = COLD_START_SCORE / 5
-    for dim, name in [
-        ("S", "Stability"),
-        ("A", "Activity"),
-        ("C", "Creditworthiness"),
-        ("R", "Reliability"),
-        ("E", "Ecosystem"),
+    for dim, name, attr in [
+        ("S", "Stability", "stability"),
+        ("A", "Activity", "activity"),
+        ("C", "Creditworthiness", "creditworthiness"),
+        ("R", "Reliability", "reliability"),
+        ("E", "Ecosystem", "ecosystem"),
     ]:
-        setattr(score, dim.lower(), DimensionScore(
+        setattr(score, attr, DimensionScore(
             dimension=dim,
             name=name,
             raw_score=base_score,
@@ -76,6 +76,11 @@ def get_score(address: str):
     """
     _ensure_initialized()
 
+    # 先从存储查询
+    cached = _store.get_latest_score(address)
+    if cached is not None:
+        return jsonify(cached.to_dict())
+
     # 从履约记录计算
     records = _store.get_performance_records(agent_id=address)
 
@@ -90,6 +95,8 @@ def get_score(address: str):
         records=records,
     )
 
+    # 保存
+    _store.save_score(score)
     return jsonify(score.to_dict())
 
 
@@ -101,10 +108,10 @@ def get_history(address: str):
     limit = request.args.get("limit", 10, type=int)
     limit = min(limit, 100)
 
-    # TODO: 从 sacred_scores 表查询历史
+    history = _store.get_score_history(address, limit=limit)
     return jsonify({
         "address": address,
-        "history": []
+        "history": history,
     })
 
 
@@ -116,10 +123,10 @@ def get_ranking():
     limit = request.args.get("limit", 100, type=int)
     limit = min(limit, 200)
 
-    # TODO: 从 sacred_scores 表查询排行榜
+    ranking = _store.get_leaderboard(limit=limit)
     return jsonify({
-        "ranking": [],
-        "total": 0
+        "ranking": ranking,
+        "total": len(ranking),
     })
 
 
@@ -146,5 +153,5 @@ def refresh_score(address: str):
         agent_info=agent_info,
     )
 
-    # TODO: 保存到 sacred_scores 表
+    _store.save_score(score)
     return jsonify(score.to_dict())

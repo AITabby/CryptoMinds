@@ -1,7 +1,7 @@
 """
 CryptoMinds Agent 信用分体系 — SACRED 五维模型
 
-五维信用分评估：Security, Availability, Consistency, Reliability, Economic
+五维信用分评估：Stability, Activity, Creditworthiness, Reliability, Ecosystem
 """
 
 from .models import SacredScore, DimensionScore, CreditGrade, ScoreHistoryEntry

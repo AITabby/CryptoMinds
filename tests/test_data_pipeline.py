@@ -138,10 +138,10 @@ def test_record_statistics():
         disputed = sum(1 for r in records if r.disputed)
 
         print(f"\n{profile.upper()} 档案 ({len(records)} 条记录):")
-        print(f"  成功: {success} ({success/len(records)*100:.1f}%)")
-        print(f"  超时: {timeout} ({timeout/len(records)*100:.1f}%)")
-        print(f"  失败: {failed} ({failed/len(records)*100:.1f}%)")
-        print(f"  争议: {disputed} ({disputed/len(records)*100:.1f}%)")
+        print(f"  成功: {success} ({success / len(records) * 100:.1f}%)")
+        print(f"  超时: {timeout} ({timeout / len(records) * 100:.1f}%)")
+        print(f"  失败: {failed} ({failed / len(records) * 100:.1f}%)")
+        print(f"  争议: {disputed} ({disputed / len(records) * 100:.1f}%)")
 
 
 if __name__ == "__main__":

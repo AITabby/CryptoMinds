@@ -66,8 +66,8 @@ class PerformanceSyncer:
         escrow = self.store.get_escrow(escrow_id)
 
         if event.event_type == EventType.ESCROW_CREATED:
-            # 创建托管
-            escrow = {
+            # 创建托管（upsert，如果已存在则更新）
+            escrow_data = {
                 "escrow_id": escrow_id,
                 "buyer": event.buyer,
                 "seller": event.seller,
@@ -77,7 +77,7 @@ class PerformanceSyncer:
                 "created_at": event.timestamp,
                 "fund_tx": event.tx_hash,
             }
-            self.store.update_escrow_status(escrow_id, "pending")
+            self.store.upsert_escrow(escrow_data)
 
         elif event.event_type == EventType.ESCROW_FUNDED:
             # 资金托管
