@@ -7,4 +7,3 @@ Escrow 状态机 + 争议解决
 from settlement.escrow_state import EscrowState, EscrowStateMachine, InvalidTransitionError
 from escrow.models import EscrowOrder
 from escrow.arbitration import ArbitrationEngine
-from escrow.dispute_timer import DisputeTimer
