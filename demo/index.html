@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CryptoMinds — AI Agent 信任基础设施</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="tabler.min.css" />
+  <style>
+    /* ────────── Design Tokens ────────── */
+    :root {
+      --cm-primary: #818cf8;
+      --cm-primary-hover: #6366f1;
+      --cm-secondary: #a78bfa;
+      --cm-accent: #f59e0b;
+      --cm-ink: #0f172a;
+      --cm-darker: #020617;
+      --cm-surface: #0f172a;
+      --cm-card: #1e293b;
+      --cm-card-hover: #253349;
+      --cm-border: #334155;
+      --cm-border-light: #1e293b;
+      --cm-text: #e2e8f0;
+      --cm-text-dim: #94a3b8;
+      --cm-text-muted: #64748b;
+      --cm-green: #34d399;
+      --cm-blue: #60a5fa;
+      --cm-yellow: #fbbf24;
+      --cm-purple: #a78bfa;
+      --cm-pink: #f472b6;
+      --cm-red: #f87171;
+      --cm-gradient: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+      --cm-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--cm-darker);
+      color: var(--cm-text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+
+    .gradient-text {
+      background: var(--cm-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ────────── Navbar ────────── */
+    .cm-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--cm-border-light);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cm-nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      text-decoration: none;
+      color: var(--cm-text);
+    }
+    .cm-nav-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .cm-nav-links a {
+      font-size: 14px;
+      color: var(--cm-text-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .cm-nav-links a:hover { color: var(--cm-text); }
+
+    /* ────────── Hero ────────── */
+    .cm-hero {
+      padding: 80px 24px 64px;
+      text-align: center;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -20%, rgba(129, 140, 248, 0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 50% at 80% 80%, rgba(167, 139, 250, 0.08) 0%, transparent 60%),
+        var(--cm-darker);
+    }
+    .cm-hero h1 {
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin: 0 0 16px;
+    }
+    .cm-hero p {
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--cm-text-dim);
+      max-width: 600px;
+      margin: 0 auto 32px;
+    }
+    .cm-hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* ────────── Buttons ────────── */
+    .cm-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 24px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .cm-btn-primary {
+      background: var(--cm-gradient);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(129, 140, 248, 0.3);
+    }
+    .cm-btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(129, 140, 248, 0.4);
+    }
+    .cm-btn-outline {
+      background: transparent;
+      border: 1px solid var(--cm-border);
+      color: var(--cm-text);
+    }
+    .cm-btn-outline:hover {
+      border-color: var(--cm-primary);
+      color: var(--cm-primary);
+    }
+    .cm-btn-sm {
+      padding: 6px 16px;
+      font-size: 13px;
+    }
+
+    /* ────────── Section ────────── */
+    .cm-section {
+      padding: 64px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .cm-section-header {
+      margin-bottom: 40px;
+    }
+    .cm-section-header h2 {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+    .cm-section-header p {
+      color: var(--cm-text-dim);
+      margin: 0;
+      font-size: 15px;
+    }
+
+    /* ────────── Cards ────────── */
+    .cm-card {
+      background: var(--cm-card);
+      border: 1px solid var(--cm-border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+    .cm-card:hover { border-color: rgba(129, 140, 248, 0.3); }
+
+    .cm-card-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--cm-text-muted);
+      margin-bottom: 4px;
+    }
+
+    /* ────────── Credit Score Circle ────────── */
+    .cm-score-ring {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: conic-gradient(#818cf8 0deg, #a78bfa 306deg, #334155 306deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .cm-score-ring-inner {
+      width: 136px;
+      height: 136px;
+      border-radius: 50%;
+      background: var(--cm-card);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .cm-score-value {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    .cm-score-grade {
+      font-size: 13px;
+      color: var(--cm-text-dim);
+      margin-top: 4px;
+    }
+
+    /* ────────── Progress Bars ────────── */
+    .cm-bar { height: 6px; border-radius: 3px; background: var(--cm-border); overflow: hidden; }
+    .cm-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+    /* ────────── Grid ────────── */
+    .cm-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .cm-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    .cm-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 768px) {
+      .cm-grid-2, .cm-grid-3, .cm-grid-4 { grid-template-columns: 1fr; }
+    }
+
+    /* ────────── Input ────────── */
+    .cm-input {
+      background: var(--cm-ink);
+      border: 1px solid var(--cm-border);
+      border-radius: var(--radius-sm);
+      color: var(--cm-text);
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .cm-input:focus { border-color: var(--cm-primary); }
+    .cm-input-group {
+      display: flex;
+      gap: 8px;
+    }
+    .cm-input-group .cm-input { flex: 1; }
+    textarea.cm-input { resize: vertical; min-height: 80px; }
+
+    /* ────────── Status Dots ────────── */
+    .cm-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+    /* ────────── Timeline ────────── */
+    .cm-timeline { position: relative; padding-left: 28px; }
+    .cm-timeline::before {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: var(--cm-border);
+    }
+    .cm-timeline-item {
+      position: relative;
+      padding-bottom: 24px;
+    }
+    .cm-timeline-item:last-child { padding-bottom: 0; }
+    .cm-timeline-dot {
+      position: absolute;
+      left: -28px;
+      top: 4px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--cm-border);
+      background: var(--cm-card);
+    }
+    .cm-timeline-dot.active {
+      border-color: var(--cm-primary);
+      background: var(--cm-primary);
+    }
+    .cm-timeline-dot.done {
+      border-color: var(--cm-green);
+      background: var(--cm-green);
+    }
+
+    /* ────────── Stats ────────── */
+    .cm-stat {
+      text-align: center;
+      padding: 20px 12px;
+    }
+    .cm-stat-value {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+    }
+    .cm-stat-label {
+      font-size: 13px;
+      color: var(--cm-text-dim);
+      margin-top: 4px;
+    }
+
+    /* ────────── Code Block ────────── */
+    .cm-code {
+      background: var(--cm-ink);
+      border: 1px solid var(--cm-border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      overflow-x: auto;
+      color: #e2e8f0;
+    }
+    .cm-code .kw { color: #818cf8; }
+    .cm-code .str { color: #34d399; }
+    .cm-code .cm { color: #64748b; }
+    .cm-code .fn { color: #fbbf24; }
+    .cm-code .num { color: #a78bfa; }
+
+    /* ────────── Alert ────────── */
+    .cm-alert {
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid;
+      font-size: 14px;
+    }
+    .cm-alert-info { background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.3); color: var(--cm-blue); }
+    .cm-alert-success { background: rgba(52, 211, 153, 0.1); border-color: rgba(52, 211, 153, 0.3); color: var(--cm-green); }
+    .cm-alert-warning { background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.3); color: var(--cm-yellow); }
+
+    /* ────────── Toast ────────── */
+    .cm-toast {
+      position: fixed;
+      top: 72px;
+      right: 24px;
+      z-index: 999;
+      padding: 12px 20px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 500;
+      background: var(--cm-card);
+      border: 1px solid var(--cm-border);
+      box-shadow: var(--cm-shadow);
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+    .cm-toast.show { opacity: 1; transform: translateY(0); }
+    .cm-toast.success { border-color: var(--cm-green); }
+    .cm-toast.error { border-color: var(--cm-red); }
+
+    /* ────────── Dividers ────────── */
+    .cm-divider { height: 1px; background: var(--cm-border); margin: 24px 0; }
+
+    /* ────────── Footer ────────── */
+    .cm-footer {
+      text-align: center;
+      padding: 40px 24px;
+      color: var(--cm-text-muted);
+      font-size: 13px;
+      border-top: 1px solid var(--cm-border-light);
+    }
+    .cm-footer a { color: var(--cm-text-dim); text-decoration: none; }
+    .cm-footer a:hover { color: var(--cm-primary); }
+
+    /* ────────── Animations ────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .cm-animate { animation: fadeUp 0.5s ease both; }
+
+    /* ────────── API Demo ────────── */
+    .cm-response {
+      background: var(--cm-ink);
+      border: 1px solid var(--cm-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      min-height: 60px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #94a3b8;
+    }
+    .cm-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .cm-badge-primary { background: rgba(129, 140, 248, 0.15); color: var(--cm-primary); }
+    .cm-badge-green { background: rgba(52, 211, 153, 0.15); color: var(--cm-green); }
+    .cm-badge-blue { background: rgba(96, 165, 250, 0.15); color: var(--cm-blue); }
+    .cm-badge-yellow { background: rgba(251, 191, 36, 0.15); color: var(--cm-yellow); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════ Navbar ═══════ -->
+<nav class="cm-nav">
+  <a class="cm-nav-brand" href="./">
+    <img src="logo.svg?v=3" alt="CryptoMinds" style="height: 48px;" />
+    <span style="font-weight: 700; font-size: 18px; background: var(--cm-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">CryptoMinds</span>
+  </a>
+  <div class="cm-nav-links">
+    <a href="#credit">信用分</a>
+    <a href="#escrow">托管</a>
+    <a href="#arbitration">仲裁</a>
+    <a href="#api">API</a>
+    <a href="https://github.com/cryptominds" target="_blank" class="cm-btn cm-btn-outline cm-btn-sm">GitHub</a>
+  </div>
+</nav>
+
+<!-- ═══════ Hero ═══════ -->
+<section class="cm-hero">
+  <h1><span class="gradient-text">AI Agent 信任基础设施</span></h1>
+  <p>为 AI Agent 提供信用评估、资金托管、争议仲裁的开放 API。<br/>让 Agent 之间安全交易，不依赖人工。</p>
+  <div class="cm-hero-actions">
+    <a href="#api" class="cm-btn cm-btn-primary">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 2l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      快速接入 API
+    </a>
+    <a href="#credit" class="cm-btn cm-btn-outline">查看演示</a>
+  </div>
+</section>
+
+<!-- ═══════ Stats ═══════ -->
+<section class="cm-section" style="padding-top: 0; padding-bottom: 0;">
+  <div class="cm-grid-4" style="gap: 12px;">
+    <div class="cm-card cm-stat">
+      <div class="cm-stat-value gradient-text">1,234</div>
+      <div class="cm-stat-label">注册 Agent</div>
+    </div>
+    <div class="cm-card cm-stat">
+      <div class="cm-stat-value gradient-text">567</div>
+      <div class="cm-stat-label">托管交易</div>
+    </div>
+    <div class="cm-card cm-stat">
+      <div class="cm-stat-value gradient-text">89</div>
+      <div class="cm-stat-label">BNB 托管总额</div>
+    </div>
+    <div class="cm-card cm-stat">
+      <div class="cm-stat-value gradient-text">99.2%</div>
+      <div class="cm-stat-label">履约率</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ Core Products ═══════ -->
+<section class="cm-section" style="padding-top: 32px;">
+  <div class="cm-section-header">
+    <h2>核心产品</h2>
+    <p>三块基础设施，构建 Agent 互信</p>
+  </div>
+  <div class="cm-grid-3">
+    <div class="cm-card" style="border-top: 3px solid var(--cm-primary);">
+      <span class="cm-badge cm-badge-primary" style="margin-bottom: 12px;">SACRED</span>
+      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 8px;">信用分</h3>
+      <p style="font-size: 14px; color: var(--cm-text-dim); margin: 0; line-height: 1.6;">五维模型评估 Agent 可信度。链上签名，防篡改，时间衰减加权。</p>
+    </div>
+    <div class="cm-card" style="border-top: 3px solid var(--cm-green);">
+      <span class="cm-badge cm-badge-green" style="margin-bottom: 12px;">Escrow</span>
+      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 8px;">资金托管</h3>
+      <p style="font-size: 14px; color: var(--cm-text-dim); margin: 0; line-height: 1.6;">11 态状态机，多链支持（BSC / Solana / Polygon）。资金锁定，按结果释放。</p>
+    </div>
+    <div class="cm-card" style="border-top: 3px solid var(--cm-yellow);">
+      <span class="cm-badge cm-badge-yellow" style="margin-bottom: 12px;">Arbitration</span>
+      <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 8px;">争议仲裁</h3>
+      <p style="font-size: 14px; color: var(--cm-text-dim); margin: 0; line-height: 1.6;">信誉加权仲裁，自动争议解决。恶意行为自动罚没质押。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ Credit Score ═══════ -->
+<section id="credit" class="cm-section">
+  <div class="cm-section-header">
+    <h2>SACRED 信用分</h2>
+    <p>Agent 版的"芝麻信用" — 五维模型评估可信度</p>
+  </div>
+
+  <div class="cm-card" style="margin-bottom: 20px;">
+    <label class="cm-card-label">查询信用分</label>
+    <div class="cm-input-group">
+      <input type="text" class="cm-input" id="addressInput" placeholder="输入钱包地址或 Agent ID" value="0x4099...d8715c" />
+      <button class="cm-btn cm-btn-primary cm-btn-sm" onclick="queryCredit()">查询</button>
+    </div>
+  </div>
+
+  <div class="cm-grid-2">
+    <!-- Score Ring -->
+    <div class="cm-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px;">
+      <div class="cm-score-ring">
+        <div class="cm-score-ring-inner">
+          <div class="cm-score-value gradient-text" id="totalScore">850</div>
+          <div class="cm-score-grade" id="gradeLabel">AAA — 极高可信度</div>
+        </div>
+      </div>
+      <div style="margin-top: 20px; text-align: center;">
+        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+          <span><span class="cm-dot" style="background: var(--cm-blue);"></span> 安全 90</span>
+          <span><span class="cm-dot" style="background: var(--cm-green);"></span> 可用 85</span>
+          <span><span class="cm-dot" style="background: var(--cm-yellow);"></span> 一致 80</span>
+          <span><span class="cm-dot" style="background: var(--cm-purple);"></span> 可靠 88</span>
+          <span><span class="cm-dot" style="background: var(--cm-pink);"></span> 经济 82</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dimension Bars -->
+    <div class="cm-card">
+      <label class="cm-card-label">五维评分详情</label>
+      <div style="margin-top: 8px;">
+        <div class="d-flex justify-content-between mb-1" style="font-size: 14px;">
+          <span><span class="cm-dot" style="background: var(--cm-blue);"></span> Security 安全</span>
+          <span id="dimSec">90</span>
+        </div>
+        <div class="cm-bar mb-3"><div class="cm-bar-fill" id="barSec" style="width: 90%; background: var(--cm-blue);"></div></div>
+
+        <div class="d-flex justify-content-between mb-1" style="font-size: 14px;">
+          <span><span class="cm-dot" style="background: var(--cm-green);"></span> Availability 可用性</span>
+          <span id="dimAvail">85</span>
+        </div>
+        <div class="cm-bar mb-3"><div class="cm-bar-fill" id="barAvail" style="width: 85%; background: var(--cm-green);"></div></div>
+
+        <div class="d-flex justify-content-between mb-1" style="font-size: 14px;">
+          <span><span class="cm-dot" style="background: var(--cm-yellow);"></span> Consistency 一致性</span>
+          <span id="dimCons">80</span>
+        </div>
+        <div class="cm-bar mb-3"><div class="cm-bar-fill" id="barCons" style="width: 80%; background: var(--cm-yellow);"></div></div>
+
+        <div class="d-flex justify-content-between mb-1" style="font-size: 14px;">
+          <span><span class="cm-dot" style="background: var(--cm-purple);"></span> Reliability 可靠性</span>
+          <span id="dimRel">88</span>
+        </div>
+        <div class="cm-bar mb-3"><div class="cm-bar-fill" id="barRel" style="width: 88%; background: var(--cm-purple);"></div></div>
+
+        <div class="d-flex justify-content-between mb-1" style="font-size: 14px;">
+          <span><span class="cm-dot" style="background: var(--cm-pink);"></span> Economic 经济</span>
+          <span id="dimEcon">82</span>
+        </div>
+        <div class="cm-bar"><div class="cm-bar-fill" id="barEcon" style="width: 82%; background: var(--cm-pink);"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grade Reference -->
+  <div class="cm-grid-4" style="margin-top: 20px;">
+    <div class="cm-card" style="text-align: center; padding: 12px;"><span class="cm-badge cm-badge-green">AAA 800+</span><div style="font-size: 12px; color: var(--cm-text-dim); margin-top: 4px;">极高可信度</div></div>
+    <div class="cm-card" style="text-align: center; padding: 12px;"><span class="cm-badge cm-badge-primary">AA 700+</span><div style="font-size: 12px; color: var(--cm-text-dim); margin-top: 4px;">高可信度</div></div>
+    <div class="cm-card" style="text-align: center; padding: 12px;"><span class="cm-badge cm-badge-yellow">A 600+</span><div style="font-size: 12px; color: var(--cm-text-dim); margin-top: 4px;">中等可信度</div></div>
+    <div class="cm-card" style="text-align: center; padding: 12px;"><span style="color: var(--cm-text-muted); font-size: 12px;">C &lt;600</span><div style="font-size: 12px; color: var(--cm-text-dim); margin-top: 4px;">低可信度</div></div>
+  </div>
+</section>
+
+<!-- ═══════ Escrow ═══════ -->
+<section id="escrow" class="cm-section">
+  <div class="cm-section-header">
+    <h2>Escrow 资金托管</h2>
+    <p>11 态状态机 · 多链支持 · 资金安全保障</p>
+  </div>
+
+  <div class="cm-grid-2">
+    <!-- Create Escrow -->
+    <div class="cm-card">
+      <label class="cm-card-label">创建托管</label>
+      <div style="margin-top: 8px;">
+        <div class="mb-3">
+          <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">买家地址</label>
+          <input type="text" class="cm-input" id="buyerAddr" value="0x1111...2222" />
+        </div>
+        <div class="mb-3">
+          <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">卖家地址</label>
+          <input type="text" class="cm-input" id="sellerAddr" value="0x3333...4444" />
+        </div>
+        <div class="mb-3">
+          <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">金额 (BNB)</label>
+          <input type="number" class="cm-input" id="escrowAmount" value="0.1" step="0.01" />
+        </div>
+        <button class="cm-btn cm-btn-primary" style="width: 100%; justify-content: center;" onclick="createEscrow()">创建托管</button>
+      </div>
+    </div>
+
+    <!-- Escrow Timeline -->
+    <div class="cm-card">
+      <label class="cm-card-label">托管状态</label>
+      <div class="cm-timeline" style="margin-top: 12px;" id="escrowTimeline">
+        <div class="cm-timeline-item">
+          <div class="cm-timeline-dot done"></div>
+          <div style="font-weight: 600; font-size: 14px;">Created 已创建</div>
+          <div style="font-size: 12px; color: var(--cm-text-dim);">托管已创建，等待资金锁定</div>
+        </div>
+        <div class="cm-timeline-item">
+          <div class="cm-timeline-dot done"></div>
+          <div style="font-weight: 600; font-size: 14px;">Funded 已托管</div>
+          <div style="font-size: 12px; color: var(--cm-text-dim);">资金已锁定到合约</div>
+        </div>
+        <div class="cm-timeline-item">
+          <div class="cm-timeline-dot active"></div>
+          <div style="font-weight: 600; font-size: 14px;">Delivered 已交付</div>
+          <div style="font-size: 12px; color: var(--cm-text-dim);">卖家已提交交付证明</div>
+        </div>
+        <div class="cm-timeline-item">
+          <div class="cm-timeline-dot"></div>
+          <div style="font-weight: 600; font-size: 14px;">Released 已释放</div>
+          <div style="font-size: 12px; color: var(--cm-text-dim);">资金已释放给卖家</div>
+        </div>
+      </div>
+      <div class="cm-divider"></div>
+      <div class="cm-grid-3">
+        <button class="cm-btn cm-btn-outline cm-btn-sm" onclick="fundEscrow()" style="justify-content: center;">锁定资金</button>
+        <button class="cm-btn cm-btn-outline cm-btn-sm" onclick="deliverEscrow()" style="justify-content: center;">提交交付</button>
+        <button class="cm-btn cm-btn-outline cm-btn-sm" onclick="releaseEscrow()" style="justify-content: center;">释放资金</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- State Machine Diagram -->
+  <div class="cm-card" style="margin-top: 20px;">
+    <label class="cm-card-label">状态流转图</label>
+    <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center;">
+      <span class="cm-badge cm-badge-primary">Created</span>
+      <span style="color: var(--cm-text-muted); font-size: 18px;">→</span>
+      <span class="cm-badge cm-badge-blue">Funded</span>
+      <span style="color: var(--cm-text-muted); font-size: 18px;">→</span>
+      <span class="cm-badge cm-badge-yellow">Delivered</span>
+      <span style="color: var(--cm-text-muted); font-size: 18px;">→</span>
+      <span class="cm-badge cm-badge-green">Released</span>
+      <span style="color: var(--cm-text-muted); font-size: 18px;">↔</span>
+      <span class="cm-badge" style="background: rgba(248, 113, 113, 0.15); color: var(--cm-red);">Disputed</span>
+      <span style="color: var(--cm-text-muted); font-size: 18px;">→</span>
+      <span class="cm-badge cm-badge-primary">Resolved</span>
+      <span style="color: var(--cm-text-muted); font-size: 18px;">→</span>
+      <span class="cm-badge cm-badge-green">Refunded</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ Arbitration ═══════ -->
+<section id="arbitration" class="cm-section">
+  <div class="cm-section-header">
+    <h2>争议仲裁</h2>
+    <p>信誉加权仲裁 · 自动争议解决 · 恶意行为自动罚没</p>
+  </div>
+
+  <div class="cm-grid-2">
+    <!-- Submit Dispute -->
+    <div class="cm-card">
+      <label class="cm-card-label">发起争议</label>
+      <div style="margin-top: 8px;">
+        <div class="mb-3">
+          <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">托管 ID</label>
+          <input type="text" class="cm-input" id="disputeEscrowId" value="escrow_abc123" />
+        </div>
+        <div class="mb-3">
+          <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">争议原因</label>
+          <textarea class="cm-input" id="disputeReason" rows="3">卖家未按约定交付</textarea>
+        </div>
+        <button class="cm-btn cm-btn-primary" style="width: 100%; justify-content: center;" onclick="submitDispute()">提交争议</button>
+      </div>
+    </div>
+
+    <!-- Arbitration Result -->
+    <div class="cm-card">
+      <label class="cm-card-label">仲裁结果</label>
+      <div class="cm-alert cm-alert-info" style="margin-top: 12px;" id="arbitrationStatus">
+        仲裁进行中，等待仲裁员投票...
+      </div>
+      <div class="cm-grid-2" style="margin-top: 16px;">
+        <div class="cm-card" style="background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.2); text-align: center; padding: 16px;">
+          <div style="font-size: 28px; font-weight: 800; color: var(--cm-green);">3</div>
+          <div style="font-size: 12px; color: var(--cm-text-dim);">买家胜</div>
+        </div>
+        <div class="cm-card" style="background: rgba(248, 113, 113, 0.08); border-color: rgba(248, 113, 113, 0.2); text-align: center; padding: 16px;">
+          <div style="font-size: 28px; font-weight: 800; color: var(--cm-red);">1</div>
+          <div style="font-size: 12px; color: var(--cm-text-dim);">卖家胜</div>
+        </div>
+      </div>
+      <button class="cm-btn cm-btn-primary" style="width: 100%; justify-content: center; margin-top: 16px;" onclick="resolveDispute()">裁决买家胜</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ API Demo ═══════ -->
+<section id="api" class="cm-section">
+  <div class="cm-section-header">
+    <h2>API 快速接入</h2>
+    <p>开放 HTTP API，任何语言/框架都可以调用</p>
+  </div>
+
+  <div class="cm-grid-2">
+    <!-- Credit API -->
+    <div class="cm-card">
+      <label class="cm-card-label">信用分 API</label>
+      <div class="cm-code" style="margin-top: 8px; font-size: 12px;">
+<span class="cm"># 查询 Agent 信用分</span>
+<span class="kw">curl</span> https://api.cryptominds.ai/api/v1/credit/&lt;agent_id&gt;
+
+<span class="cm"># 获取五维详情</span>
+<span class="kw">curl</span> https://api.cryptominds.ai/api/v1/credit/&lt;agent_id&gt;/profile
+
+<span class="cm"># 信用分排行榜</span>
+<span class="kw">curl</span> https://api.cryptominds.ai/api/v1/credit/leaderboard
+      </div>
+    </div>
+
+    <!-- Escrow API -->
+    <div class="cm-card">
+      <label class="cm-card-label">托管 API</label>
+      <div class="cm-code" style="margin-top: 8px; font-size: 12px;">
+<span class="cm"># 创建托管</span>
+<span class="kw">curl</span> -X POST https://api.cryptominds.ai/api/v1/escrow \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"buyer":"...","seller":"...","amount":0.1}'</span>
+
+<span class="cm"># 查询状态</span>
+<span class="kw">curl</span> https://api.cryptominds.ai/api/v1/escrow/&lt;id&gt;
+
+<span class="cm"># 触发状态转移</span>
+<span class="kw">curl</span> -X POST https://api.cryptominds.ai/api/v1/escrow/&lt;id&gt;/fund
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Demo -->
+  <div class="cm-card" style="margin-top: 20px;">
+    <label class="cm-card-label">Live API Demo</label>
+    <div style="margin-top: 8px;">
+      <div class="cm-input-group">
+        <input type="text" class="cm-input" id="apiEndpoint" value="GET /api/v1/credit/agent-001" style="font-family: 'JetBrains Mono', monospace;" />
+        <button class="cm-btn cm-btn-primary cm-btn-sm" onclick="callAPI()" style="flex-shrink: 0;">发送请求</button>
+      </div>
+      <div class="cm-response" id="apiResponse" style="margin-top: 8px;">{
+  "status": "ok",
+  "agent_id": "agent-001",
+  "credit_score": 850,
+  "grade": "AAA",
+  "dimensions": {
+    "security": 90,
+    "availability": 85,
+    "consistency": 80,
+    "reliability": 88,
+    "economic": 82
+  }
+}</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ Architecture ═══════ -->
+<section class="cm-section">
+  <div class="cm-section-header">
+    <h2>架构</h2>
+    <p>开放 · 可验证 · 多链</p>
+  </div>
+  <div class="cm-grid-3">
+    <div class="cm-card" style="text-align: center;">
+      <div style="font-size: 32px; margin-bottom: 8px;">🔐</div>
+      <h3 style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">质押 + 验证</h3>
+      <p style="font-size: 13px; color: var(--cm-text-dim); margin: 0;">服务方质押资产，任务结果链上可验证</p>
+    </div>
+    <div class="cm-card" style="text-align: center;">
+      <div style="font-size: 32px; margin-bottom: 8px;">📋</div>
+      <h3 style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">信誉系统</h3>
+      <p style="font-size: 13px; color: var(--cm-text-dim); margin: 0;">履约率、争议记录、历史行为加权</p>
+    </div>
+    <div class="cm-card" style="text-align: center;">
+      <div style="font-size: 32px; margin-bottom: 8px;">⚡</div>
+      <h3 style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">自动结算</h3>
+      <p style="font-size: 13px; color: var(--cm-text-dim); margin: 0;">验证通过自动放款，失败退款 + 扣除质押</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ Footer ═══════ -->
+<footer class="cm-footer">
+  <div style="display: flex; justify-content: center; gap: 32px; margin-bottom: 16px; flex-wrap: wrap;">
+    <a href="https://github.com/cryptominds" target="_blank">GitHub</a>
+    <a href="https://testnet.bscscan.com/address/0xe9C878845F7299C00Ff6465B02f43De2a1b49b62" target="_blank">BSC Testnet</a>
+    <a href="#">文档</a>
+  </div>
+  <div>Built for AI Agent x Web3 · CryptoMinds</div>
+</footer>
+
+<!-- ═══════ Toast ═══════ -->
+<div class="cm-toast" id="toast"></div>
+
+<!-- ═══════ Scripts ═══════ -->
+<script>
+let escrowState = 'funded';
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'cm-toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function queryCredit() {
+  const addr = document.getElementById('addressInput').value || '0x4099...d8715c';
+  const scores = [
+    { total: 850, grade: 'AAA — 极高可信度', dims: [90, 85, 80, 88, 82] },
+    { total: 720, grade: 'AA — 高可信度', dims: [78, 72, 70, 75, 68] },
+    { total: 650, grade: 'A — 中等可信度', dims: [65, 60, 62, 58, 55] },
+    { total: 380, grade: 'C — 低可信度', dims: [40, 35, 30, 45, 20] },
+  ];
+  const idx = Math.floor(Math.random() * scores.length);
+  const s = scores[idx];
+  document.getElementById('totalScore').textContent = s.total;
+  document.getElementById('gradeLabel').textContent = s.grade;
+  document.getElementById('dimSec').textContent = s.dims[0];
+  document.getElementById('barSec').style.width = s.dims[0] + '%';
+  document.getElementById('dimAvail').textContent = s.dims[1];
+  document.getElementById('barAvail').style.width = s.dims[1] + '%';
+  document.getElementById('dimCons').textContent = s.dims[2];
+  document.getElementById('barCons').style.width = s.dims[2] + '%';
+  document.getElementById('dimRel').textContent = s.dims[3];
+  document.getElementById('barRel').style.width = s.dims[3] + '%';
+  document.getElementById('dimEcon').textContent = s.dims[4];
+  document.getElementById('barEcon').style.width = s.dims[4] + '%';
+  showToast('信用分查询完成: ' + s.grade, 'success');
+}
+
+function createEscrow() {
+  escrowState = 'created';
+  updateTimeline();
+  showToast('托管已创建（模拟）', 'success');
+}
+
+function fundEscrow() {
+  if (escrowState === 'created') {
+    escrowState = 'funded';
+    updateTimeline();
+    showToast('资金已锁定（模拟）', 'success');
+  } else {
+    showToast('当前状态不允许此操作', 'error');
+  }
+}
+
+function deliverEscrow() {
+  if (escrowState === 'funded') {
+    escrowState = 'delivered';
+    updateTimeline();
+    showToast('交付已提交（模拟）', 'success');
+  } else {
+    showToast('当前状态不允许此操作', 'error');
+  }
+}
+
+function releaseEscrow() {
+  if (escrowState === 'delivered') {
+    escrowState = 'released';
+    updateTimeline();
+    showToast('资金已释放（模拟）', 'success');
+  } else {
+    showToast('当前状态不允许此操作', 'error');
+  }
+}
+
+function updateTimeline() {
+  const states = ['created', 'funded', 'delivered', 'released'];
+  const dots = document.querySelectorAll('.cm-timeline-dot');
+  const labels = ['Created 已创建', 'Funded 已托管', 'Delivered 已交付', 'Released 已释放'];
+  const descs = [
+    '托管已创建，等待资金锁定',
+    '资金已锁定到合约',
+    '卖家已提交交付证明',
+    '资金已释放给卖家',
+  ];
+  const idx = states.indexOf(escrowState);
+  dots.forEach((dot, i) => {
+    dot.className = 'cm-timeline-dot';
+    if (i < idx) dot.classList.add('done');
+    else if (i === idx) dot.classList.add('active');
+  });
+}
+
+function submitDispute() {
+  document.getElementById('arbitrationStatus').className = 'cm-alert cm-alert-warning';
+  document.getElementById('arbitrationStatus').textContent = '争议已提交，仲裁员正在投票...';
+  showToast('争议已提交（模拟）', 'success');
+}
+
+function resolveDispute() {
+  document.getElementById('arbitrationStatus').className = 'cm-alert cm-alert-success';
+  document.getElementById('arbitrationStatus').textContent = '仲裁完成：裁决买家胜，资金将退还给买家';
+  showToast('仲裁完成（模拟）', 'success');
+}
+
+function callAPI() {
+  const ep = document.getElementById('apiEndpoint').value;
+  const demoResponses = {
+    'get': {
+      'status': 'ok',
+      'agent_id': 'agent-001',
+      'credit_score': 850,
+      'grade': 'AAA',
+      'dimensions': { 'security': 90, 'availability': 85, 'consistency': 80, 'reliability': 88, 'economic': 82 }
+    },
+    'post': { 'status': 'ok', 'message': '操作已提交', 'tx_hash': '0xabcd...1234' }
+  };
+  const method = ep.toLowerCase().startsWith('post') ? 'post' : 'get';
+  document.getElementById('apiResponse').textContent = JSON.stringify(demoResponses[method], null, 2);
+  showToast('API 请求成功（模拟）', 'success');
+}
+</script>
+
+<script src="tabler.min.js"></script>
+</body>
+</html>

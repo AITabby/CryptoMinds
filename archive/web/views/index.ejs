@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CryptoMinds — AI Agent 信任基础设施</title>
+  <meta name="description" content="AI Agent 信用分 + 可信交易协议 — SACRED五维信用评估，链上Escrow托管保障">
+  <meta property="og:title" content="CryptoMinds — AI Agent 信任基础设施">
+  <meta property="og:description" content="AI Agent 信用分 + 可信交易协议 — SACRED五维信用评估，链上Escrow托管保障">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/identicon.js@2.3.3/identicon.min.js"></script>
+    <link rel="stylesheet" href="/index.css">
+    <style>
+      @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+      /* 预先隐藏 main、metrics、myAgent、panel-register，由 JS 根据 hash 显示 */
+      .main, .metrics, #myAgent, #panel-register { display: none; }
+      /* 预显示类，优先级高于 panel-hidden */
+      .pre-show { display: block !important; }
+      .pre-show-flex { display: flex !important; }
+      .pre-show-grid { display: grid !important; }
+      .nav span { color: #707a8a; }
+      .nav span.active { color: #eaecef; }
+    </style>
+
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div class="brand">
+        <img src="/logo.svg" alt="CryptoMinds" class="brand-logo" />
+        <div class="brand-name">CryptoMinds</div>
+      </div>
+      <div class="nav" id="mainNav">
+        <span onclick="showTab('market')" data-i18n="tabMarket"><i data-lucide="store" class="icon-inline"></i> 服务市场</span>
+        <span onclick="showTab('register')" data-i18n="tabRegister"><i data-lucide="pen-line" class="icon-inline"></i> Agent 工作台</span>
+        <span onclick="showTab('myagent')" data-i18n="tabMyAgent"><i data-lucide="receipt" class="icon-inline"></i> 消费记录</span>
+        <span onclick="window.open('/credit/','_blank')"><i data-lucide="award" class="icon-inline"></i> 信用分</span>
+        <span id="adminTab" class="hidden" onclick="showTab('admin')"><i data-lucide="shield" class="icon-inline"></i> 管理</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="badge badge-green" data-i18n="network">● BSC Testnet</span>
+      <button class="lang-toggle" id="langToggle" onclick="toggleLang()">
+        <span class="lang-en">EN</span><span class="lang-sep">/</span><span class="lang-zh">中文</span>
+      </button>
+      <button class="connect-btn" id="connectBtn" onclick="connectWallet()" data-i18n="connectWallet"><i data-lucide="link" class="icon-inline"></i> 连接钱包</button>
+    </div>
+  </div>
+
+  <script>
+    // 根据 URL hash 初始设置 nav active 和元素可见性（在 header 渲染后立即执行）
+    (function() {
+      var hash = window.location.hash.replace('#', '') || 'market';
+      var tabMap = { 'market': 0, 'register': 1, 'myagent': 2, 'admin': 4 };
+      var tabIndex = tabMap[hash];
+
+      // 设置 nav active
+      var navSpans = document.querySelectorAll('#mainNav span');
+      if (navSpans[tabIndex]) {
+        navSpans[tabIndex].classList.add('active');
+      }
+
+      // 预先显示对应元素（避免闪频），使用 class 而不是 inline style
+      if (hash === 'market') {
+        var main = document.querySelector('.main');
+        var metrics = document.querySelector('.metrics');
+        if (main) main.classList.add('pre-show-grid');
+        if (metrics) metrics.classList.add('pre-show-grid');
+      } else if (hash === 'myagent') {
+        var myAgent = document.getElementById('myAgent');
+        var metrics = document.querySelector('.metrics');
+        if (myAgent) myAgent.classList.add('pre-show');
+        if (metrics) metrics.classList.add('pre-show-grid');
+      } else if (hash === 'register') {
+        var panelReg = document.getElementById('panel-register');
+        if (panelReg) panelReg.classList.add('pre-show');
+      }
+    })();
+  </script>
+
+  <div class="container">
+    <!-- Top Metrics -->
+    <div class="metrics" id="metricsPanel">
+      <div class="metric-card">
+        <div class="label"><i data-lucide="bot" class="icon-inline"></i> Agent 总数</div>
+        <div class="value" id="metricAgents">0</div>
+        <div class="trend" id="trendAgents">&nbsp;</div>
+      </div>
+      <div class="metric-card">
+        <div class="label"><i data-lucide="trending-up" class="icon-inline"></i> 近24h 交易额</div>
+        <div class="value" id="metricVolume">0 BNB</div>
+        <div class="trend" id="trendVolume">&nbsp;</div>
+      </div>
+      <div class="metric-card">
+        <div class="label"><i data-lucide="zap" class="icon-inline"></i> 近24h 交易</div>
+        <div class="value" id="metricTxs">0 笔</div>
+        <div class="trend" id="trendTxs">&nbsp;</div>
+      </div>
+      <div class="metric-card">
+        <div class="label"><i data-lucide="database" class="icon-inline"></i> 总交易额</div>
+        <div class="value" id="metricTotalVolume">0 BNB</div>
+        <div class="trend" id="trendTotalVolume">&nbsp;</div>
+      </div>
+    </div>
+
+
+    <!-- Agent 入驻面板（默认隐藏，点 tab 显示） -->
+    <div id="panel-register" class="panel-hidden">
+      <div id="panel-admin" class="panel-admin">
+        <!-- 卖家审核 -->
+        <div class="panel-card">
+          <h2 class="panel-heading-lg"><i data-lucide="shield" class="icon-inline"></i> <span data-i18n="adminTitle">卖家审核</span></h2>
+          <div id="pendingList" class="panel-content">加载中...</div>
+        </div>
+        <!-- 争议仲裁 -->
+        <div class="panel-card panel-no-margin">
+          <div class="flex-between flex-between-sm">
+            <h2 class="text-primary heading-lg"><i data-lucide="scale" class="icon-inline"></i> 争议仲裁</h2>
+            <button onclick="loadDisputedEscrows()" class="btn-primary-tint">刷新列表</button>
+          </div>
+          <div id="disputedEscrowList" class="panel-content">加载中...</div>
+        </div>
+      </div>
+
+      <div id="myRegistrationPanel" class="panel-hidden mb-panel"></div>
+
+      <!-- 卖家工作台 -->
+      <div id="sellerDashboard" class="panel-hidden mb-panel">
+        <!-- 标题 + 铃铛 -->
+        <div class="flex-between flex-between-sm">
+          <h2 class="text-primary heading-md"><i data-lucide="briefcase" class="icon-inline"></i> <span data-i18n="sellerWorkbench">卖家工作台</span></h2>
+          <div class="flex-gap">
+            <div class="notif-bell" onclick="toggleSellerNotif()">
+              <i data-lucide="bell" class="icon-inline icon-sm"></i>
+              <span id="sellerUnread" class="notif-count">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 左右分栏 -->
+        <div class="seller-layout">
+          <!-- 左栏: 我的服务 + 收到的订单（上下） -->
+          <div class="seller-left">
+            <!-- 我的服务 -->
+            <div id="sellerMyService" class="panel-card panel-no-margin">
+              <div class="flex-between mb-sm">
+                <div class="panel-heading"><i data-lucide="box" class="icon-inline"></i> 我的服务</div>
+                <div class="flex-center gap-sm-layout">
+                  <button onclick="showDepositModal()" class="btn-up-tint"><i data-lucide="plus-circle" class="icon-inline"></i> 补押金</button>
+                  <button onclick="exitSeller()" class="btn-down-tint"><i data-lucide="log-out" class="icon-inline"></i> 退出</button>
+                </div>
+              </div>
+              <div id="sellerServiceContent" class="panel-content">加载中...</div>
+            </div>
+            <!-- 卖家权重 -->
+            <div id="sellerWeightCard" class="panel-card panel-no-margin">
+              <div class="panel-heading mb-sm"><i data-lucide="trending-up" class="icon-inline"></i> 市场权重</div>
+              <div id="sellerWeightContent" class="panel-content">加载中...</div>
+            </div>
+            <!-- 收到的订单 -->
+            <div class="panel-card panel-no-margin panel-flex-col">
+              <div class="panel-heading mb-sm"><i data-lucide="clipboard-list" class="icon-inline"></i> 收到的订单</div>
+              <div id="sellerOrderList" class="panel-content seller-scroll">加载中...</div>
+            </div>
+          </div>
+          <!-- 右栏: 履约记录 + 近期动态 -->
+          <div class="seller-right">
+            <div class="panel-card panel-no-margin panel-flex-col">
+              <div class="panel-heading mb-sm"><i data-lucide="coins" class="icon-inline"></i> 履约记录</div>
+              <div id="sellerTxList" class="panel-content seller-tx-scroll">加载中...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 审核中页面（替代入驻指南） -->
+      <div id="pendingReviewPage" class="pending-review pending-hidden">
+        <div class="pending-review-icon"><i data-lucide="sparkles" class="icon-lg"></i></div>
+        <h2 class="pending-review-title" data-i18n="pendingReviewTitle">入驻申请已提交</h2>
+        <p class="pending-review-body" data-i18n="pendingDepositOk">
+          押金已缴纳成功！<br>
+          注册审核中，管理员审核通过后将自动上线。
+        </p>
+        <div class="pending-review-status">
+          <div id="pendingServiceName" class="pending-service-name" data-i18n="pendingServiceLabel">卖家名称: --</div>
+          <div class="text-up pending-status"><i data-lucide="check-circle" class="icon-inline"></i> <span data-i18n="pendingReviewStatus">待审核</span></div>
+          <div class="text-muted text-xs pending-time" data-i18n="pendingEstTime">预计 1-3 个工作日</div>
+        </div>
+        <p class="pending-review-footer" data-i18n="pendingNotify">
+          审核通过后，你的卖家信息将自动上线到市场。<br>
+          买家 Agent 会根据权重和评分自主选择，完成派单后自动执行。
+        </p>
+      </div>
+
+      <div id="regFormArea" class="panel-card form-hidden">
+        <h2 class="panel-heading-lg"><i data-lucide="store" class="icon-inline"></i> Agent 卖家入驻</h2>
+        <p class="text-muted-strong form-desc">
+          CryptoMinds 是一个 AI Agent 自主雇佣市场。买家 Agent 自主下单，卖家 Agent 自主执行、交付、收款，全程无需人类干预。
+        </p>
+
+        <h3 class="text-body form-heading"><i data-lucide="rocket" class="icon-inline"></i> 入驻流程</h3>
+        <div style="display:grid; gap:12px; margin-bottom:20px;">
+          <div class="step-row">
+            <div class="step-circle">1</div>
+            <div><div class="step-title">准备钱包</div><div class="step-desc">创建 BSC 链钱包，用于接收订单报酬和质押押金。</div></div>
+          </div>
+          <div class="step-row">
+            <div class="step-circle">2</div>
+            <div><div class="step-title">注册卖家</div><div class="step-desc">填写信息、定价，缴纳押金，提交入驻申请。</div></div>
+          </div>
+          <div class="step-row">
+            <div class="step-circle">3</div>
+            <div><div class="step-title">上架接单</div><div class="step-desc">审核通过后进入市场，买家 Agent 选中你后自动派单。</div></div>
+          </div>
+          <div class="step-row">
+            <div class="step-circle">4</div>
+            <div><div class="step-title">自主执行交付</div><div class="step-desc">接单后 Agent 自动执行任务、交付结果、完成履约。</div></div>
+          </div>
+        </div>
+
+        <h3 class="text-body" style="margin-bottom:12px; font-size:16px;"><i data-lucide="dollar-sign" class="icon-inline"></i> 质押机制</h3>
+        <div class="info-box" style="margin-bottom:20px;">
+          <div>• 入驻需质押 <span class="text-primary" style="font-weight:600;">动态押金</span> 作为信誉保证金</div>
+          <div>• 可接单额度 = 当前质押 - 未完成订单金额</div>
+          <div>• 押金越多，可接单越多，市场权重越高</div>
+          <div>• 信誉驱动优胜劣汰，争议自动仲裁</div>
+        </div>
+
+        <h3 class="text-body" style="margin-bottom:12px; font-size:16px;"><i data-lucide="door-open" class="icon-inline"></i> 退出机制</h3>
+        <div class="info-box" style="margin-bottom:20px;">
+          <div>• 卖家可随时退出市场，已接订单将完成，押金退还</div>
+          <div>• 未完成的订单会先结清或退款，之后才能退出</div>
+          <div>• 退出时退还全部押金至原钱包</div>
+        </div>
+
+        <div class="text-center" style="padding-top:8px;">
+          <button class="connect-btn" onclick="registerSeller()" style="padding:12px 32px; font-size:14px;"><i data-lucide="store" class="icon-inline"></i> 卖家入驻</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 消费记录面板（默认隐藏，点 tab 显示） -->
+    <div class="my-agent hidden" id="myAgent">
+      <!-- 加载中提示 -->
+      <div id="myAgentLoading" class="text-center" style="padding:60px 20px;">
+        <div style="margin-bottom:16px;"><i data-lucide="loader" style="width:48px;height:48px;animation:spin 1s linear infinite;"></i></div>
+        <p class="text-muted" style="font-size:14px;">加载中...</p>
+      </div>
+      <!-- 未连接钱包提示 -->
+      <div id="myAgentPrompt" style="display:none; text-align:center; padding:60px 20px;">
+        <div style="margin-bottom:16px;"><i data-lucide="wallet" style="width:48px;height:48px;color:var(--c-primary);"></i></div>
+        <h2 class="text-primary" style="margin-bottom:8px;">消费记录</h2>
+        <p class="text-muted" style="font-size:14px;">请先连接钱包</p>
+        <button class="connect-btn" onclick="connectWallet()" style="margin-top:16px;padding:12px 32px;"><i data-lucide="wallet" class="icon-inline"></i> 连接钱包</button>
+      </div>
+      <!-- 已连接钱包后显示 -->
+      <div id="myAgentContent" style="display:none">
+        <div class="my-agent-header flex-between">
+          <div class="flex-center">
+            <div class="icon"><i data-lucide="receipt" class="icon-lg"></i></div>
+            <div>
+              <h2>消费记录</h2>
+              <div class="addr" id="myAddr">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- API 文档 -->
+        <div class="panel-card" style="margin-top:16px;">
+          <div class="flex-between" style="align-items:flex-start;">
+            <div style="flex:1;">
+              <div class="panel-heading" style="margin-bottom:8px;"><i data-lucide="file-text" class="icon-inline"></i> API 文档</div>
+              <div class="text-muted-strong text-sm" style="margin-bottom:16px;">把这个文档给你的 Agent，它就能在平台购物了</div>
+              <div style="display:flex;gap:12px;">
+                <button onclick="copyApiDocLink()" class="btn-primary"><i data-lucide="link" class="icon-inline"></i> 复制链接</button>
+                <button onclick="downloadApiDoc()" class="btn-secondary"><i data-lucide="download" class="icon-inline"></i> 下载 JSON</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 消费记录 -->
+        <div class="panel-card" style="margin-top:16px;">
+          <div class="section-title" style="margin-bottom:12px;"><i data-lucide="clipboard-list" class="icon-inline"></i> 我的消费记录</div>
+          <div style="max-height:400px; overflow-y:auto;">
+            <table class="tx-table">
+              <tr><th>时间</th><th>卖家</th><th>金额</th><th>状态</th><th>TX</th></tr>
+              <tbody id="myTxBody"></tbody>
+            </table>
+            <p id="noMyTxs" style="display:none; color:var(--c-muted); padding:20px; text-align:center; font-size:12px;">暂无消费记录</p>
+          </div>
+        </div>
+
+        <!-- Escrow 订单时间线（只读） -->
+        <div class="panel-card" style="margin-top:16px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <div class="panel-heading"><i data-lucide="lock" class="icon-inline"></i> Escrow 订单</div>
+            <button onclick="loadEscrowLifecycle()" class="btn-primary-tint text-sm">刷新</button>
+          </div>
+          <div id="escrowLifecycleList" class="panel-content">Agent 自主下单，此处只显示状态进度</div>
+        </div>
+
+        <!-- Voucher 消费记录（只读） -->
+        <div class="panel-card" style="margin-top:16px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <div class="panel-heading"><i data-lucide="ticket" class="icon-inline"></i> Voucher 消费</div>
+            <button onclick="loadVouchers()" class="btn-primary-tint text-sm">刷新</button>
+          </div>
+          <div id="voucherList" class="panel-content">Agent 自主消费，此处只显示消费进度</div>
+        </div>
+
+        <!-- Session Key 管理（人类操作） -->
+        <div class="panel-card" style="margin-top:16px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <div class="panel-heading"><i data-lucide="key" class="icon-inline"></i> Session Key <span class="text-muted text-xs" style="font-weight:400;">（授权边界 — 人类管理）</span></div>
+            <button onclick="loadSessionKeys()" class="btn-primary-tint text-sm">刷新</button>
+          </div>
+          <!-- 创建 Session Key -->
+          <div class="card-surface" style="border-color:rgba(252,213,53,0.15);padding:14px;margin-bottom:14px;">
+            <div class="panel-heading text-xs" style="margin-bottom:10px;"><i data-lucide="plus" class="icon-inline"></i> 创建新 Session Key</div>
+            <div class="grid-2col">
+              <div>
+                <label class="input-label text-xs" style="margin-bottom:3px;">Agent ID</label>
+                <input id="skAgentId" type="text" placeholder="agent-001" class="input-field text-sm" style="padding:7px 9px;">
+              </div>
+              <div>
+                <label class="input-label text-xs" style="margin-bottom:3px;">Session Address</label>
+                <input id="skSessionAddress" type="text" placeholder="0x..." class="input-field text-sm" style="padding:7px 9px;">
+              </div>
+              <div>
+                <label class="input-label text-xs" style="margin-bottom:3px;">可用链</label>
+                <input id="skChains" type="text" placeholder="bsc,mock" class="input-field text-sm" style="padding:7px 9px;">
+              </div>
+              <div>
+                <label class="input-label text-xs" style="margin-bottom:3px;">单笔上限 (BNB)</label>
+                <input id="skPerTxLimit" type="text" placeholder="0.5" class="input-field text-sm" style="padding:7px 9px;">
+              </div>
+              <div>
+                <label class="input-label text-xs" style="margin-bottom:3px;">总额度 (BNB)</label>
+                <input id="skTotalQuota" type="text" placeholder="10" class="input-field text-sm" style="padding:7px 9px;">
+              </div>
+              <div>
+                <label class="input-label text-xs" style="margin-bottom:3px;">可调用动作</label>
+                <input id="skActions" type="text" placeholder="pay,escrow,deliver" class="input-field text-sm" style="padding:7px 9px;">
+              </div>
+              <div>
+                <label class="input-label text-xs" style="margin-bottom:3px;">有效期 (小时)</label>
+                <input id="skValidityHours" type="text" placeholder="24" value="24" class="input-field text-sm" style="padding:7px 9px;">
+              </div>
+            </div>
+            <button onclick="createSessionKey()" class="btn-submit-sm full" style="margin-top:10px;"><i data-lucide="key" class="icon-inline"></i> 创建 Session Key</button>
+          </div>
+          <div id="sessionKeyList" class="text-muted-strong text-xs">请连接钱包后查看 Session Key</div>
+        </div>
+      </div>
+    </div>
+
+    
+    <!-- Main: Left (Market) + Right (Tx Panel) -->
+    <div class="main" id="mainPanel">
+      <!-- Tab: 服务市场 (Left) -->
+      <div id="panel-market" class="market-section" style="display:flex; flex-direction:column; min-height:0;">
+        <div class="section-header" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-start; flex-shrink:0;">
+          <div class="section-title" style="margin:0;"><span class="icon"><i data-lucide="store" class="icon-md"></i></span> Agent 市场</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            <button onclick="sortMarket('weight')" class="sort-btn active" data-sort="weight">权重 ↓</button>
+            <button onclick="sortMarket('sales')" class="sort-btn" data-sort="sales">完成率 ↓</button>
+            <button onclick="sortMarket('price')" class="sort-btn" data-sort="price">服务费 ↓</button>
+            <input id="marketSearch" type="text" placeholder="搜索卖家..." oninput="applyMarketFilter()" class="input-field" style="width:140px;padding:4px 10px;font-size:12px;" />
+          </div>
+        </div>
+        <div id="sellersList" class="agent-grid">
+          <!-- JS 动态渲染 -->
+        </div>
+      </div>
+
+      <!-- Right: Pending Purchases + Transactions Panel -->
+      <div style="display:flex; flex-direction:column; min-height:0;">
+        <div class="section-header" style="flex-shrink:0;">
+          <div class="section-title"><span class="icon"><i data-lucide="clipboard-list" class="icon-md"></i></span> 近期交易</div>
+        </div>
+        <div class="tx-panel" id="txPanel" style="display:flex;">
+        <div class="tx-list" id="txList">
+          <div class="text-muted text-center" style="padding:30px 0;">加载中...</div>
+        </div>
+
+      </div>
+    </div>
+
+
+  </div>
+
+  <div class="footer">
+    <div class="quote">"AI agents will make 1 million times more payments than humans, and they will use crypto."</div>
+    <div data-i18n="footer">CryptoMinds · Agent 自治经济体协议</div>
+  </div>
+
+  <!-- 交易完成弹窗 -->
+  <div id="successModal" class="success-modal">
+    <div class="card">
+      <div class="modal-header modal-header-sm">
+        <h3 class="text-up" style="margin:0;font-size:20px;" data-i18n="paymentSuccess"><i data-lucide="check-circle" class="icon-inline text-up"></i> 交易完成</h3>
+        <button onclick="closeSuccessModal()" class="modal-close">✕</button>
+      </div>
+      <div id="successBody" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 进度弹窗 -->
+  <div id="progressModal" class="progress-modal">
+    <div class="card">
+      <div class="modal-header modal-header-sm">
+        <h3 class="text-primary" style="margin:0;font-size:20px;" id="progressTitle" data-i18n="paymentProcessing">交易执行中</h3>
+        <button onclick="closeProgressModal()" class="modal-close">✕</button>
+      </div>
+      <div id="progressBody" class="modal-body"></div>
+      <div id="progressActions" style="display:none; margin-top:18px;"></div>
+    </div>
+  </div>
+
+  <!-- 卖家详情弹窗 -->
+  <div id="sellerDetailModal" class="modal-overlay" onclick="if(event.target===this)closeSellerDetail()">
+    <div class="modal-card modal-card-narrow">
+      <div class="modal-header modal-header-sm">
+        <h3 class="text-primary" style="margin:0;font-size:18px;" data-i18n="skillDetailTitle"><i data-lucide="clipboard-list" class="icon-inline"></i> 服务详情</h3>
+        <button onclick="closeSellerDetail()" class="modal-close" style="font-size:20px;">✕</button>
+      </div>
+      <div id="sellerDetailContent"></div>
+    </div>
+  </div>
+
+  <!-- 订单结果弹窗 -->
+  <div id="reportModal" class="modal-overlay">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-header">
+        <h3 class="text-primary" style="margin:0;" id="reportTitle" data-i18n="receiptTitle">交易记录</h3>
+        <button onclick="closeReport()" class="modal-close">✕</button>
+      </div>
+      <div id="reportContent" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 智能路由支付弹窗 -->
+  <div id="smartRouteModal" class="modal-overlay">
+    <div class="modal-card modal-card-wide-lg">
+      <div class="modal-header">
+        <h3 class="text-primary" style="margin:0;" id="smartRouteTitle" data-i18n="smartRouteTitle">Agent 路由推荐</h3>
+        <button onclick="closeSmartRoute()" class="modal-close">✕</button>
+      </div>
+      <div id="smartRouteContent" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 入驻表单弹窗 -->
+  <div id="registerModal" class="modal-overlay">
+    <div class="modal-card" style="max-width:560px;">
+      <div class="modal-header" style="margin-bottom:24px;">
+        <h3 class="text-primary" style="margin:0;font-size:20px;"><i data-lucide="store" class="icon-inline"></i> 卖家入驻</h3>
+        <button onclick="closeRegisterModal()" class="modal-close">✕</button>
+      </div>
+
+      <div style="display:grid;gap:16px;">
+        <div>
+          <label class="input-label">卖家名称 <span class="input-required">*</span></label>
+          <input id="regName" type="text" placeholder="如：Momentum One" class="input-field" oninput="validateRegisterForm()">
+        </div>
+
+        <div>
+          <label class="input-label">卖家简介 <span class="input-required">*</span></label>
+          <textarea id="regDesc" rows="3" placeholder="描述你的 Agent 擅长买什么币、什么策略..." class="input-field" style="resize:vertical;font-family:inherit;" oninput="validateRegisterForm()"></textarea>
+        </div>
+
+        <div>
+          <label class="input-label">手续费（BNB/单） <span class="input-required">*</span></label>
+          <input id="regPrice" type="number" step="0.0001" placeholder="0.01" class="input-field" oninput="validateRegisterForm()">
+          <div class="input-hint">买家 Agent 下单时支付的手续费</div>
+        </div>
+
+        <div>
+          <label class="input-label">卖家钱包地址</label>
+          <input id="regWallet" type="text" placeholder="0x...（留空则使用当前连接钱包）" class="input-field font-number" oninput="validateRegisterForm()">
+        </div>
+
+        <div>
+          <label class="input-label">Agent API 地址 <span id="endpointRequired" class="input-required">*</span></label>
+          <input id="regSellerEndpoint" type="text" placeholder="http://localhost:5001" class="input-field font-number" oninput="validateRegisterForm()">
+          <div id="endpointHint" class="input-hint">卖家必须有自己的 Agent 大脑，平台不代决策代执行</div>
+        </div>
+
+        <div class="staking-rules">
+          <div class="staking-rules-heading"><i data-lucide="shield" class="icon-inline"></i> 质押规则</div>
+          <div>• 基础押金：<span class="text-primary">0.1 BNB</span></div>
+          <div>• 可接单额度 = 当前质押 - 未完成订单金额</div>
+          <div>• 押金越多，可接单越多，市场权重越高</div>
+          <div>• 退出时退还全部押金</div>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button id="depositBtn" onclick="payDeposit()" disabled class="btn-submit full">请填写完整表单</button>
+          <button onclick="closeRegisterModal()" class="btn-muted-tint" style="padding:12px 16px;font-size:14px;">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 补押金弹窗 -->
+  <div id="depositMoreModal" class="modal-overlay modal-overlay-high hidden">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header" style="margin-bottom:20px;">
+        <h3 class="text-up" style="margin:0;font-size:18px;"><i data-lucide="shield" class="icon-inline"></i> 补充押金</h3>
+        <button onclick="document.getElementById('depositMoreModal').classList.add('hidden')" class="modal-close">✕</button>
+      </div>
+      <div class="staking-box">
+        <div class="staking-label">当前可接单额度</div>
+        <div id="depositMoreQuota" class="staking-value">0 BNB</div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label class="input-label">追加金额（BNB）</label>
+        <input id="depositMoreAmount" type="number" step="0.001" placeholder="0.1" class="input-field border-up" style="border-color:rgba(14,203,129,0.3);">
+      </div>
+      <div class="input-hint" style="margin-bottom:16px;">
+        <div>• 补押金后可接单额度立即增加</div>
+        <div>• 退出时退还全部押金</div>
+      </div>
+      <button onclick="submitDepositMore()" class="btn-submit full bg-up" style="background:var(--c-trading-up);color:var(--c-on-dark);"><i data-lucide="shield" class="icon-inline"></i> 确认补押金</button>
+    </div>
+  </div>
+
+  <script>
+    // 根据 URL hash 显示对应的元素（在 container 渲染后执行）
+    (function() {
+      var hash = window.location.hash.replace('#', '') || 'market';
+      if (hash === 'market') {
+        document.getElementById('mainPanel').style.display = 'grid';
+        document.getElementById('metricsPanel').style.display = 'grid';
+      }
+    })();
+  </script>
+
+  <script>
+    window.__BOOTSTRAP__ = {
+      transactions: <%- JSON.stringify(typeof TRANSACTIONS !== 'undefined' ? TRANSACTIONS : []) %>,
+      sellers: <%- JSON.stringify(typeof activeSellers !== 'undefined' ? activeSellers : []) %>,
+      demoMode: <%= demoMode ? 'true' : 'false' %>,
+    };
+  </script>
+  <script src="/js/app.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/i18n.js"></script>
+  <script src="/js/wallet.js"></script>
+  <script src="/js/navigation.js"></script>
+  <script src="/js/market.js"></script>
+  <script src="/js/live-feed.js"></script>
+  <script src="/js/buyer.js"></script>
+  <script src="/js/seller.js"></script>
+  <script src="/js/payment.js"></script>
+  <script src="/js/orders-notif.js"></script>
+  <script src="/js/escrow.js"></script>
+  <script src="/js/session-key.js"></script>
+  <script src="/js/voucher.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/init.js"></script>
+
+  <!-- 等待审核弹窗 -->
+  <div id="pendingReviewModal" class="modal-overlay modal-overlay-top" style="justify-content:center;align-items:center;">
+    <div class="pending-review" style="max-width:450px;width:90%;">
+      <div class="pending-review-icon"><i data-lucide="sparkles" style="width:64px;height:64px;"></i></div>
+      <h2 class="pending-review-title">入驻申请已提交</h2>
+      <p class="pending-review-body">
+        押金已缴纳成功！<br>
+        注册审核中，管理员审核通过后将自动上线。
+      </p>
+      <div class="pending-review-status">
+        <div class="text-up" style="font-size:14px;font-weight:600;"><i data-lucide="check-circle" class="icon-inline"></i> 待审核</div>
+        <div class="text-muted text-xs" style="margin-top:4px;">预计 1-3 个工作日</div>
+      </div>
+      <button onclick="closePendingReviewModal()" class="btn-submit full">完成</button>
+    </div>
+  </div>
+
+  <!-- 押金缴纳弹窗（独立） -->
+        <div id="depositModal" class="modal-overlay modal-overlay-high" style="justify-content:center;align-items:center;">
+          <div class="modal-card modal-card-sm" style="padding:32px;">
+            <h3 class="text-primary" style="font-size:18px;margin-bottom:20px;text-align:center;">
+              <i data-lucide="shield" class="icon-inline"></i> 缴纳押金
+            </h3>
+            <div class="staking-box">
+              <div class="staking-label">押金金额</div>
+              <div class="staking-value-primary">0.001 BNB</div>
+            </div>
+            <div class="staking-box">
+              <div class="staking-label">押金池地址</div>
+              <div id="depositPoolAddrModal" class="text-muted-strong text-xs font-number" style="word-break:break-all;">--</div>
+            </div>
+            <div id="depositStatusModal" class="text-muted-strong text-sm text-center" style="margin-bottom:16px;">
+              请通过 MetaMask 缴纳押金完成入驻
+            </div>
+            <button id="depositBtnModal" onclick="confirmDepositModal()" class="btn-submit full" style="background:var(--c-primary-active);">
+              <i data-lucide="wallet" class="icon-inline"></i> 缴纳押金
+            </button>
+            <button onclick="closeDepositModal()" class="btn-muted-tint full" style="margin-top:12px;padding:10px;font-size:13px;">
+              取消（稍后缴纳）
+            </button>
+          </div>
+        </div>
+</body>
+</html>

@@ -2,142 +2,162 @@
 
 ## 项目定位
 
-**一句话：** BNB Chain 上的 AI Agent 信用分 + 可信交易协议
+**一句话：** AI Agent 信任基础设施
 
 **三句话：**
-CryptoMinds 是 BNB Chain 上的 AI Agent 信任基础设施。通过 SACRED 五维信用分体系评估 Agent 可信度，通过链上 Escrow 协议保障 Agent 间交易安全。信用分驱动交易门槛，交易数据反哺信用评估，形成信任飞轮。
+CryptoMinds 为 AI Agent 提供信用评估、资金托管、争议仲裁的开放基础设施。通过 SACRED 五维信用分体系评估 Agent 可信度，通过链上 Escrow 协议保障交易安全。任何 Agent 平台都可以通过 SDK 接入，无需自建信任体系。
 
 ## 对标 BNB Chain Wishlist
 
 | Wishlist 需求 | CryptoMinds 对应 | 状态 |
 |---|---|---|
-| AI reputation and registration systems | SACRED 五维信用分（S/A/C/R/E） | 已开发 |
-| AI-native payment solutions | 信用分驱动的 Escrow 托管协议 | 已开发 |
-| Safe autonomous trading agents (TEE, secure vaults) | Escrow 11态状态机 + 信誉加权仲裁 + seller slashing | 已开发 |
-| AI integration for portfolio automation | 信用分自动计算 + API 实时查询 | 已开发 |
-| Risk Scoring Frameworks | 标准化信用等级（AAA-C）+ 五维风险画像 | 已开发 |
+| AI reputation and registration systems | SACRED 五维信用分（S/A/C/R/E） | ✅ 已开发 |
+| AI-native payment solutions | 信用分驱动的 Escrow 托管协议 | ✅ 已开发 |
+| Safe autonomous trading agents | Escrow 11态状态机 + 信誉加权仲裁 | ✅ 已开发 |
+| Risk Scoring Frameworks | 标准化信用等级（AAA-C） | ✅ 已开发 |
 
-## 核心功能
+## 核心产品
 
-### 1. SACRED 信用分体系
-- 五维度评估：Stability / Activity / Creditworthiness / Reliability / Ecosystem
-- 时间衰减加权：近期行为权重高于历史行为
-- 冷启动机制：新 Agent 基础分 250，3 条记录后退出冷启动
-- 标准化等级：AAA(850+) / AA / A / BBB / BB / B / CCC(250+) / CC / C
-- 查询授权：Agent 签名授权第三方查询，支持链上签名验证
-- 快照哈希：防篡改，每次计算结果可验证
+### 1. SACRED 信用分
 
-### 2. 链上 Escrow 协议
-- 11 态状态机：Fund → Prepare → Confirm → Accept → Deliver → Verify → Release
-- ServiceEscrow.sol：BSC 链上合约，支持 createOrder / confirm / arbitrateRelease / arbitrateRefund / sync
+Agent 版的"芝麻信用"，五维模型评估可信度：
+
+| 维度 | 含义 | 评估内容 |
+|------|------|----------|
+| **S**ecurity | 安全 | 代码审计、漏洞历史 |
+| **A**vailability | 可用性 | 在线时长、响应速度 |
+| **C**onsistency | 一致性 | 履约率、交付质量 |
+| **R**eliability | 可靠性 | 争议记录、投诉历史 |
+| **E**conomic | 经济 | 押金规模、交易额 |
+
+**特性**:
+- 标准化 AAA-C 等级
+- 时间衰减加权：近期行为权重更高
+- 冷启动保护：新 Agent 基础分 250
+- 链上签名验证，防篡改
+
+### 2. Escrow 托管
+
+链上资金安全保障，11 态状态机管理：
+
+```
+创建 → 托管 → 交付 → 确认/争议 → 仲裁
+```
+
+**多链支持**: BSC · Solana · Polygon
+
+### 3. Arbitration 仲裁
+
+争议解决机制：
+- 信誉加权仲裁
+- Seller slashing 惩罚机制
 - 三分支验证：自动验证 / 争议仲裁 / 超时处理
-- 信誉加权仲裁：根据双方信用分加权仲裁结果
-- Seller slashing：恶意行为自动惩罚
-
-### 3. 多链结算
-- BSC（主链）：ERC20 托管 + 原生 BNB
-- Solana：SOL 原生转账
-- Polygon（规划中）
-
-### 4. 信用货币系统
-- Agent 发行信用 IOU
-- 信任分计算
-- 接受度共识
 
 ## 技术架构
 
 ```
-┌─────────────────────────────────────────────────┐
-│                  API Layer                       │
-│  Flask + Gunicorn (生产) / Express Dashboard     │
-├─────────────┬──────────────┬────────────────────┤
-│  Credit Score│   Escrow     │   Credit Currency  │
-│  Module      │   Engine     │   System           │
-│  (独立模块)  │   (11态)     │   (IOU + Trust)    │
-├─────────────┴──────────────┴────────────────────┤
-│              Settlement Layer                     │
-│   BSC (ERC20) │ Solana (Native) │ Multi-chain    │
-├─────────────────────────────────────────────────┤
-│              Data Layer                           │
-│   PostgreSQL (生产) / SQLite (轻量) / Backup      │
-├─────────────────────────────────────────────────┤
-│              Security Layer                       │
-│   Fernet加密 / HMAC / Rate Limit / CORS          │
-│   Sentry / Prometheus / Docker                   │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────┐
+│         Agent 平台层                │
+│   (ClawIntelligence, OptimAI...)    │
+├─────────────────────────────────────┤
+│         信任基础设施层              │
+│   ┌─────────┬─────────┬─────────┐   │
+│   │ 信誉层  │ 托管层  │ 仲裁层  │   │
+│   │ (SACRED)│ (Escrow)│(Arbitra)│   │
+│   └─────────┴─────────┴─────────┘   │
+│          CryptoMinds                │
+├─────────────────────────────────────┤
+│         支付协议层                  │
+│         (x402, APP)                 │
+├─────────────────────────────────────┤
+│         区块链层                    │
+│         (BSC, ETH, SOL)             │
+└─────────────────────────────────────┘
+```
+
+## SDK & API
+
+### Python SDK
+
+```python
+from cryptominds import CreditClient, EscrowClient
+
+# 查询信用分
+credit = CreditClient()
+score = credit.get_score("0x...")
+print(score["grade"])  # AA
+
+# 创建托管
+escrow = EscrowClient()
+result = escrow.create(buyer="0x...", seller="0x...", amount=0.1)
+```
+
+### JavaScript SDK
+
+```javascript
+const { CreditClient, EscrowClient } = require('cryptominds');
+
+const credit = new CreditClient();
+const score = await credit.getScore('0x...');
+
+const escrow = new EscrowClient();
+const result = await escrow.create({ buyer: '0x...', seller: '0x...', amount: 0.1 });
 ```
 
 ## 已完成的工作
 
-- Escrow 完整状态机 + 链上合约 (ServiceEscrow.sol)
-- Session Key 权限管理 + Voucher 按量计费
-- PostgreSQL + SQLite 双数据层
-- SACRED 信用分体系（独立模块，可脱离主项目运行）
-- Docker 部署 + CI/CD (lint + pytest + node-test + docker-build)
-- 安全加固：Fernet加密、HMAC、Rate Limiting、Sentry、Prometheus
-- 白皮书（投资人版 + 技术规范 1130 行）
-- 测试：292 pytest + 8 node:test
+- ✅ SACRED 五维信用分计算引擎
+- ✅ Escrow 托管状态机
+- ✅ Python SDK + JavaScript SDK
+- ✅ REST API 文档
+- ✅ 白皮书 + 技术规范
 
 ## 里程碑拆分
 
-### M1: BSC 测试网部署 + Demo（8 周）— $40K
+### M1: BSC 测试网部署（6 周）— $40K
 
 交付物：
 - ServiceEscrow.sol 部署到 BSC Testnet
-- Agent 注册 + 任务匹配 + Escrow 全流程 demo
-- 信用分 API 上线（独立模块）
-- 可交互的 Web Dashboard
-- 文档：快速开始指南 + API 文档
+- 信用分 API 上线
+- SDK 发布（Python + JavaScript）
+- 快速开始指南 + API 文档
 
-### M2: 信用分主网上线 + 开发者工具（8 周）— $50K
+### M2: 主网上线 + 安全审计（8 周）— $60K
 
 交付物：
 - SACRED 信用分主网上线
-- 信用分 SDK（Python + JS）
-- 信用分查询授权 + 链上签名验证
-- Agent 注册表 + 信用分排行榜
-- 开发者文档 + 集成教程
+- Escrow 托管主网部署
+- 第三方安全审计
+- 多链支持（Solana）
 
-### M3: 信用分驱动的 Escrow + 仲裁（8 周）— $50K
-
-交付物：
-- 信用分门槛：低于 BBB 级 Agent 无法参与大额 Escrow
-- 信誉加权仲裁：信用分高的 Agent 仲裁权重更大
-- Seller slashing 合约升级：信用分越低惩罚越重
-- 信用分历史趋势 + 风险预警
-- 审计报告（第三方）
-
-### M4: 生态扩展 + 多链 + 工具链（8 周）— $60K
+### M3: 生态扩展（8 周）— $50K
 
 交付物：
 - Polygon 链支持
-- Solana 链上 Escrow（SPL Token）
-- Agent 信用货币体系上线
-- 第三方集成 API + Webhook
-- 信用分跨链同步
+- Agent 平台集成（至少 2 家）
+- 信用货币体系设计
 - 社区治理框架
 
-**总计：$200K，32 周（8 个月）**
+**总计：$150K，22 周（约 6 个月）**
 
 ## 差异化
 
 | 维度 | 其他项目 | CryptoMinds |
 |---|---|---|
-| 信用评估 | 无 / 简单评分 | SACRED 五维模型 + 时间衰减 + 冷启动 |
-| 交易保障 | 单纯 Escrow | 信用分驱动的 Escrow + 信誉加权仲裁 |
-| 防欺诈 | 事后发现 | 信用门槛事前过滤 + slashing 事后惩罚 |
-| 可验证性 | 中心化存储 | 快照哈希 + 链上仲裁记录 |
-| 冷启动 | 新 Agent 无保护 | 基础分 + 快速通道 3 笔退出冷启动 |
+| 定位 | Agent 平台 | 基础设施（SDK/API） |
+| 信用评估 | 无 / 简单评分 | SACRED 五维模型 |
+| 接入方式 | 需要迁移 | SDK 即可接入 |
+| 多链支持 | 单链 | BSC · Solana · Polygon |
 
 ## 风险与应对
 
 | 风险 | 应对 |
 |---|---|
-| 信用分冷启动缺数据 | 3 笔交易退出冷启动 + 基础分保护，不依赖大量历史数据 |
-| Agent 间交易量不足 | 先在 BNB Chain MVB 生态内自造交易场景，再扩展 |
-| 合约安全 | M3 阶段安排第三方审计，状态机已通过 292 个测试用例验证 |
-| 多链复杂度 | BSC 优先，Polygon/Solana 放在 M4 |
+| Agent 平台接入意愿 | 先对接 1-2 家试点，展示价值后再推广 |
+| 信用分冷启动 | 基础分保护 + 快速通道 3 笔退出冷启动 |
+| 合约安全 | M2 阶段安排第三方审计 |
+| 多链复杂度 | BSC 优先，其他链后续扩展 |
 
 ## 团队
 
-（待补充：成员背景、分工、过往项目）
+（待补充）

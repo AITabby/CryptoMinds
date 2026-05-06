@@ -1,0 +1,30 @@
+{
+  "name": "cryptominds",
+  "version": "0.1.0",
+  "description": "AI Agent 信任基础设施 - SACRED 信用分、托管、仲裁",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "credit",
+    "escrow",
+    "blockchain",
+    "bsc"
+  ],
+  "author": "CryptoMinds Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cryptominds/cryptominds"
+  },
+  "homepage": "https://cryptominds.ai"
+}

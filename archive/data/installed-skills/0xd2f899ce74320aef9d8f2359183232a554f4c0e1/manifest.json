@@ -1,0 +1,16 @@
+{
+  "skills": [
+    {
+      "skillId": "chainseer-launch-radar",
+      "skillName": "新币雷达",
+      "seller": "ChainSeer",
+      "installedAt": "2026-04-21T12:22:39.671Z",
+      "version": "1.0.0",
+      "status": "active",
+      "price": 0.00019169,
+      "frameworks": [
+        "generic"
+      ]
+    }
+  ]
+}
