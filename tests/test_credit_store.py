@@ -5,8 +5,12 @@
 import pytest
 import tempfile
 import os
+import time
 from src.credit.store import CreditScoreStore
-from src.credit.models import SacredScore, DimensionScore
+from src.credit.models import (
+    SacredScore, DimensionScore, QueryAuthorization,
+    PerformanceRecord, TaskStatus
+)
 
 
 class TestCreditScoreStore:
@@ -130,3 +134,126 @@ class TestCreditScoreStore:
         # 验证已撤销
         valid = store.verify_authorization("test_auth_revoke", "querier_123")
         assert valid is False
+
+    def test_verify_authorization_nonexistent(self, store):
+        """测试验证不存在的授权"""
+        valid = store.verify_authorization("nonexistent", "anyone")
+        assert valid is False
+
+    def test_list_authorizations(self, store):
+        """测试列出授权"""
+        auth = QueryAuthorization(
+            auth_id="list_auth_001",
+            agent_id="list_agent",
+            querier_id="querier_001",
+            signature="sig",
+            expires_at=int(time.time()) + 3600,
+            created_at=int(time.time()),
+        )
+        store.save_authorization(auth)
+
+        auths = store.list_authorizations("list_agent")
+        assert len(auths) == 1
+        assert auths[0].auth_id == "list_auth_001"
+
+    def test_get_score_statistics_empty(self, store):
+        """测试空数据库的统计"""
+        stats = store.get_score_statistics()
+        assert stats["total_agents"] == 0
+        assert stats["avg_score"] == 0
+
+    def test_get_score_statistics(self, store):
+        """测试分数统计"""
+        for i, (agent_id, score_val, grade) in enumerate([
+            ("stat_agent_a", 800, "AAA"),
+            ("stat_agent_b", 600, "BBB"),
+            ("stat_agent_c", 400, "CCC"),
+        ]):
+            score = SacredScore(
+                agent_id=agent_id,
+                wallet=f"0x{i:040d}",
+                stability=DimensionScore("S", "Stability", weighted_score=score_val / 5),
+                activity=DimensionScore("A", "Activity", weighted_score=score_val / 5),
+                creditworthiness=DimensionScore("C", "Creditworthiness", weighted_score=score_val / 5),
+                reliability=DimensionScore("R", "Reliability", weighted_score=score_val / 5),
+                ecosystem=DimensionScore("E", "Ecosystem", weighted_score=score_val / 5),
+                calculated_at=int(time.time()),
+            )
+            score.total_score = score_val
+            score.grade = grade
+            store.save_score(score)
+
+        stats = store.get_score_statistics()
+        assert stats["total_agents"] == 3
+        assert "grade_counts" in stats
+
+    def test_leaderboard_with_grade_filter(self, store):
+        """测试按等级过滤排行榜"""
+        for i, (agent_id, score_val, grade) in enumerate([
+            ("aaa_agent", 900, "AAA"),
+            ("bbb_agent", 600, "BBB"),
+        ]):
+            score = SacredScore(
+                agent_id=agent_id,
+                wallet=f"0x{i:040d}",
+                stability=DimensionScore("S", "Stability", weighted_score=score_val / 5),
+                activity=DimensionScore("A", "Activity", weighted_score=score_val / 5),
+                creditworthiness=DimensionScore("C", "Creditworthiness", weighted_score=score_val / 5),
+                reliability=DimensionScore("R", "Reliability", weighted_score=score_val / 5),
+                ecosystem=DimensionScore("E", "Ecosystem", weighted_score=score_val / 5),
+                calculated_at=int(time.time()),
+            )
+            score.total_score = score_val
+            score.grade = grade
+            store.save_score(score)
+
+        aaa_only = store.get_leaderboard(limit=10, grade="AAA")
+        assert len(aaa_only) == 1
+        assert aaa_only[0]["grade"] == "AAA"
+
+    def test_severe_violation(self, store):
+        """测试严重违约记录"""
+        store.record_severe_violation(
+            agent_id="bad_agent",
+            wallet="0xbad",
+            record_id="rec_001",
+            violation_type="buyer_win",
+            penalty_points=0.3,
+            occurred_at=int(time.time()),
+        )
+
+        violations = store.get_severe_violations("bad_agent")
+        assert len(violations) == 1
+        assert violations[0]["violation_type"] == "buyer_win"
+
+    def test_performance_record(self, store):
+        """测试履约记录"""
+        record = PerformanceRecord(
+            record_id="perf_001",
+            task_id="task_001",
+            task_type="escrow",
+            buyer_wallet="0xbuyer",
+            seller_wallet="0xseller",
+            seller_agent_id="seller_agent",
+            chain="bsc",
+            amount="1.0",
+            status=TaskStatus.SETTLED,
+            success=True,
+            score=1.0,
+            created_at=int(time.time()),
+        )
+
+        store.save_performance_record(record)
+
+        # 按 Agent ID 获取
+        records = store.get_performance_records(agent_id="seller_agent")
+        assert len(records) == 1
+        assert records[0].seller_agent_id == "seller_agent"
+
+        # 按钱包获取
+        records = store.get_performance_records(wallet="0xbuyer")
+        assert len(records) == 1
+
+    def test_close(self, store):
+        """测试关闭（无操作）"""
+        store.close()  # 应该不报错

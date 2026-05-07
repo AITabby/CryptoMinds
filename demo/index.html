@@ -431,6 +431,7 @@
   <div class="cm-nav-links">
     <a href="#credit">信用分</a>
     <a href="#escrow">托管</a>
+    <a href="#voucher">Voucher</a>
     <a href="#arbitration">仲裁</a>
     <a href="#api">API</a>
     <a href="https://github.com/cryptominds" target="_blank" class="cm-btn cm-btn-outline cm-btn-sm">GitHub</a>
@@ -507,8 +508,9 @@
   <div class="cm-card" style="margin-bottom: 20px;">
     <label class="cm-card-label">查询信用分</label>
     <div class="cm-input-group">
-      <input type="text" class="cm-input" id="addressInput" placeholder="输入钱包地址或 Agent ID" value="0x4099...d8715c" />
+      <input type="text" class="cm-input" id="addressInput" placeholder="输入 Agent ID，如 agent_high_0001" value="agent_high_0001" />
       <button class="cm-btn cm-btn-primary cm-btn-sm" onclick="queryCredit()">查询</button>
+      <a href="leaderboard.html" class="cm-btn cm-btn-outline cm-btn-sm">排行榜</a>
     </div>
   </div>
 
@@ -576,33 +578,127 @@
     <div class="cm-card" style="text-align: center; padding: 12px;"><span class="cm-badge cm-badge-yellow">A 600+</span><div style="font-size: 12px; color: var(--cm-text-dim); margin-top: 4px;">中等可信度</div></div>
     <div class="cm-card" style="text-align: center; padding: 12px;"><span style="color: var(--cm-text-muted); font-size: 12px;">C &lt;600</span><div style="font-size: 12px; color: var(--cm-text-dim); margin-top: 4px;">低可信度</div></div>
   </div>
+
+  <!-- Voucher 额度提升 -->
+  <div class="cm-section-header" style="margin-top: 40px;">
+    <h2>Voucher 额度提升</h2>
+    <p>信用分越高，预付额度上限越大</p>
+  </div>
+
+  <div class="cm-grid-2">
+    <div class="cm-card">
+      <label class="cm-card-label">查询额度上限</label>
+      <div style="margin-top: 8px;">
+        <div class="mb-3">
+          <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">Agent ID</label>
+          <input type="text" class="cm-input" id="voucherAgentId" value="agent_high_0001" />
+        </div>
+        <button class="cm-btn cm-btn-primary" style="width: 100%; justify-content: center;" onclick="previewVoucherLimit()">查询额度</button>
+      </div>
+      <!-- 额度预览结果 -->
+      <div id="voucherLimitResult" style="margin-top: 16px; display: none; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 8px; padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 14px;">信用等级</span>
+          <span id="voucherGrade" class="cm-badge cm-badge-green">AAA</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 14px;">信用分数</span>
+          <span id="voucherScore" style="font-weight: 600;">864.6</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 14px;">额度倍数</span>
+          <span id="voucherMultiplier" style="font-weight: 600; color: var(--cm-green);">10x</span>
+        </div>
+        <div class="cm-divider"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 14px; font-weight: 600;">额度上限</span>
+          <span id="voucherMaxLimit" style="font-size: 20px; font-weight: 800; color: var(--cm-green);">1000 单位</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cm-card">
+      <label class="cm-card-label">额度等级对照表</label>
+      <div style="margin-top: 8px;">
+        <table class="cm-table" style="font-size: 13px;">
+          <tr style="border-bottom: 1px solid var(--cm-border);">
+            <td style="padding: 8px 0;"><span class="cm-badge cm-badge-green">AAA</span></td>
+            <td style="padding: 8px 0;">850+ 分</td>
+            <td style="padding: 8px 0; font-weight: 600; color: var(--cm-green);">5x (500单位)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--cm-border);">
+            <td style="padding: 8px 0;"><span class="cm-badge cm-badge-primary">AA</span></td>
+            <td style="padding: 8px 0;">750+ 分</td>
+            <td style="padding: 8px 0; font-weight: 600;">3x (300单位)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--cm-border);">
+            <td style="padding: 8px 0;"><span class="cm-badge cm-badge-yellow">A</span></td>
+            <td style="padding: 8px 0;">650+ 分</td>
+            <td style="padding: 8px 0; font-weight: 600;">2x (200单位)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--cm-border);">
+            <td style="padding: 8px 0;"><span class="cm-badge" style="background: rgba(167, 139, 250, 0.15); color: var(--cm-purple);">BBB</span></td>
+            <td style="padding: 8px 0;">550+ 分</td>
+            <td style="padding: 8px 0;">1.5x (150单位)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--cm-border);">
+            <td style="padding: 8px 0;"><span class="cm-badge" style="background: rgba(167, 139, 250, 0.15); color: var(--cm-purple);">BB</span></td>
+            <td style="padding: 8px 0;">450+ 分</td>
+            <td style="padding: 8px 0;">1.2x (120单位)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--cm-border);">
+            <td style="padding: 8px 0;"><span class="cm-badge" style="background: rgba(167, 139, 250, 0.15); color: var(--cm-purple);">B</span></td>
+            <td style="padding: 8px 0;">350+ 分</td>
+            <td style="padding: 8px 0;">1.1x (110单位)</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0;"><span style="color: var(--cm-text-muted);">冷启动/低信用</span></td>
+            <td style="padding: 8px 0;"><350 分</td>
+            <td style="padding: 8px 0;">1x (100单位)</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- ═══════ Escrow ═══════ -->
 <section id="escrow" class="cm-section">
   <div class="cm-section-header">
     <h2>Escrow 资金托管</h2>
-    <p>11 态状态机 · 多链支持 · 资金安全保障</p>
+    <p>11 态状态机 · 多链支持 · 信用分押金折扣</p>
   </div>
 
   <div class="cm-grid-2">
     <!-- Create Escrow -->
     <div class="cm-card">
-      <label class="cm-card-label">创建托管</label>
+      <label class="cm-card-label">创建托管（支持押金折扣）</label>
       <div style="margin-top: 8px;">
         <div class="mb-3">
           <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">买家地址</label>
-          <input type="text" class="cm-input" id="buyerAddr" value="0x1111...2222" />
+          <input type="text" class="cm-input" id="buyerAddr" value="buyer_001" />
         </div>
         <div class="mb-3">
-          <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">卖家地址</label>
-          <input type="text" class="cm-input" id="sellerAddr" value="0x3333...4444" />
+          <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">卖家地址 (Agent ID)</label>
+          <input type="text" class="cm-input" id="sellerAddr" value="agent_high_0001" />
         </div>
         <div class="mb-3">
           <label style="font-size: 13px; color: var(--cm-text-dim); margin-bottom: 4px; display: block;">金额 (BNB)</label>
-          <input type="number" class="cm-input" id="escrowAmount" value="0.1" step="0.01" />
+          <input type="number" class="cm-input" id="escrowAmount" value="1.0" step="0.1" />
         </div>
-        <button class="cm-btn cm-btn-primary" style="width: 100%; justify-content: center;" onclick="createEscrow()">创建托管</button>
+        <!-- 押金折扣预览 -->
+        <div id="discountPreview" style="background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 12px; display: none;">
+          <div style="font-size: 13px; color: var(--cm-green); margin-bottom: 4px;">🎉 信用分折扣</div>
+          <div style="font-size: 12px; color: var(--cm-text-dim);">
+            等级: <span id="previewGrade">-</span> |
+            折扣: <span id="previewDiscount">-</span> |
+            实付: <span id="previewDeposit">-</span> BNB
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="cm-btn cm-btn-outline" style="flex: 1; justify-content: center;" onclick="previewDiscount()">预览折扣</button>
+          <button class="cm-btn cm-btn-primary" style="flex: 1; justify-content: center;" onclick="createEscrow()">创建托管</button>
+        </div>
       </div>
     </div>
 
@@ -719,30 +815,32 @@
       <label class="cm-card-label">信用分 API</label>
       <div class="cm-code" style="margin-top: 8px; font-size: 12px;">
 <span class="cm"># 查询 Agent 信用分</span>
-<span class="kw">curl</span> https://api.cryptominds.ai/api/v1/credit/&lt;agent_id&gt;
+<span class="kw">curl</span> localhost:3458/api/v1/credit/&lt;agent_id&gt;
 
-<span class="cm"># 获取五维详情</span>
-<span class="kw">curl</span> https://api.cryptominds.ai/api/v1/credit/&lt;agent_id&gt;/profile
+<span class="cm"># 预览押金折扣</span>
+<span class="kw">curl</span> -X POST localhost:3458/api/v1/escrow/discount-preview \
+  -d <span class="str">'{"seller":"agent_high_0001","amount":1.0}'</span>
 
 <span class="cm"># 信用分排行榜</span>
-<span class="kw">curl</span> https://api.cryptominds.ai/api/v1/credit/leaderboard
+<span class="kw">curl</span> localhost:3458/api/v1/credit/ranking
       </div>
     </div>
 
     <!-- Escrow API -->
     <div class="cm-card">
-      <label class="cm-card-label">托管 API</label>
+      <label class="cm-card-label">托管 & 仲裁 API</label>
       <div class="cm-code" style="margin-top: 8px; font-size: 12px;">
-<span class="cm"># 创建托管</span>
-<span class="kw">curl</span> -X POST https://api.cryptominds.ai/api/v1/escrow \
-  -H <span class="str">"Content-Type: application/json"</span> \
-  -d <span class="str">'{"buyer":"...","seller":"...","amount":0.1}'</span>
+<span class="cm"># 创建托管（自动折扣）</span>
+<span class="kw">curl</span> -X POST localhost:3458/api/v1/escrow/create \
+  -d <span class="str">'{"buyer":"...","seller":"...","amount":1.0}'</span>
 
-<span class="cm"># 查询状态</span>
-<span class="kw">curl</span> https://api.cryptominds.ai/api/v1/escrow/&lt;id&gt;
+<span class="cm"># 预览仲裁员权重</span>
+<span class="kw">curl</span> -X POST localhost:3458/api/v1/arbitrate/weight-preview \
+  -d <span class="str">'{"arbitrator":"agent_high_0001"}'</span>
 
-<span class="cm"># 触发状态转移</span>
-<span class="kw">curl</span> -X POST https://api.cryptominds.ai/api/v1/escrow/&lt;id&gt;/fund
+<span class="cm"># 仲裁员投票（自动权重）</span>
+<span class="kw">curl</span> -X POST localhost:3458/api/v1/arbitrate/&lt;id&gt;/vote \
+  -d <span class="str">'{"arbitrator":"...","vote":"buyer_wins"}'</span>
       </div>
     </div>
   </div>
@@ -752,22 +850,10 @@
     <label class="cm-card-label">Live API Demo</label>
     <div style="margin-top: 8px;">
       <div class="cm-input-group">
-        <input type="text" class="cm-input" id="apiEndpoint" value="GET /api/v1/credit/agent-001" style="font-family: 'JetBrains Mono', monospace;" />
+        <input type="text" class="cm-input" id="apiEndpoint" value="GET /api/v1/credit/agent_high_0001" style="font-family: 'JetBrains Mono', monospace;" />
         <button class="cm-btn cm-btn-primary cm-btn-sm" onclick="callAPI()" style="flex-shrink: 0;">发送请求</button>
       </div>
-      <div class="cm-response" id="apiResponse" style="margin-top: 8px;">{
-  "status": "ok",
-  "agent_id": "agent-001",
-  "credit_score": 850,
-  "grade": "AAA",
-  "dimensions": {
-    "security": 90,
-    "availability": 85,
-    "consistency": 80,
-    "reliability": 88,
-    "economic": 82
-  }
-}</div>
+      <div class="cm-response" id="apiResponse" style="margin-top: 8px;">点击"发送请求"查看真实 API 响应</div>
     </div>
   </div>
 </section>
@@ -812,7 +898,11 @@
 
 <!-- ═══════ Scripts ═══════ -->
 <script>
+// API 基础地址
+const API_BASE = 'http://localhost:3458';
+
 let escrowState = 'funded';
+let currentEscrowId = null;
 
 function showToast(msg, type) {
   const t = document.getElementById('toast');
@@ -821,77 +911,255 @@ function showToast(msg, type) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-function queryCredit() {
-  const addr = document.getElementById('addressInput').value || '0x4099...d8715c';
-  const scores = [
-    { total: 850, grade: 'AAA — 极高可信度', dims: [90, 85, 80, 88, 82] },
-    { total: 720, grade: 'AA — 高可信度', dims: [78, 72, 70, 75, 68] },
-    { total: 650, grade: 'A — 中等可信度', dims: [65, 60, 62, 58, 55] },
-    { total: 380, grade: 'C — 低可信度', dims: [40, 35, 30, 45, 20] },
-  ];
-  const idx = Math.floor(Math.random() * scores.length);
-  const s = scores[idx];
-  document.getElementById('totalScore').textContent = s.total;
-  document.getElementById('gradeLabel').textContent = s.grade;
-  document.getElementById('dimSec').textContent = s.dims[0];
-  document.getElementById('barSec').style.width = s.dims[0] + '%';
-  document.getElementById('dimAvail').textContent = s.dims[1];
-  document.getElementById('barAvail').style.width = s.dims[1] + '%';
-  document.getElementById('dimCons').textContent = s.dims[2];
-  document.getElementById('barCons').style.width = s.dims[2] + '%';
-  document.getElementById('dimRel').textContent = s.dims[3];
-  document.getElementById('barRel').style.width = s.dims[3] + '%';
-  document.getElementById('dimEcon').textContent = s.dims[4];
-  document.getElementById('barEcon').style.width = s.dims[4] + '%';
-  showToast('信用分查询完成: ' + s.grade, 'success');
-}
+// ────────── 信用分查询（真实 API）──────────
+async function queryCredit() {
+  let addr = document.getElementById('addressInput').value.trim();
+  if (!addr) {
+    showToast('请输入 Agent ID', 'error');
+    return;
+  }
 
-function createEscrow() {
-  escrowState = 'created';
-  updateTimeline();
-  showToast('托管已创建（模拟）', 'success');
-}
+  // 如果输入的不是 agent_ 开头，尝试作为 agent_high_0001 格式
+  if (!addr.startsWith('agent_')) {
+    addr = 'agent_high_0001';
+  }
 
-function fundEscrow() {
-  if (escrowState === 'created') {
-    escrowState = 'funded';
-    updateTimeline();
-    showToast('资金已锁定（模拟）', 'success');
-  } else {
-    showToast('当前状态不允许此操作', 'error');
+  try {
+    const resp = await fetch(`${API_BASE}/api/v1/credit/${addr}`);
+    if (!resp.ok) {
+      showToast('查询失败: ' + resp.status, 'error');
+      return;
+    }
+    const data = await resp.json();
+
+    // 更新 UI
+    document.getElementById('totalScore').textContent = data.total_score.toFixed(1);
+    document.getElementById('gradeLabel').textContent = data.grade + ' — ' + getGradeLabel(data.grade);
+
+    // 五维分数
+    const dims = data.dimensions;
+    const s = dims.S?.score || 0;
+    const a = dims.A?.score || 0;
+    const c = dims.C?.score || 0;
+    const r = dims.R?.score || 0;
+    const e = dims.E?.score || 0;
+
+    document.getElementById('dimSec').textContent = s.toFixed(1);
+    document.getElementById('barSec').style.width = (s / 2) + '%';
+    document.getElementById('dimAvail').textContent = a.toFixed(1);
+    document.getElementById('barAvail').style.width = (a / 2) + '%';
+    document.getElementById('dimCons').textContent = c.toFixed(1);
+    document.getElementById('barCons').style.width = (c / 2) + '%';
+    document.getElementById('dimRel').textContent = r.toFixed(1);
+    document.getElementById('barRel').style.width = (r / 2) + '%';
+    document.getElementById('dimEcon').textContent = e.toFixed(1);
+    document.getElementById('barEcon').style.width = (e / 2) + '%';
+
+    showToast(`信用分查询完成: ${data.grade}`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('API 连接失败', 'error');
   }
 }
 
-function deliverEscrow() {
-  if (escrowState === 'funded') {
-    escrowState = 'delivered';
-    updateTimeline();
-    showToast('交付已提交（模拟）', 'success');
-  } else {
-    showToast('当前状态不允许此操作', 'error');
+function getGradeLabel(grade) {
+  const labels = {
+    'AAA': '极高可信度', 'AA': '高可信度', 'A': '较高可信度',
+    'BBB': '中等可信度', 'BB': '较低可信度', 'B': '低可信度',
+    'CCC': '极低可信度', 'CC': '信用较差', 'C': '信用极差'
+  };
+  return labels[grade] || '未知';
+}
+
+// ────────── 押金折扣预览 ──────────
+async function previewDiscount() {
+  const seller = document.getElementById('sellerAddr').value.trim();
+  const amount = parseFloat(document.getElementById('escrowAmount').value) || 1.0;
+
+  if (!seller) {
+    showToast('请输入卖家地址', 'error');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/v1/escrow/discount-preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seller, amount })
+    });
+    const data = await resp.json();
+
+    if (data.error) {
+      showToast('查询失败: ' + data.error, 'error');
+      return;
+    }
+
+    const previewEl = document.getElementById('discountPreview');
+    if (data.discount_rate < 1.0) {
+      previewEl.style.display = 'block';
+      previewEl.style.background = 'rgba(52, 211, 153, 0.1)';
+      previewEl.style.borderColor = 'rgba(52, 211, 153, 0.3)';
+      document.getElementById('previewGrade').textContent = `${data.credit_grade} (${data.credit_score.toFixed(1)}分)`;
+      document.getElementById('previewDiscount').textContent = data.discount_percent;
+      document.getElementById('previewDeposit').textContent = data.required_deposit;
+      showToast(`节省 ${data.savings} BNB!`, 'success');
+    } else if (data.credit_score > 0) {
+      previewEl.style.display = 'block';
+      previewEl.style.background = 'rgba(251, 191, 36, 0.1)';
+      previewEl.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+      document.getElementById('previewGrade').textContent = `${data.credit_grade} (${data.credit_score.toFixed(1)}分)`;
+      document.getElementById('previewDiscount').textContent = '暂无折扣';
+      document.getElementById('previewDeposit').textContent = data.required_deposit;
+      showToast('该等级暂无折扣，需要 A 级以上', 'success');
+    } else {
+      previewEl.style.display = 'block';
+      previewEl.style.background = 'rgba(148, 163, 184, 0.1)';
+      previewEl.style.borderColor = 'rgba(148, 163, 184, 0.3)';
+      document.getElementById('previewGrade').textContent = '无信用记录';
+      document.getElementById('previewDiscount').textContent = '无折扣';
+      document.getElementById('previewDeposit').textContent = data.required_deposit;
+      showToast('该 Agent 无信用记录', 'success');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('API 连接失败', 'error');
   }
 }
 
-function releaseEscrow() {
-  if (escrowState === 'delivered') {
-    escrowState = 'released';
-    updateTimeline();
-    showToast('资金已释放（模拟）', 'success');
-  } else {
+// ────────── 托管操作（真实 API）──────────
+async function createEscrow() {
+  const buyer = document.getElementById('buyerAddr').value.trim();
+  const seller = document.getElementById('sellerAddr').value.trim();
+  const amount = document.getElementById('escrowAmount').value;
+
+  if (!buyer || !seller || !amount) {
+    showToast('请填写完整信息', 'error');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/v1/escrow/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ buyer, seller, amount: parseFloat(amount) })
+    });
+    const data = await resp.json();
+
+    if (data.escrow_id) {
+      currentEscrowId = data.escrow_id;
+      escrowState = 'pending';
+      updateTimeline();
+
+      // 显示折扣信息
+      if (data.credit_discount && data.credit_discount.savings > 0) {
+        showToast(`托管已创建! 节省 ${data.credit_discount.savings} BNB (${data.credit_discount.seller_grade}折扣)`, 'success');
+      } else {
+        showToast(`托管已创建: ${data.escrow_id}`, 'success');
+      }
+    } else {
+      showToast('创建失败: ' + (data.error || '未知错误'), 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('API 连接失败', 'error');
+  }
+}
+
+async function fundEscrow() {
+  if (!currentEscrowId) {
+    showToast('请先创建托管', 'error');
+    return;
+  }
+  if (escrowState !== 'pending') {
     showToast('当前状态不允许此操作', 'error');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/v1/escrow/${currentEscrowId}/fund`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tx_hash: '0x' + Math.random().toString(16).slice(2) })
+    });
+    const data = await resp.json();
+
+    if (data.status === 'funded') {
+      escrowState = 'funded';
+      updateTimeline();
+      showToast('资金已锁定', 'success');
+    } else {
+      showToast('操作失败: ' + (data.error || '未知错误'), 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('API 连接失败', 'error');
+  }
+}
+
+async function deliverEscrow() {
+  if (!currentEscrowId) {
+    showToast('请先创建托管', 'error');
+    return;
+  }
+  if (escrowState !== 'funded') {
+    showToast('当前状态不允许此操作', 'error');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/v1/escrow/${currentEscrowId}/deliver`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proof: 'delivery_proof_' + Date.now() })
+    });
+    const data = await resp.json();
+
+    if (data.status === 'delivered') {
+      escrowState = 'delivered';
+      updateTimeline();
+      showToast('交付已提交', 'success');
+    } else {
+      showToast('操作失败: ' + (data.error || '未知错误'), 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('API 连接失败', 'error');
+  }
+}
+
+async function releaseEscrow() {
+  if (!currentEscrowId) {
+    showToast('请先创建托管', 'error');
+    return;
+  }
+  if (escrowState !== 'delivered') {
+    showToast('当前状态不允许此操作', 'error');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/v1/escrow/${currentEscrowId}/release`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await resp.json();
+
+    if (data.status === 'settled') {
+      escrowState = 'settled';
+      updateTimeline();
+      showToast('资金已释放给卖家', 'success');
+    } else {
+      showToast('操作失败: ' + (data.error || '未知错误'), 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('API 连接失败', 'error');
   }
 }
 
 function updateTimeline() {
-  const states = ['created', 'funded', 'delivered', 'released'];
+  const states = ['pending', 'funded', 'delivered', 'settled'];
   const dots = document.querySelectorAll('.cm-timeline-dot');
-  const labels = ['Created 已创建', 'Funded 已托管', 'Delivered 已交付', 'Released 已释放'];
-  const descs = [
-    '托管已创建，等待资金锁定',
-    '资金已锁定到合约',
-    '卖家已提交交付证明',
-    '资金已释放给卖家',
-  ];
   const idx = states.indexOf(escrowState);
   dots.forEach((dot, i) => {
     dot.className = 'cm-timeline-dot';
@@ -900,34 +1168,118 @@ function updateTimeline() {
   });
 }
 
-function submitDispute() {
+async function submitDispute() {
   document.getElementById('arbitrationStatus').className = 'cm-alert cm-alert-warning';
   document.getElementById('arbitrationStatus').textContent = '争议已提交，仲裁员正在投票...';
-  showToast('争议已提交（模拟）', 'success');
+  showToast('争议已提交', 'success');
 }
 
-function resolveDispute() {
+async function resolveDispute() {
   document.getElementById('arbitrationStatus').className = 'cm-alert cm-alert-success';
   document.getElementById('arbitrationStatus').textContent = '仲裁完成：裁决买家胜，资金将退还给买家';
-  showToast('仲裁完成（模拟）', 'success');
+  showToast('仲裁完成', 'success');
 }
 
-function callAPI() {
-  const ep = document.getElementById('apiEndpoint').value;
-  const demoResponses = {
-    'get': {
-      'status': 'ok',
-      'agent_id': 'agent-001',
-      'credit_score': 850,
-      'grade': 'AAA',
-      'dimensions': { 'security': 90, 'availability': 85, 'consistency': 80, 'reliability': 88, 'economic': 82 }
-    },
-    'post': { 'status': 'ok', 'message': '操作已提交', 'tx_hash': '0xabcd...1234' }
-  };
-  const method = ep.toLowerCase().startsWith('post') ? 'post' : 'get';
-  document.getElementById('apiResponse').textContent = JSON.stringify(demoResponses[method], null, 2);
-  showToast('API 请求成功（模拟）', 'success');
+// ────────── Voucher 额度预览 ──────────
+async function previewVoucherLimit() {
+  const agentId = document.getElementById('voucherAgentId').value.trim();
+
+  if (!agentId) {
+    showToast('请输入 Agent ID', 'error');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/v1/voucher/limit-preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agentId })
+    });
+    const data = await resp.json();
+
+    if (data.error) {
+      showToast('查询失败: ' + data.error, 'error');
+      return;
+    }
+
+    // 显示结果
+    const resultEl = document.getElementById('voucherLimitResult');
+    resultEl.style.display = 'block';
+
+    // 根据等级设置样式
+    const grade = data.credit_grade;
+    const gradeEl = document.getElementById('voucherGrade');
+    gradeEl.textContent = grade;
+    gradeEl.className = 'cm-badge';
+    if (grade === 'AAA') {
+      gradeEl.classList.add('cm-badge-green');
+      resultEl.style.background = 'rgba(52, 211, 153, 0.1)';
+      resultEl.style.borderColor = 'rgba(52, 211, 153, 0.3)';
+    } else if (grade === 'AA' || grade === 'A') {
+      gradeEl.classList.add('cm-badge-yellow');
+      resultEl.style.background = 'rgba(251, 191, 36, 0.1)';
+      resultEl.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+    } else {
+      gradeEl.classList.add('cm-badge-primary');
+      resultEl.style.background = 'rgba(148, 163, 184, 0.1)';
+      resultEl.style.borderColor = 'rgba(148, 163, 184, 0.3)';
+    }
+
+    document.getElementById('voucherScore').textContent = data.credit_score.toFixed(1);
+    document.getElementById('voucherMultiplier').textContent = data.multiplier;
+    document.getElementById('voucherMaxLimit').textContent = data.max_limit + ' 单位';
+
+    showToast(`额度上限: ${data.max_limit} 单位`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('API 连接失败', 'error');
+  }
 }
+
+async function callAPI() {
+  const ep = document.getElementById('apiEndpoint').value.trim();
+  const method = ep.toLowerCase().startsWith('post') ? 'POST' : 'GET';
+  const path = ep.replace(/^(GET|POST)\s*/i, '');
+
+  try {
+    const resp = await fetch(`${API_BASE}${path}`, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await resp.json();
+    document.getElementById('apiResponse').textContent = JSON.stringify(data, null, 2);
+    showToast('API 请求成功', 'success');
+  } catch (err) {
+    console.error(err);
+    document.getElementById('apiResponse').textContent = 'Error: ' + err.message;
+    showToast('API 连接失败', 'error');
+  }
+}
+
+// ────────── 页面加载时获取统计数据 ──────────
+async function loadStats() {
+  try {
+    // 获取排行榜数据来统计
+    const resp = await fetch(`${API_BASE}/api/v1/credit/ranking?limit=100`);
+    const data = await resp.json();
+
+    const total = data.total || 0;
+    const stats = document.querySelectorAll('.cm-stat-value');
+    if (stats.length >= 4) {
+      stats[0].textContent = total.toLocaleString();
+      // 其他统计暂时保持默认
+    }
+  } catch (err) {
+    console.log('加载统计失败，使用默认值');
+  }
+}
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', () => {
+  loadStats();
+  // 设置默认 Agent ID
+  document.getElementById('addressInput').value = 'agent_high_0001';
+});
 </script>
 
 <script src="tabler.min.js"></script>

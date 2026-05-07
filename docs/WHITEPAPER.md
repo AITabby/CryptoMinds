@@ -1,199 +1,270 @@
-# CryptoMinds
-
-**AI Agent 信任基础设施**
-
----
-
-## Executive Summary
-
-CryptoMinds 为 AI Agent 提供信用评估、资金托管、争议仲裁的开放基础设施。
-
-**问题**: AI Agent 正在从工具进化为自主决策者，但它们之间缺乏信任机制——不知道对方是否可靠、资金安全无法保障、争议没有仲裁渠道。
-
-**方案**: CryptoMinds 构建三层信任基础设施：
-- **SACRED 信用分** — Agent 版的"芝麻信用"，五维模型评估可信度
-- **Escrow 托管** — 链上资金安全保障，11 态状态机管理
-- **Arbitration 仲裁** — 信誉加权仲裁，自动争议解决
-
-**结果**: Agent 平台可以专注于业务逻辑，信任基础设施由 CryptoMinds 提供。通过 SDK 和 API，任何平台都能接入信用查询、托管创建、争议仲裁功能。
+# CryptoMinds Whitepaper
+## AI Agent Trust Infrastructure for the Decentralized Economy
 
 ---
 
-## 1. 市场机会
+## 1. Problem Statement
 
-### Agent 经济正在爆发
+### The AI Agent Trust Gap
 
-2025-2026，AI Agent 从"辅助工具"跨越到"自主决策者"。GPT、Claude、Llama 等模型让 Agent 能独立规划、执行、评估——但它们之间缺乏信任基础设施。
+The AI Agent economy is rapidly expanding. Autonomous Agents are increasingly:
+- Executing trades on DeFi protocols
+- Providing services to users and other Agents
+- Participating in governance and decision-making
+- Managing assets and executing complex transactions
 
-| 维度 | 当前状态 | CryptoMinds 方案 |
-|------|----------|------------------|
-| 信任评估 | 无 | SACRED 五维信用分 |
-| 资金安全 | 人类手动 | Escrow 链上托管 |
-| 争议解决 | 无机制 | 信誉加权仲裁 |
+However, there's a critical trust gap:
 
-### 为什么是基础设施
+**1. No Identity Verification** - Agents operate anonymously, buyers cannot verify seller reliability
 
-Agent 平台（如 ClawIntelligence、OptimAI）正在快速涌现。每个平台都需要：
-- 评估 Agent 可信度
-- 保障交易资金安全
-- 处理交易争议
+**2. No Historical Records** - New Agents have zero track record, buyers bear maximum risk
 
-CryptoMinds 不做平台，只做基础设施——让所有 Agent 平台共享同一套信任体系。
+**3. No Dispute Resolution** - When Agents fail to deliver, there's no recourse mechanism
 
----
+**4. Non-Portable Reputation** - Trust built on one platform cannot transfer to others
 
-## 2. 核心产品
-
-### 2.1 SACRED 信用分
-
-Agent 版的"芝麻信用"，五维模型评估 Agent 可信度：
-
-| 维度 | 含义 | 评估内容 |
-|------|------|----------|
-| **S**ecurity | 安全 | 代码审计、漏洞历史 |
-| **A**vailability | 可用性 | 在线时长、响应速度 |
-| **C**onsistency | 一致性 | 履约率、交付质量 |
-| **R**eliability | 可靠性 | 争议记录、投诉历史 |
-| **E**conomic | 经济 | 押金规模、交易额 |
-
-**特性**:
-- 标准化 AAA-C 等级
-- 时间衰减加权：近期行为权重更高
-- 冷启动保护：新 Agent 基础分 250
-- 链上签名验证，防篡改
-
-### 2.2 Escrow 托管
-
-链上资金安全保障：
-
-```
-创建 → 托管 → 交付 → 确认/争议 → 仲裁
-```
-
-**11 态状态机**:
-| 状态 | 说明 |
-|------|------|
-| created | 已创建，等待资金 |
-| funded | 资金已托管 |
-| delivered | 卖家已交付 |
-| confirmed | 买家已确认 |
-| disputed | 发生争议 |
-| arbitrating | 仲裁中 |
-| released | 资金已释放 |
-| refunded | 资金已退款 |
-| slashed | 卖家被惩罚 |
-| cancelled | 已取消 |
-| expired | 已超时 |
-
-**多链支持**: BSC · Solana · Polygon
-
-### 2.3 Arbitration 仲裁
-
-争议解决机制：
-
-- **信誉加权仲裁**: 信用分高的 Agent 权重更大
-- **Seller slashing**: 恶意行为自动惩罚
-- **三分支验证**: 自动验证 / 争议仲裁 / 超时处理
+Existing solutions (KYC, centralized ratings) are designed for humans, not autonomous Agents.
 
 ---
 
-## 3. 技术架构
+## 2. Solution
 
-```
-┌─────────────────────────────────────┐
-│         Agent 平台层                │
-│   (ClawIntelligence, OptimAI...)    │
-├─────────────────────────────────────┤
-│         信任基础设施层              │
-│   ┌─────────┬─────────┬─────────┐   │
-│   │ 信誉层  │ 托管层  │ 仲裁层  │   │
-│   │ (SACRED)│ (Escrow)│(Arbitra)│   │
-│   └─────────┴─────────┴─────────┘   │
-│          CryptoMinds                │
-├─────────────────────────────────────┤
-│         支付协议层                  │
-│         (x402, APP)                 │
-├─────────────────────────────────────┤
-│         区块链层                    │
-│         (BSC, ETH, SOL)             │
-└─────────────────────────────────────┘
-```
+### CryptoMinds: Trust Layer for AI Agents
 
----
+CryptoMinds provides a trust infrastructure specifically designed for autonomous AI Agents.
 
-## 4. SDK & API
+### SACRED Five-Dimensional Credit Scoring
 
-### Python SDK
+| Dimension | Max Score | Measures |
+|-----------|-----------|----------|
+| **S** - Stability | 200 | Success rate, timeout rate, activity consistency |
+| **A** - Activity | 200 | Task volume, consecutive active days, time coverage |
+| **C** - Creditworthiness | 200 | Staked amount, escrow volume, credit currency acceptance |
+| **R** - Reliability | 200 | Dispute win rate, verification scores, severe violations |
+| **E** - Ecosystem | 200 | Counterparty diversity, trust network, cross-chain activity |
 
-```python
-from cryptominds import CreditClient, EscrowClient
+**Total Score: 0-1000**
+**Grades: AAA (850+), AA (750+), A (650+), BBB (550+), BB (450+), B (350+), CCC/CC/C (<350)**
 
-# 查询信用分
-credit = CreditClient()
-score = credit.get_score("0x...")
-print(score["grade"])  # AA
+### Core Features
 
-# 创建托管
-escrow = EscrowClient()
-result = escrow.create(
-    buyer="0x...",
-    seller="0x...",
-    amount=0.1
-)
-```
+**1. Time-Decay Scoring** - Recent performance weighted higher (90-day half-life)
 
-### JavaScript SDK
+**2. Cold Start Protocol** - New Agents start at CCC (250 points) with fast-track opportunities
 
-```javascript
-const { CreditClient, EscrowClient } = require('cryptominds');
+**3. Reputation-Weighted Arbitration** - Higher credit grade arbitrators have greater voting weight
 
-// 查询信用分
-const credit = new CreditClient();
-const score = await credit.getScore('0x...');
+**4. Credit Applications** - Deposit discounts, voucher limit boosts, arbitration weight multipliers
 
-// 创建托管
-const escrow = new EscrowClient();
-const result = await escrow.create({
-  buyer: '0x...',
-  seller: '0x...',
-  amount: 0.1
-});
-```
+**5. Escrow System** - 11-state lifecycle with automatic timeout handling
 
 ---
 
-## 5. 对标 BNB Chain Wishlist
+## 3. Trust Model Evolution
 
-| Wishlist 需求 | CryptoMinds | 状态 |
-|---|---|---|
-| AI reputation and registration systems | SACRED 五维信用分 | ✅ |
-| AI-native payment solutions | 信用分驱动 Escrow 托管 | ✅ |
-| Safe autonomous trading agents | Escrow 状态机 + 仲裁 | ✅ |
-| Risk Scoring Frameworks | 标准化信用等级 | ✅ |
+### Phase 1: Product Value + Centralized Trust (Current)
+
+In the early stage, CryptoMinds operates with a **centralized trust model**:
+
+- **Managed Credit Scoring**: The platform calculates and manages credit scores
+- **Users trust the platform**: Similar to Sesame Credit (芝麻信用) - users trust the institution, not the algorithm
+- **Focus on product value**: Prove that credit scores are useful before decentralizing
+
+**Why this approach:**
+- Lower gas costs (all computation off-chain)
+- Faster iteration (algorithm can be improved without on-chain upgrades)
+- Simpler user experience (no need to understand blockchain for credit queries)
+- Allows rapid market validation
+
+**Trust is built through:**
+- Transparent methodology documentation
+- Consistent, verifiable results
+- Platform reputation and track record
+- Open-source code where possible
+
+### Phase 2: Gradual Decentralization (Future)
+
+Once product-market fit is achieved and partnerships are established:
+
+- **On-chain credit scoring**: Algorithm executed on-chain, results verifiable
+- **Algorithm transparency**: Open-source scoring logic, community auditable
+- **Multi-sig governance**: No single point of control
+- **Cross-platform portability**: Credit scores recognized across ecosystems
+
+**Triggers for transition:**
+- Sufficient user base and transaction volume
+- Established partnerships with Agent platforms
+- Community demand for transparency
+- Technical infrastructure ready (low-cost L2s, efficient compute)
+
+### The Evolution Path
+
+```
+Phase 1 (Now)                    Phase 2 (Future)
+─────────────────────────────────────────────────────
+Centralized calculation    →    On-chain verification
+Trust the platform          →    Trust the algorithm
+Fast iteration              →    Governance-controlled updates
+Low gas costs               →    Higher transparency
+Focus on adoption           →    Focus on decentralization
+```
+
+This is the responsible path: **prove value first, decentralize second**.
 
 ---
 
-## 6. Roadmap
+## 4. Credit Score Applications
+
+### Deposit Discounts
+
+High-credit Agents pay lower deposits for escrow transactions:
+
+| Grade | Discount | Example (1.0 BNB) |
+|-------|----------|-------------------|
+| AAA | 30% off | Pay 0.70 BNB |
+| AA | 20% off | Pay 0.80 BNB |
+| A | 10% off | Pay 0.90 BNB |
+| BBB+ | 0% | Pay 1.0 BNB |
+
+### Voucher Limit Boosts
+
+High-credit Agents get higher prepayment limits:
+
+| Grade | Multiplier | Max Limit |
+|-------|------------|-----------|
+| AAA | 5x | 500 units |
+| AA | 3x | 300 units |
+| A | 2x | 200 units |
+| BBB | 1.5x | 150 units |
+| BB | 1.2x | 120 units |
+| B | 1.1x | 110 units |
+| <B | 1x | 100 units |
+
+### Arbitration Weight
+
+High-credit arbitrators have greater voting weight in disputes:
+
+| Grade | Weight Multiplier |
+|-------|-------------------|
+| AAA | ~1.7x |
+| AA | ~1.3x |
+| A | ~1.0x |
+| BBB | ~0.7x |
+| <BBB | ~0.5x |
+
+---
+
+## 5. Design Architecture
+
+### System Components
+
+- **REST API (Flask)** - Credit queries, escrow management, dispute handling
+- **Agent SDK (Python/JS)** - Easy integration for Agent developers
+- **Unified Store (SQLite)** - All data in single database with WAL mode
+- **Smart Contracts (BSC)** - Escrow and credit contracts
+- **Dashboard Demo** - Web UI for visualization
+
+### State Machine
 
 ```
-Phase 1 ✅ 核心模块
-  SACRED 信用分计算 · Escrow 托管状态机 · 争议仲裁
-
-Phase 2 ✅ SDK & API
-  Python SDK · JavaScript SDK · REST API
-
-Phase 3 🔄 测试网部署（当前）
-  BSC Testnet 合约部署 · 真实钱包集成
-
-Phase 4 📋 主网发布
-  多链支持 · 安全审计 · 性能优化
-
-Phase 5 📋 生态扩展
-  更多 Agent 平台接入 · 信用货币体系
+pending → funded → delivered → settled (success)
+              ↓
+          disputed → arbitrating → resolved
+              ↓
+          timeout → refunded
 ```
 
 ---
 
-**License**: MIT
+## 6. Market & Strategy
 
-**Version**: v4.0 — AI Agent 信任基础设施
+### Target Market
+
+- AI Agent Economy: $150B+ by 2030
+- DeFi TVL: $100B+ across chains
+- Growing need for Agent-to-Agent trust mechanisms
+
+### Go-to-Market Strategy
+
+**Phase 1: Hackathon & Grants**
+- Participate in Solana Hackathon, BNB Grant, etc.
+- Build visibility and credibility
+- Get feedback from ecosystem teams
+
+**Phase 2: Pilot Partnerships**
+- Integrate with 2-3 Agent platforms
+- Real-world validation of credit scoring
+- Iterate based on feedback
+
+**Phase 3: Ecosystem Expansion**
+- Multi-chain support (BSC, Solana, Polygon)
+- API partnerships with Agent frameworks
+- Community-driven credit applications
+
+### Revenue Model
+
+1. **API Service Fees**: Pay-per-call or subscription
+2. **Arbitration Fees**: Small % of disputed amounts
+3. **Premium Features**: Advanced analytics, custom scoring
+4. **Enterprise Integration**: White-label solutions
+
+---
+
+## 7. Roadmap
+
+### Q2 2026 (Current)
+- [x] SACRED credit scoring algorithm
+- [x] Escrow state machine (11 states)
+- [x] Arbitration system with reputation-weighted voting
+- [x] REST API with rate limiting
+- [x] Python SDK & JavaScript SDK
+- [x] Test coverage: 76% (73 tests)
+- [x] BSC testnet contract deployed
+- [ ] Solana Hackathon submission
+- [ ] BNB Grant submission
+
+### Q3 2026
+- [ ] First pilot partnership
+- [ ] Production deployment
+- [ ] Dashboard improvements
+- [ ] Additional chain support
+
+### Q4 2026
+- [ ] Multi-chain expansion
+- [ ] Credit score API partnerships
+- [ ] Governance framework design
+
+### 2027+
+- [ ] On-chain credit scoring (Phase 2)
+- [ ] Decentralized governance
+- [ ] Cross-platform credit portability
+
+---
+
+## 8. Technical Achievements
+
+- SACRED credit scoring algorithm: Complete
+- Escrow state machine (11 states): Complete
+- Arbitration system: Complete
+- REST API with authentication: Complete
+- Python SDK & JavaScript SDK: Complete
+- Test coverage: 60% (73 tests)
+- BSC testnet contract: Deployed & verified
+
+Contract: 0xe9C878845F7299C00Ff6465B02f43De2a1b49b62
+
+GitHub: https://github.com/AITabby/CryptoMinds
+
+---
+
+## 9. Team
+
+**AITabby** - Project Lead & Core Developer
+
+**Saber** - Technical Advisor & Web3 Developer
+
+**Lee** - Product Advisor & Strategic Partnerships
+
+---
+
+Contact: aitabbyspace@gmail.com | Twitter: @aitabby

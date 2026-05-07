@@ -1,7 +1,8 @@
 """
-信用分数据持久化 — 使用独立 SQLite 数据库
+信用分数据持久化
 
-与现有 cryptominds.db 完全分离，互不干扰。
+注意：此类保留用于测试和独立使用。
+生产环境建议使用 UnifiedStore。
 """
 
 import json
@@ -9,9 +10,11 @@ import sqlite3
 import time
 from typing import Dict, List, Optional
 
-from .config import DEFAULT_DB_PATH
 from .models import (SacredScore, DimensionScore, QueryAuthorization,
                      ScoreHistoryEntry, PerformanceRecord)
+
+# 默认数据库路径
+DEFAULT_DB_PATH = "cryptominds.db"
 
 
 class CreditScoreStore:

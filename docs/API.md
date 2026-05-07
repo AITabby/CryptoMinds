@@ -2,7 +2,8 @@
 
 ## 基础信息
 
-- **Base URL**: `https://api.cryptominds.ai`
+- **Base URL**: `http://localhost:3458` (本地开发)
+- **生产 URL**: 待部署
 - **版本**: v1
 - **格式**: JSON
 
@@ -13,70 +14,41 @@
 ### 查询信用分
 
 ```
-GET /api/v1/credit/:address
+GET /api/v1/credit/:agent_id
 ```
 
 **参数**:
-- `address` (path): Agent 钱包地址
+- `agent_id` (path): Agent ID（如 agent_high_0001）
 
 **响应**:
 ```json
 {
-  "address": "0x...",
-  "score": 85,
-  "grade": "AA",
+  "agent_id": "agent_high_0001",
+  "wallet": "0x...",
+  "total_score": 864.6,
+  "grade": "AAA",
   "dimensions": {
-    "security": 90,
-    "availability": 85,
-    "consistency": 80,
-    "reliability": 88,
-    "economic": 82
+    "S": {"name": "Stability", "score": 175.2},
+    "A": {"name": "Activity", "score": 168.4},
+    "C": {"name": "Creditworthiness", "score": 172.8},
+    "R": {"name": "Reliability", "score": 178.6},
+    "E": {"name": "Ecosystem", "score": 169.6}
   },
-  "updated_at": "2026-05-06T12:00:00Z"
+  "record_count": 245,
+  "updated_at": "2026-05-07T12:00:00Z"
 }
 ```
 
 **信用等级**:
 | 分数范围 | 等级 |
 |---------|------|
-| 90-100 | AAA |
-| 80-89 | AA |
-| 70-79 | A |
-| 60-69 | BBB |
-| 50-59 | BB |
-| 40-49 | B |
-| 0-39 | C |
-
----
-
-### 查询信用分历史
-
-```
-GET /api/v1/credit/:address/history
-```
-
-**参数**:
-- `address` (path): Agent 钱包地址
-- `limit` (query, optional): 返回数量，默认 10
-
-**响应**:
-```json
-{
-  "address": "0x...",
-  "history": [
-    {
-      "score": 85,
-      "grade": "AA",
-      "timestamp": "2026-05-06T12:00:00Z"
-    },
-    {
-      "score": 82,
-      "grade": "A",
-      "timestamp": "2026-05-05T12:00:00Z"
-    }
-  ]
-}
-```
+| 850+ | AAA |
+| 750-849 | AA |
+| 650-749 | A |
+| 550-649 | BBB |
+| 450-549 | BB |
+| 350-449 | B |
+| <350 | C |
 
 ---
 
@@ -87,26 +59,55 @@ GET /api/v1/credit/ranking
 ```
 
 **参数**:
-- `dimension` (query, optional): 按特定维度排序 (security/availability/consistency/reliability/economic)
-- `limit` (query, optional): 返回数量，默认 100
+- `limit` (query, optional): 返回数量，默认 50
 
 **响应**:
 ```json
 {
   "ranking": [
     {
-      "address": "0x...",
-      "score": 95,
+      "agent_id": "agent_high_0001",
+      "wallet": "0x...",
+      "total_score": 864.6,
       "grade": "AAA"
     }
   ],
-  "total": 1000
+  "total": 40
 }
 ```
 
 ---
 
 ## 托管 API
+
+### 预览押金折扣
+
+```
+POST /api/v1/escrow/discount-preview
+```
+
+**请求体**:
+```json
+{
+  "seller": "agent_high_0001",
+  "amount": 1.0
+}
+```
+
+**响应**:
+```json
+{
+  "credit_score": 864.6,
+  "credit_grade": "AAA",
+  "discount_rate": 0.7,
+  "discount_percent": "30%",
+  "required_deposit": 0.7,
+  "original_deposit": 1.0,
+  "savings": 0.3
+}
+```
+
+---
 
 ### 创建托管
 
@@ -117,33 +118,27 @@ POST /api/v1/escrow/create
 **请求体**:
 ```json
 {
-  "buyer": "0x...",
-  "seller": "0x...",
-  "amount": 0.1,
-  "token": "BNB",
-  "timeout": 86400,
-  "metadata": {}
+  "buyer": "buyer_001",
+  "seller": "agent_high_0001",
+  "amount": 1.0
 }
 ```
-
-**参数**:
-- `buyer` (required): 买家地址
-- `seller` (required): 卖家地址
-- `amount` (required): 托管金额
-- `token` (optional): 代币类型，默认 BNB
-- `timeout` (optional): 超时时间（秒），默认 86400
-- `metadata` (optional): 附加数据
 
 **响应**:
 ```json
 {
-  "escrow_id": "0x...",
-  "state": "created",
-  "buyer": "0x...",
-  "seller": "0x...",
-  "amount": 0.1,
-  "token": "BNB",
-  "created_at": "2026-05-06T12:00:00Z"
+  "escrow_id": "escrow_abc123",
+  "state": "pending",
+  "buyer": "buyer_001",
+  "seller": "agent_high_0001",
+  "amount": 1.0,
+  "required_deposit": 0.7,
+  "credit_discount": {
+    "seller_grade": "AAA",
+    "discount_percent": "30%",
+    "savings": 0.3
+  },
+  "created_at": "2026-05-07T12:00:00Z"
 }
 ```
 
@@ -158,91 +153,85 @@ GET /api/v1/escrow/:id
 **响应**:
 ```json
 {
-  "escrow_id": "0x...",
+  "escrow_id": "escrow_abc123",
   "state": "funded",
-  "buyer": "0x...",
-  "seller": "0x...",
-  "amount": 0.1,
-  "token": "BNB",
-  "created_at": "2026-05-06T12:00:00Z",
-  "funded_at": "2026-05-06T12:05:00Z"
+  "buyer": "buyer_001",
+  "seller": "agent_high_0001",
+  "amount": 1.0,
+  "created_at": "2026-05-07T12:00:00Z",
+  "funded_at": "2026-05-07T12:05:00Z"
 }
 ```
 
 **状态说明**:
 | 状态 | 说明 |
 |------|------|
-| created | 已创建，等待资金 |
+| pending | 已创建，等待资金 |
 | funded | 资金已托管 |
 | delivered | 卖家已交付 |
-| confirmed | 买家已确认 |
 | disputed | 发生争议 |
-| arbitrating | 仲裁中 |
-| released | 资金已释放给卖家 |
-| refunded | 资金已退款给买家 |
-| slashed | 卖家被惩罚 |
-| cancelled | 已取消 |
-| expired | 已超时 |
+| settled | 已结算 |
+| refunded | 已退款 |
 
 ---
 
-### 确认托管资金
+## Voucher API
+
+### 预览额度上限
 
 ```
-POST /api/v1/escrow/:id/fund
+POST /api/v1/voucher/limit-preview
 ```
 
 **请求体**:
 ```json
 {
-  "tx_hash": "0x..."
+  "agent_id": "agent_high_0001"
 }
 ```
 
----
-
-### 提交交付证明
-
-```
-POST /api/v1/escrow/:id/deliver
-```
-
-**请求体**:
+**响应**:
 ```json
 {
-  "proof": {
-    "type": "transaction",
-    "tx_hash": "0x...",
-    "data": {}
-  }
+  "agent_id": "agent_high_0001",
+  "credit_score": 864.6,
+  "credit_grade": "AAA",
+  "multiplier": "5x",
+  "max_limit": 500,
+  "base_limit": 100
 }
 ```
-
----
-
-### 释放资金
-
-```
-POST /api/v1/escrow/:id/release
-```
-
-买家确认交付后调用，资金释放给卖家。
-
----
-
-### 申请退款
-
-```
-POST /api/v1/escrow/:id/refund
-```
-
-买家申请退款，需满足以下条件之一：
-- 卖家未在超时时间内交付
-- 仲裁判定买家胜诉
 
 ---
 
 ## 仲裁 API
+
+### 预览仲裁权重
+
+```
+POST /api/v1/arbitrate/weight-preview
+```
+
+**请求体**:
+```json
+{
+  "arbitrator": "agent_high_0001"
+}
+```
+
+**响应**:
+```json
+{
+  "arbitrator": "agent_high_0001",
+  "credit_score": 864.6,
+  "credit_grade": "AAA",
+  "weight_multiplier": 1.68,
+  "base_weight": 1.0,
+  "effective_weight": 1.68
+}
+```
+
+---
 
 ### 提交争议
 
@@ -253,85 +242,45 @@ POST /api/v1/arbitrate/submit
 **请求体**:
 ```json
 {
-  "escrow_id": "0x...",
-  "reason": "未按约定交付",
-  "evidence": {
-    "description": "...",
-    "attachments": []
-  }
+  "escrow_id": "escrow_abc123",
+  "reason": "未按约定交付"
 }
 ```
 
 **响应**:
 ```json
 {
-  "dispute_id": "0x...",
-  "escrow_id": "0x...",
+  "dispute_id": "dispute_xyz789",
+  "escrow_id": "escrow_abc123",
   "state": "pending",
-  "created_at": "2026-05-06T12:00:00Z"
+  "created_at": "2026-05-07T12:00:00Z"
 }
 ```
 
 ---
 
-### 查询争议状态
+### 仲裁员投票
 
 ```
-GET /api/v1/arbitrate/:id
-```
-
-**响应**:
-```json
-{
-  "dispute_id": "0x...",
-  "escrow_id": "0x...",
-  "state": "resolved",
-  "result": "buyer_wins",
-  "arbitrators": [
-    {
-      "address": "0x...",
-      "vote": "buyer",
-      "weight": 0.85
-    }
-  ],
-  "resolved_at": "2026-05-06T14:00:00Z"
-}
-```
-
----
-
-### 添加证据
-
-```
-POST /api/v1/arbitrate/:id/evidence
+POST /api/v1/arbitrate/:dispute_id/vote
 ```
 
 **请求体**:
 ```json
 {
-  "description": "补充证据",
-  "attachments": ["https://..."]
+  "arbitrator": "agent_high_0001",
+  "vote": "buyer_wins"
 }
-```
-
----
-
-### 查询仲裁员
-
-```
-GET /api/v1/arbitrate/:id/arbitrators
 ```
 
 **响应**:
 ```json
 {
-  "arbitrators": [
-    {
-      "address": "0x...",
-      "credit_score": 92,
-      "weight": 0.85
-    }
-  ]
+  "dispute_id": "dispute_xyz789",
+  "arbitrator": "agent_high_0001",
+  "vote": "buyer_wins",
+  "weight": 1.68,
+  "credited": true
 }
 ```
 
@@ -343,19 +292,14 @@ GET /api/v1/arbitrate/:id/arbitrators
 
 ```json
 {
-  "error": {
-    "code": "INVALID_ADDRESS",
-    "message": "Invalid wallet address format"
-  }
+  "error": "错误描述"
 }
 ```
 
-**错误码**:
-| 错误码 | 说明 |
-|--------|------|
-| INVALID_ADDRESS | 无效的钱包地址 |
-| INSUFFICIENT_BALANCE | 余额不足 |
-| ESCROW_NOT_FOUND | 托管不存在 |
-| INVALID_STATE | 状态不允许此操作 |
-| UNAUTHORIZED | 无权限 |
-| TIMEOUT_EXPIRED | 已超时 |
+**常见错误**:
+| 错误 | 说明 |
+|------|------|
+| Agent not found | Agent 不存在 |
+| Invalid amount | 无效金额 |
+| Escrow not found | 托管不存在 |
+| Invalid state | 状态不允许此操作 |

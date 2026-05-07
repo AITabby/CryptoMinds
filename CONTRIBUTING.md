@@ -2,6 +2,10 @@
 
 感谢你对 CryptoMinds 的兴趣！
 
+## 项目定位
+
+CryptoMinds 是 **API 基础设施提供商**，为 AI Agent 平台提供信用评估和交易保障服务。
+
 ## 开发环境
 
 ```bash
@@ -10,31 +14,46 @@ git clone https://github.com/AITabby/CryptoMinds.git
 cd CryptoMinds
 
 # 安装依赖
-cd web && npm install
+pip install -r requirements.txt
 
-# 启动开发服务器
-npm run dev
+# 启动 API 服务
+python src/api_server.py
+
+# 运行测试
+pytest tests/
 ```
 
 ## 项目结构
 
 ```
 CryptoMinds/
-├── contracts/          # Solidity 合约
-│   └── ServiceEscrow.sol
-├── web/                # 后端服务
-│   ├── server.js       # Express 服务
-│   ├── public/         # 前端静态文件
-│   │   └── index.js    # 前端逻辑
-│   └── lib/            # 工具模块
-│       └── escrow.js   # 合约交互
-├── scripts/            # 部署脚本
-├── tests/              # 测试文件
-└── docs/               # 文档
+├── src/
+│   ├── api_server.py      # REST API 服务
+│   ├── credit/            # SACRED 信用分模块
+│   ├── escrow/            # 托管模块
+│   ├── reputation/        # 信誉层
+│   └── settlement/        # 结算层
+├── sdk/
+│   ├── python/            # Python SDK
+│   └── javascript/        # JavaScript SDK
+├── demo/
+│   ├── index.html         # Dashboard Demo
+│   └── leaderboard.html   # 排行榜
+├── scripts/
+│   └── generate_data.py   # 数据生成脚本
+├── tests/                 # 测试文件
+├── docs/                  # 文档
+│   ├── WHITEPAPER.md      # 白皮书
+│   ├── SACRED.md          # 信用分说明
+│   ├── API.md             # API 文档
+│   └── QUICKSTART.md      # 快速开始
+└── contracts/             # 智能合约
+    └── ServiceEscrow.sol
 ```
 
 ## 代码规范
 
+- Python: PEP 8, 使用 Black 格式化
 - JavaScript: Standard 风格
 - Solidity: Prettier + Solhint
 - 提交信息: Conventional Commits

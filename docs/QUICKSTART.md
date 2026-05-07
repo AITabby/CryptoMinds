@@ -2,16 +2,29 @@
 
 ## 安装
 
-### Python
+### 本地开发（推荐）
 
 ```bash
-pip install cryptominds
+# 克隆仓库
+git clone https://github.com/AITabby/CryptoMinds.git
+cd CryptoMinds
+
+# 安装依赖
+pip install -r requirements.txt
 ```
 
-### JavaScript
+### Python SDK（待发布）
 
 ```bash
-npm install cryptominds
+# 尚未发布到 PyPI，请使用本地安装
+pip install -e ./sdk/python
+```
+
+### JavaScript SDK（待发布）
+
+```bash
+# 尚未发布到 npm，请使用本地安装
+npm link ./sdk/javascript
 ```
 
 ---

@@ -1,11 +1,11 @@
 """
 SACRED 五维信用分计算引擎
 
-S - Stability 稳定性: 成功率 120 + 超时率 40 + 不活跃衰减 40
-A - Activity 活跃度: 近期任务量 80 + 连续活跃 70 + 时段覆盖 50
-C - Creditworthiness 履约力: 质押量 80 + 托管金额 60 + 信用货币接受度 60
-R - Reliability 可信度: 争议赢率 70 + 验证门评分 70 + 严重违约惩罚 60
-E - Ecosystem 生态度: 交互Agent数 80 + 信任网络 60 + 跨链活跃 60
+S - Stability 稳定性: 成功率 120 + 超时率 40 + 不活跃衰减 40 = 200
+A - Activity 活跃度: 近期任务量 100 + 连续活跃 60 + 时段覆盖 40 = 200
+C - Creditworthiness 履约力: 质押量 100 + 托管金额 50 + 信用货币接受度 50 = 200
+R - Reliability 可信度: 争议赢率 70 + 验证门评分 70 + 严重违约惩罚 60 = 200
+E - Ecosystem 生态度: 交互Agent数 80 + 信任网络 60 + 跨链活跃 60 = 200
 """
 
 import math

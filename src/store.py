@@ -181,6 +181,25 @@ class UnifiedStore:
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_violation_agent ON severe_violations(agent_id);
+
+                -- Voucher 按量计费表
+                CREATE TABLE IF NOT EXISTS vouchers (
+                    voucher_id TEXT PRIMARY KEY NOT NULL,
+                    issuer TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    total_units INTEGER NOT NULL,
+                    units_used INTEGER DEFAULT 0,
+                    unit_price REAL NOT NULL,
+                    total_deposit REAL NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'issued',
+                    escrow_id TEXT DEFAULT '',
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER DEFAULT 0
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_voucher_agent ON vouchers(agent_id);
+                CREATE INDEX IF NOT EXISTS idx_voucher_issuer ON vouchers(issuer);
+                CREATE INDEX IF NOT EXISTS idx_voucher_status ON vouchers(status);
             """)
             conn.commit()
         finally:
@@ -936,3 +955,117 @@ class UnifiedStore:
     def close(self):
         """关闭连接（SQLite 连接是每次调用创建的，无需关闭）"""
         pass
+
+    # ═════════════════════════════════════════════════════
+    # Voucher 操作
+    # ═════════════════════════════════════════════════════
+
+    def create_voucher(
+        self,
+        voucher_id: str,
+        issuer: str,
+        agent_id: str,
+        total_units: int,
+        unit_price: float,
+        escrow_id: str = "",
+    ) -> Dict:
+        """创建 Voucher"""
+        now = int(time.time())
+        total_deposit = total_units * unit_price
+
+        conn = self._connect()
+        try:
+            conn.execute(
+                """INSERT INTO vouchers
+                   (voucher_id, issuer, agent_id, total_units, units_used,
+                    unit_price, total_deposit, status, escrow_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, 0, ?, ?, 'issued', ?, ?, ?)""",
+                (voucher_id, issuer, agent_id, total_units, unit_price,
+                 total_deposit, escrow_id, now, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return self.get_voucher(voucher_id)
+
+    def get_voucher(self, voucher_id: str) -> Optional[Dict]:
+        """获取 Voucher"""
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT * FROM vouchers WHERE voucher_id = ?",
+                (voucher_id,),
+            ).fetchone()
+            if row:
+                return dict(row)
+            return None
+        finally:
+            conn.close()
+
+    def use_voucher(self, voucher_id: str, units: int) -> Optional[Dict]:
+        """使用 Voucher 单位"""
+        voucher = self.get_voucher(voucher_id)
+        if not voucher:
+            return None
+
+        if voucher["status"] != "issued":
+            return {"error": "Voucher 状态不允许使用"}
+
+        new_used = voucher["units_used"] + units
+        if new_used > voucher["total_units"]:
+            return {"error": "超出可用额度"}
+
+        new_status = "exhausted" if new_used >= voucher["total_units"] else "issued"
+        now = int(time.time())
+
+        conn = self._connect()
+        try:
+            conn.execute(
+                """UPDATE vouchers
+                   SET units_used = ?, status = ?, updated_at = ?
+                   WHERE voucher_id = ?""",
+                (new_used, new_status, now, voucher_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return self.get_voucher(voucher_id)
+
+    def list_vouchers(self, agent_id: str = None, issuer: str = None) -> List[Dict]:
+        """列出 Voucher"""
+        conn = self._connect()
+        try:
+            if agent_id:
+                rows = conn.execute(
+                    "SELECT * FROM vouchers WHERE agent_id = ? ORDER BY created_at DESC",
+                    (agent_id,),
+                ).fetchall()
+            elif issuer:
+                rows = conn.execute(
+                    "SELECT * FROM vouchers WHERE issuer = ? ORDER BY created_at DESC",
+                    (issuer,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM vouchers ORDER BY created_at DESC",
+                ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    def update_voucher_status(self, voucher_id: str, status: str) -> Optional[Dict]:
+        """更新 Voucher 状态"""
+        now = int(time.time())
+        conn = self._connect()
+        try:
+            conn.execute(
+                "UPDATE vouchers SET status = ?, updated_at = ? WHERE voucher_id = ?",
+                (status, now, voucher_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return self.get_voucher(voucher_id)

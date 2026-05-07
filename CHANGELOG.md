@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-05-07 — 文档更新 + 清理 + Voucher 持久化 + 测试补充
+
+- **文档更新**：WHITEPAPER 加入信任模型演进，SACRED 修正分数范围和计算细节
+- **冷启动阈值统一**：代码和文档统一为 10 笔保护期
+- **清理旧数据库**：删除根目录孤立 db 文件和 credit_score 目录
+- **删除错误文件**：移除 Binance 设计规范（DESIGN.md）
+- **修正注释**：calculator.py 注释与代码一致
+- **清理依赖**：移除未使用的 psycopg2-binary
+- **合约位置**：复制 ServiceEscrow.sol 到主目录 contracts/
+- **新增部署文档**：docs/DEPLOYMENT.md
+- **修正配置示例**：.env.example 明确测试网配置
+- **修正白皮书语调**：移除 "decentralized" 表述
+- **Voucher 持久化**：从内存存储改为 SQLite，重启不丢失
+- **测试补充**：新增 test_voucher.py, test_decay.py, test_signature.py, test_event_signatures.py, test_collector_mock.py
+- **测试覆盖率提升**：60% → 76%（超过 75% 目标）
+- **测试基线**：142 pytest passing（+57）
+
+### 已知问题
+- 部分模块覆盖率较低（collector 27-32%，需要链交互难以测试）
+- .env 密钥需生产环境轮换
+
 ## 2026-05-03 — 主网部署加固 + 测试基线更新
 
 - **主网部署路径加固**：Nginx/SSL 反代、Docker 内部端口隔离、生产环境显式 `CRYPTOMINDS_ENV=prod` 与 `DEMO_MODE=false`

@@ -2,10 +2,18 @@
 
 **AI Agent 信任基础设施**
 
-为 AI Agent 提供信用评估、资金托管、争议仲裁的开放基础设施。
+为 AI Agent 提供信用评估、资金托管、争议仲裁的开放 API。
 
 [![BSC Testnet](https://img.shields.io/badge/BSC-Testnet-green?logo=binance)](https://testnet.bscscan.com/address/0xe9C878845F7299C00Ff6465B02f43De2a1b49b62)
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
+
+---
+
+## 定位
+
+CryptoMinds 是 **API 基础设施提供商**，为 AI Agent 平台提供信用评估和交易保障服务。
+
+我们不是 Agent 市场，而是 Agent 经济的**信任层**——类似 Agent 版的芝麻信用 + 支付宝托管。
 
 ---
 
@@ -17,16 +25,21 @@ Agent 版的"芝麻信用"，五维模型评估 Agent 可信度：
 
 | 维度 | 含义 | 评估内容 |
 |------|------|----------|
-| **S**ecurity | 安全 | 代码审计、漏洞历史 |
-| **A**vailability | 可用性 | 在线时长、响应速度 |
-| **C**onsistency | 一致性 | 履约率、交付质量 |
-| **R**eliability | 可靠性 | 争议记录、投诉历史 |
-| **E**conomic | 经济 | 押金规模、交易额 |
+| **S**tability | 稳定性 | 成功率、超时率 |
+| **A**ctivity | 活跃度 | 任务量、活跃天数 |
+| **C**reditworthiness | 信用度 | 质押金额、托管量 |
+| **R**eliability | 可靠性 | 争议胜率、验证分数 |
+| **E**cosystem | 生态度 | 交易对手多样性 |
 
-- 标准化 AAA-C 等级
-- 时间衰减加权：近期行为权重更高
-- 冷启动保护：新 Agent 基础分 250
-- 链上签名验证，防篡改
+**总分**: 0-1000 | **等级**: AAA, AA, A, BBB, BB, B, C
+
+### 信用分应用
+
+| 应用 | 说明 |
+|------|------|
+| 押金折扣 | AAA 级省 30%，AA 级省 20% |
+| 额度提升 | AAA 级 5x Voucher 额度上限 |
+| 仲裁权重 | 高信用 Agent 投票权重更大 |
 
 ### 托管层 (Escrow)
 
@@ -46,6 +59,24 @@ Agent 版的"芝麻信用"，五维模型评估 Agent 可信度：
 
 ---
 
+## 信任模型
+
+### 当前阶段：管理层信任
+
+- 平台负责计算信用分（类似芝麻信用）
+- 用户信任平台，专注产品价值
+- 低成本、快速迭代
+
+### 未来演进：去中心化信任
+
+- 算法上链，可验证
+- 透明公开，社区治理
+- 跨平台信用互通
+
+**路径**：先证明价值，再去中心化
+
+---
+
 ## 快速开始
 
 ### 安装 SDK
@@ -60,22 +91,23 @@ pip install cryptominds
 from cryptominds import CreditClient
 
 client = CreditClient()
-score = client.get_score("0x...")
+score = client.get_score("agent_high_0001")
 print(score)
-# {"score": 85, "grade": "AA", "dimensions": {...}}
+# {"total_score": 864.6, "grade": "AAA", "dimensions": {...}}
 ```
 
-### 创建托管
+### 预览押金折扣
 
 ```python
 from cryptominds import EscrowClient
 
 escrow = EscrowClient()
-result = escrow.create(
-    buyer="0x...",
-    seller="0x...",
-    amount=0.1
+discount = escrow.preview_discount(
+    seller="agent_high_0001",
+    amount=1.0
 )
+print(discount)
+# {"discount_percent": "30%", "required_deposit": 0.7}
 ```
 
 ---
@@ -85,41 +117,55 @@ result = escrow.create(
 ### 信用分 API
 
 ```
-GET /api/v1/credit/:address
-```
-
-返回：
-```json
-{
-  "address": "0x...",
-  "score": 85,
-  "grade": "AA",
-  "dimensions": {
-    "security": 90,
-    "availability": 85,
-    "consistency": 80,
-    "reliability": 88,
-    "economic": 82
-  }
-}
+GET /api/v1/credit/:agent_id        # 查询信用分
+GET /api/v1/credit/ranking          # 排行榜
+POST /api/v1/voucher/limit-preview  # 预览额度上限
 ```
 
 ### 托管 API
 
 ```
-POST /api/v1/escrow/create     # 创建托管
-GET  /api/v1/escrow/:id        # 查询状态
-POST /api/v1/escrow/:id/release # 释放资金
-POST /api/v1/escrow/:id/refund  # 退款
+POST /api/v1/escrow/create           # 创建托管
+POST /api/v1/escrow/discount-preview # 预览折扣
+GET  /api/v1/escrow/:id              # 查询状态
+POST /api/v1/escrow/:id/release      # 释放资金
 ```
 
 ### 仲裁 API
 
 ```
-POST /api/v1/arbitrate/submit  # 提交争议
-GET  /api/v1/arbitrate/:id     # 查询状态
-POST /api/v1/arbitrate/:id/resolve # 仲裁结果
+POST /api/v1/arbitrate/submit        # 提交争议
+POST /api/v1/arbitrate/weight-preview # 预览仲裁权重
+GET  /api/v1/arbitrate/:id           # 查询状态
 ```
+
+---
+
+## 路线图
+
+### Q2 2026 (当前)
+- [x] SACRED 信用分算法
+- [x] 托管状态机 (11态)
+- [x] 信誉加权仲裁
+- [x] REST API
+- [x] Python/JS SDK
+- [x] BSC 测试网部署
+- [ ] Solana Hackathon 提交
+- [ ] BNB Grant 提交
+
+### Q3 2026
+- [ ] 首个 Pilot 合作伙伴
+- [ ] 生产环境部署
+- [ ] Dashboard 优化
+
+### Q4 2026
+- [ ] 多链扩展
+- [ ] API 合作伙伴
+
+### 2027+
+- [ ] 链上信用分（阶段2）
+- [ ] 去中心化治理
+- [ ] 跨平台信用互通
 
 ---
 
@@ -137,45 +183,10 @@ POST /api/v1/arbitrate/:id/resolve # 仲裁结果
 │   └─────────┴─────────┴─────────┘   │
 │          CryptoMinds                │
 ├─────────────────────────────────────┤
-│         支付协议层                  │
-│         (x402, APP)                 │
-├─────────────────────────────────────┤
 │         区块链层                    │
 │         (BSC, ETH, SOL)             │
 └─────────────────────────────────────┘
 ```
-
----
-
-## 项目结构
-
-```
-cryptominds/
-├── src/
-│   ├── credit/          # SACRED 信用分
-│   ├── escrow/          # 托管层
-│   ├── reputation/      # 信誉层
-│   ├── settlement/      # 多链结算
-│   ├── verification/    # 验证门
-│   └── api/             # API 入口
-├── sdk/
-│   ├── python/          # Python SDK
-│   └── javascript/      # JavaScript SDK
-├── tests/               # 测试
-├── docs/                # 文档
-└── archive/             # 归档
-```
-
----
-
-## 对标 BNB Chain Wishlist
-
-| Wishlist 需求 | CryptoMinds | 状态 |
-|---|---|---|
-| AI reputation and registration systems | SACRED 五维信用分 | ✅ |
-| AI-native payment solutions | 信用分驱动 Escrow 托管 | ✅ |
-| Safe autonomous trading agents | Escrow 状态机 + 仲裁 | ✅ |
-| Risk Scoring Frameworks | 标准化信用等级 | ✅ |
 
 ---
 
@@ -198,9 +209,11 @@ pytest tests/
 
 | 文档 | 内容 |
 |------|------|
-| [白皮书](docs/WHITEPAPER.md) | 产品定位 + 市场分析 |
-| [技术规范](docs/WHITEPAPER_TECH_SPEC.md) | 架构 + 状态机 + 安全模型 |
+| [白皮书](docs/WHITEPAPER.md) | 产品定位 + 信任模型演进 |
+| [信用分说明](docs/SACRED.md) | 五维模型 + 应用场景 |
 | [API 文档](docs/API.md) | 端点说明 + 示例 |
+| [快速开始](docs/QUICKSTART.md) | SDK 使用指南 |
+| [部署指南](docs/DEPLOYMENT.md) | 环境配置 + 生产部署 |
 
 ---
 

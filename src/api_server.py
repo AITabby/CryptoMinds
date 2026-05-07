@@ -414,6 +414,134 @@ def _record_escrow_result(escrow_id: str, result: str):
     store.save_performance_record(record)
 
 
+# ── Voucher 按量计费 API ──
+
+def calculate_voucher_limit(agent_id: str) -> dict:
+    """计算 Voucher 额度上限"""
+    score_data = store.get_latest_score(agent_id)
+
+    if not score_data:
+        return {
+            "credit_score": 0,
+            "credit_grade": "N/A",
+            "multiplier": "1x",
+            "max_limit": 100,
+            "base_limit": 100
+        }
+
+    # 处理 SacredScore 对象或 dict
+    if hasattr(score_data, "total_score"):
+        score = score_data.total_score
+        grade = score_data.grade
+    else:
+        score = score_data.get("total_score", 0)
+        grade = score_data.get("grade", "C")
+
+    # 根据等级计算倍数
+    multipliers = {
+        "AAA": 5, "AA": 3, "A": 2, "BBB": 1.5,
+        "BB": 1.2, "B": 1.1
+    }
+    multiplier = multipliers.get(grade, 1)
+
+    base_limit = 100
+    max_limit = int(base_limit * multiplier)
+
+    return {
+        "credit_score": score,
+        "credit_grade": grade,
+        "multiplier": f"{multiplier}x",
+        "max_limit": max_limit,
+        "base_limit": base_limit
+    }
+
+
+@app.route("/api/v1/voucher/limit-preview", methods=["POST"])
+def voucher_limit_preview():
+    """预览额度上限"""
+    data = request.json or {}
+    agent_id = data.get("agent_id")
+
+    if not agent_id:
+        return jsonify({"error": "缺少 Agent ID"}), 400
+
+    limit_info = calculate_voucher_limit(agent_id)
+
+    return jsonify({
+        "agent_id": agent_id,
+        "credit_score": limit_info["credit_score"],
+        "credit_grade": limit_info["credit_grade"],
+        "multiplier": limit_info["multiplier"],
+        "max_limit": limit_info["max_limit"]
+    })
+
+
+@app.route("/api/v1/voucher/create", methods=["POST"])
+def voucher_create():
+    """创建 Voucher"""
+    data = request.json or {}
+    issuer = data.get("issuer")
+    agent_id = data.get("agent_id")
+    total_units = int(data.get("total_units", 100))
+    unit_price = float(data.get("unit_price", 0.01))
+    escrow_id = data.get("escrow_id", "")
+
+    if not issuer or not agent_id:
+        return jsonify({"error": "缺少发行者或 Agent ID"}), 400
+
+    import uuid
+    voucher_id = f"voucher_{uuid.uuid4().hex[:12]}"
+
+    voucher = store.create_voucher(
+        voucher_id=voucher_id,
+        issuer=issuer,
+        agent_id=agent_id,
+        total_units=total_units,
+        unit_price=unit_price,
+        escrow_id=escrow_id,
+    )
+
+    return jsonify(voucher)
+
+
+@app.route("/api/v1/voucher/<voucher_id>", methods=["GET"])
+def voucher_get(voucher_id):
+    """查询 Voucher"""
+    voucher = store.get_voucher(voucher_id)
+    if not voucher:
+        return jsonify({"error": "Voucher 不存在"}), 404
+    return jsonify(voucher)
+
+
+@app.route("/api/v1/voucher/<voucher_id>/use", methods=["POST"])
+def voucher_use(voucher_id):
+    """使用 Voucher"""
+    data = request.json or {}
+    units = int(data.get("units", 1))
+
+    result = store.use_voucher(voucher_id, units)
+    if not result:
+        return jsonify({"error": "Voucher 不存在"}), 404
+    if result.get("error"):
+        return jsonify({"error": result["error"]}), 400
+
+    return jsonify(result)
+
+
+@app.route("/api/v1/voucher/list", methods=["GET"])
+def voucher_list():
+    """查询 Voucher 列表"""
+    agent_id = request.args.get("agent_id")
+    issuer = request.args.get("issuer")
+
+    vouchers = store.list_vouchers(agent_id=agent_id, issuer=issuer)
+
+    return jsonify({
+        "vouchers": vouchers,
+        "total": len(vouchers)
+    })
+
+
 # ── 启动 ──
 
 def start_api(port=None, debug=None):

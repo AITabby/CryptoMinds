@@ -8,7 +8,7 @@ LONG_HALF_LIFE = 90      # 长期指标：成功率、信任网络
 
 # 冷启动
 COLD_START_SCORE = 250       # 新 Agent 初始分
-COLD_START_THRESHOLD = 3     # 完成N个任务后退出冷启动
+COLD_START_THRESHOLD = 10    # 完成N个任务后退出冷启动（保护期）
 COLD_START_MAX_BOOST = 80    # 快速通道最多提80分
 
 # 评分范围
@@ -30,8 +30,8 @@ GRADE_THRESHOLDS = [
 AUTHORIZATION_TTL = 3600     # 默认授权有效期1小时
 AUTHORIZATION_MAX_TTL = 86400  # 最长24小时
 
-# 数据库路径
-DEFAULT_DB_PATH = "credit_score/credit_score.db"
+# 数据库路径（统一使用 cryptominds.db）
+# DEFAULT_DB_PATH 已废弃，统一由 UnifiedStore 管理
 
 # API
 API_HOST = "127.0.0.1"
