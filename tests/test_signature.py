@@ -2,12 +2,7 @@
 签名工具测试
 """
 
-import pytest
-import sys
-import os
 import time
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.utils.signature import (
     create_sign_message,
@@ -52,7 +47,7 @@ class TestVerifyApiSignature:
             max_age_seconds=300,
         )
 
-        assert result["valid"] == False
+        assert result["valid"] is False
         assert "expired" in result["error"].lower()
 
     def test_future_timestamp(self):
@@ -68,7 +63,7 @@ class TestVerifyApiSignature:
             max_age_seconds=300,
         )
 
-        assert result["valid"] == False
+        assert result["valid"] is False
 
     def test_valid_timestamp(self):
         """测试有效时间戳"""
@@ -98,7 +93,7 @@ class TestVerifyEthSignature:
             signature="invalid",
             expected_address="0xabc",
         )
-        assert result["valid"] == False
+        assert result["valid"] is False
 
     def test_no_expected_address(self):
         """测试无预期地址"""
@@ -109,4 +104,4 @@ class TestVerifyEthSignature:
             signature="invalid",
             expected_address=None,
         )
-        assert result["valid"] == False
+        assert result["valid"] is False

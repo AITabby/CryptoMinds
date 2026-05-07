@@ -2,12 +2,7 @@
 时间衰减测试
 """
 
-import pytest
-import sys
-import os
 import time
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.credit.decay import (
     time_decay,
@@ -82,19 +77,19 @@ class TestNoDecayViolation:
 
     def test_seller_win_is_severe(self):
         """测试 seller_win 是严重违约"""
-        assert no_decay_violation("seller_win") == True
+        assert no_decay_violation("seller_win") is True
 
     def test_timeout_is_severe(self):
         """测试 timeout 是严重违约"""
-        assert no_decay_violation("timeout") == True
+        assert no_decay_violation("timeout") is True
 
     def test_buyer_win_not_severe(self):
         """测试 buyer_win 不是严重违约"""
-        assert no_decay_violation("buyer_win") == False
+        assert no_decay_violation("buyer_win") is False
 
     def test_settled_not_severe(self):
         """测试 settled 不是严重违约"""
-        assert no_decay_violation("settled") == False
+        assert no_decay_violation("settled") is False
 
 
 class TestApplyDecayToRecords:

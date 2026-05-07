@@ -2,13 +2,6 @@
 事件签名工具测试
 """
 
-import pytest
-import sys
-import os
-import subprocess
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from src.utils.event_signatures import (
     keccak256,
     ESCROW_EVENT_SIGNATURES,

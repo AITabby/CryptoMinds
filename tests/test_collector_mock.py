@@ -2,14 +2,7 @@
 Collector 模拟数据测试
 """
 
-import pytest
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from src.collector.mock_data import MockDataGenerator
-from src.credit.models import TaskStatus
 
 
 class TestMockDataGenerator:
@@ -58,10 +51,6 @@ class TestMockDataGenerator:
 
         high_records = gen.generate_records(agent_id="high", profile="high", days=30)
         low_records = gen.generate_records(agent_id="low", profile="low", days=30)
-
-        # 高信用 Agent 应该有更多成功记录
-        high_success = sum(1 for r in high_records if r.success)
-        low_success = sum(1 for r in low_records if r.success)
 
         # 只验证记录存在
         assert len(high_records) > 0
