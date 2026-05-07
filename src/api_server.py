@@ -1,10 +1,10 @@
 """
-CryptoMinds API 服务
+CryptoMinds 信用层 API 服务
 
-AI Agent 信任基础设施 API
-- 信用分查询
-- 托管管理
-- 争议仲裁
+AI Agent 信用分基础设施
+- SACRED五维信用分查询
+- 履约记录上报
+- 信任网络分析
 """
 
 import os
@@ -51,7 +51,7 @@ def check_auth():
     if not REQUIRE_AUTH:
         return None
 
-    # 优先检查内部令牌
+    # 优先检查内部令牌（交易层调用）
     internal_token = request.headers.get("X-CryptoMinds-Internal-Token")
     if internal_token and INTERNAL_TOKEN:
         expected = hashlib.sha256(INTERNAL_TOKEN.encode()).hexdigest()
@@ -69,47 +69,14 @@ def check_auth():
             g.auth_type = "api_key"
             return None
 
-    # 检查签名（Agent 钱包签名）
-    signature = request.headers.get("X-CryptoMinds-Signature")
-    address = request.headers.get("X-CryptoMinds-Address")
-    timestamp = request.headers.get("X-CryptoMinds-Timestamp")
-
-    if signature and address and timestamp:
-        try:
-            timestamp_int = int(timestamp)
-        except ValueError:
-            return jsonify({"error": "无效的时间戳"}), 401
-
-        # 确定操作类型
-        action = request.path.replace("/api/v1/", "").replace("/", "_")
-
-        # 验证签名
-        from utils.signature import verify_api_signature
-        result = verify_api_signature(
-            signature=signature,
-            address=address,
-            action=action,
-            timestamp=timestamp_int,
-        )
-
-        if result.get("valid"):
-            g.auth_type = "signature"
-            g.signer_address = result.get("recovered_address", address)
-            return None
-        else:
-            return jsonify({"error": result.get("error", "签名验证失败")}), 401
-
-    return jsonify({"error": "未授权访问，请提供有效的认证信息"}), 401
+    return jsonify({"error": "未授权访问"}), 401
 
 
 @app.before_request
 def before_request():
     """请求前中间件"""
-    # 跳过健康检查
     if request.path in ("/health", "/api/v1/info"):
         return None
-
-    # 检查认证
     return check_auth()
 
 
@@ -117,16 +84,16 @@ def before_request():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "service": "cryptominds-api"})
+    return jsonify({"status": "ok", "service": "cryptominds-credit"})
 
 
 @app.route("/api/v1/info")
 def info():
     return jsonify({
-        "name": "CryptoMinds",
-        "version": "0.1.0",
-        "description": "AI Agent 信任基础设施",
-        "features": ["credit", "escrow", "arbitration"]
+        "name": "CryptoMinds Credit Layer",
+        "version": "1.0.0",
+        "description": "AI Agent 信用分基础设施",
+        "features": ["sacred_credit", "trust_network", "performance_records"]
     })
 
 
@@ -135,301 +102,89 @@ def info():
 app.register_blueprint(credit_bp, url_prefix="/api/v1/credit")
 
 
-# ── 托管 API ──
+# ── 履约记录上报 API（供交易层调用）──
 
-@app.route("/api/v1/escrow/create", methods=["POST"])
-def escrow_create():
-    """创建托管"""
+@app.route("/api/v1/records", methods=["POST"])
+def create_record():
+    """
+    上报履约记录
+
+    交易层调用此接口上报任务完成情况，用于更新信用分
+    """
     data = request.json
-    required = ["buyer", "seller", "amount"]
+    required = ["record_id", "seller_agent_id", "success"]
     if not all(k in data for k in required):
         return jsonify({"error": "缺少必要参数"}), 400
 
-    escrow = store.create_escrow(
-        buyer=data["buyer"],
-        seller=data["seller"],
-        amount=float(data["amount"]),
-        token=data.get("token", "BNB"),
-        timeout=data.get("timeout", 86400),
-        metadata=data.get("metadata")
-    )
-    return jsonify(escrow)
-
-
-@app.route("/api/v1/escrow/<escrow_id>", methods=["GET"])
-def escrow_get(escrow_id):
-    """查询托管状态"""
-    escrow = store.get_escrow(escrow_id)
-    if not escrow:
-        return jsonify({"error": "托管不存在"}), 404
-    return jsonify(escrow)
-
-
-@app.route("/api/v1/escrow/<escrow_id>/fund", methods=["POST"])
-def escrow_fund(escrow_id):
-    """确认资金托管"""
-    data = request.json
-    tx_hash = data.get("tx_hash")
-    if not tx_hash:
-        return jsonify({"error": "缺少交易哈希"}), 400
-
-    escrow = store.get_escrow(escrow_id)
-    if not escrow or escrow["status"] != "pending":
-        return jsonify({"error": "托管不存在或状态不允许"}), 400
-
-    escrow = store.update_escrow_status(
-        escrow_id, "funded",
-        fund_tx=tx_hash,
-        funded_at=int(__import__("time").time()),
-    )
-    return jsonify(escrow)
-
-
-@app.route("/api/v1/escrow/<escrow_id>/deliver", methods=["POST"])
-def escrow_deliver(escrow_id):
-    """提交交付证明"""
-    data = request.json
-    proof = data.get("proof")
-    if not proof:
-        return jsonify({"error": "缺少交付证明"}), 400
-
-    escrow = store.get_escrow(escrow_id)
-    if not escrow or escrow["status"] != "funded":
-        return jsonify({"error": "托管不存在或状态不允许"}), 400
-
-    escrow = store.update_escrow_status(
-        escrow_id, "delivered",
-        delivery_proof=str(proof),
-        delivered_at=int(__import__("time").time()),
-    )
-    return jsonify(escrow)
-
-
-@app.route("/api/v1/escrow/<escrow_id>/release", methods=["POST"])
-def escrow_release(escrow_id):
-    """释放资金"""
-    escrow = store.get_escrow(escrow_id)
-    if not escrow or escrow["status"] not in ("delivered", "verified"):
-        return jsonify({"error": "托管不存在或状态不允许"}), 400
-
-    escrow = store.update_escrow_status(
-        escrow_id, "settled",
-        completed_at=int(__import__("time").time()),
-    )
-
-    # 写入履约记录
-    _record_escrow_result(escrow_id, "settled")
-
-    return jsonify(escrow)
-
-
-@app.route("/api/v1/escrow/<escrow_id>/refund", methods=["POST"])
-def escrow_refund(escrow_id):
-    """申请退款"""
-    escrow = store.get_escrow(escrow_id)
-    if not escrow:
-        return jsonify({"error": "托管不存在"}), 404
-
-    allowed = ("pending", "funded", "disputed", "arbitrating")
-    if escrow["status"] not in allowed:
-        return jsonify({"error": "状态不允许退款"}), 400
-
-    escrow = store.update_escrow_status(
-        escrow_id, "refunded",
-        completed_at=int(__import__("time").time()),
-    )
-
-    # 写入履约记录
-    _record_escrow_result(escrow_id, "refunded")
-
-    return jsonify(escrow)
-
-
-@app.route("/api/v1/escrow/<escrow_id>/dispute", methods=["POST"])
-def escrow_dispute(escrow_id):
-    """发起争议"""
-    data = request.json
-    reason = data.get("reason", "")
-
-    escrow = store.get_escrow(escrow_id)
-    if not escrow or escrow["status"] not in ("delivered", "funded"):
-        return jsonify({"error": "托管不存在或状态不允许"}), 400
-
-    escrow = store.update_escrow_status(
-        escrow_id, "disputed",
-        disputed=True,
-        dispute_reason=reason,
-    )
-
-    # 创建争议记录
-    dispute = store.create_dispute(
-        escrow_id=escrow_id,
-        reason=reason,
-        evidence=data.get("evidence"),
-    )
-    return jsonify({"escrow": escrow, "dispute": dispute})
-
-
-# ── 仲裁 API ──
-
-@app.route("/api/v1/arbitrate/submit", methods=["POST"])
-def arbitrate_submit():
-    """提交争议"""
-    data = request.json
-    required = ["escrow_id", "reason"]
-    if not all(k in data for k in required):
-        return jsonify({"error": "缺少必要参数"}), 400
-
-    dispute = store.create_dispute(
-        escrow_id=data["escrow_id"],
-        reason=data["reason"],
-        evidence=data.get("evidence")
-    )
-    return jsonify(dispute)
-
-
-@app.route("/api/v1/arbitrate/<dispute_id>", methods=["GET"])
-def arbitrate_get(dispute_id):
-    """查询争议状态"""
-    dispute = store.get_dispute(dispute_id)
-    if not dispute:
-        return jsonify({"error": "争议不存在"}), 404
-    return jsonify(dispute)
-
-
-@app.route("/api/v1/arbitrate/<dispute_id>/evidence", methods=["POST"])
-def arbitrate_evidence(dispute_id):
-    """添加证据"""
-    data = request.json
-    dispute = store.add_dispute_evidence(dispute_id, data)
-    if not dispute:
-        return jsonify({"error": "争议不存在"}), 404
-    return jsonify(dispute)
-
-
-@app.route("/api/v1/arbitrate/<dispute_id>/arbitrators", methods=["GET"])
-def arbitrate_arbitrators(dispute_id):
-    """查询仲裁员"""
-    dispute = store.get_dispute(dispute_id)
-    if not dispute:
-        return jsonify({"error": "争议不存在"}), 404
-    return jsonify({"arbitrators": dispute.get("arbitrators", [])})
-
-
-@app.route("/api/v1/arbitrate/<dispute_id>/vote", methods=["POST"])
-def arbitrate_vote(dispute_id):
-    """仲裁员投票"""
-    data = request.json
-    required = ["arbitrator", "vote", "weight"]
-    if not all(k in data for k in required):
-        return jsonify({"error": "缺少必要参数"}), 400
-
-    dispute = store.add_vote(
-        dispute_id=dispute_id,
-        arbitrator=data["arbitrator"],
-        vote=data["vote"],
-        weight=float(data["weight"]),
-    )
-    if not dispute:
-        return jsonify({"error": "争议不存在"}), 404
-    return jsonify(dispute)
-
-
-@app.route("/api/v1/arbitrate/<dispute_id>/resolve", methods=["POST"])
-def arbitrate_resolve(dispute_id):
-    """解决争议"""
-    data = request.json
-    result = data.get("result")
-    if not result:
-        return jsonify({"error": "缺少结果参数"}), 400
-
-    dispute = store.resolve_dispute(
-        dispute_id=dispute_id,
-        result=result,
-        reason=data.get("reason", ""),
-    )
-    if not dispute:
-        return jsonify({"error": "争议不存在"}), 404
-
-    # 更新托管状态 + 写履约记录
-    escrow_id = dispute["escrow_id"]
-    now = int(__import__("time").time())
-    if result == "buyer_wins":
-        store.update_escrow_status(
-            escrow_id, "refunded",
-            resolution="buyer_win", completed_at=now)
-        _record_escrow_result(escrow_id, "refunded")
-    elif result == "seller_wins":
-        store.update_escrow_status(
-            escrow_id, "settled",
-            resolution="seller_win", completed_at=now)
-        _record_escrow_result(escrow_id, "settled")
-
-    return jsonify(dispute)
-
-
-# ── 辅助函数 ──
-
-def _record_escrow_result(escrow_id: str, result: str):
-    """托管结算后自动写入履约记录"""
     from credit.models import PerformanceRecord, TaskStatus
 
-    escrow = store.get_escrow(escrow_id)
-    if not escrow:
-        return
-
-    status_map = {
-        "settled": TaskStatus.SETTLED,
-        "refunded": TaskStatus.REFUNDED,
-    }
-    task_status = status_map.get(result, TaskStatus.SETTLED)
-
-    response_time = 0
-    if escrow.get("delivered_at") and escrow.get("created_at"):
-        response_time = (escrow["delivered_at"] - escrow["created_at"]) * 1000
-
     record = PerformanceRecord(
-        record_id=f"perf_{escrow_id}",
-        task_id=escrow_id,
-        task_type="escrow",
-        buyer_wallet=escrow["buyer"],
-        seller_wallet=escrow["seller"],
-        seller_agent_id=escrow["seller"],
-        chain="bsc",
-        amount=str(escrow["amount"]),
-        status=task_status,
-        success=task_status == TaskStatus.SETTLED,
-        score=0.5,  # 默认中性分数
-        created_at=escrow["created_at"],
-        completed_at=escrow.get("completed_at", 0),
-        response_time_ms=response_time,
-        payment_tx=escrow.get("fund_tx", ""),
-        payment_amount=escrow.get("amount", "0"),
-        evidence=escrow.get("evidence", ""),
-        disputed=escrow.get("disputed", False),
-        dispute_reason=escrow.get("dispute_reason", ""),
-        resolution=escrow.get("resolution", ""),
+        record_id=data["record_id"],
+        task_id=data.get("task_id", data["record_id"]),
+        task_type=data.get("task_type", "token_delivery"),
+        buyer_wallet=data.get("buyer_wallet", ""),
+        seller_wallet=data.get("seller_wallet", ""),
+        seller_agent_id=data["seller_agent_id"],
+        chain=data.get("chain", "bsc"),
+        amount=data.get("amount", "0"),
+        status=TaskStatus.SETTLED if data["success"] else TaskStatus.REFUNDED,
+        success=data["success"],
+        score=data.get("score", 0.5),
+        created_at=data.get("created_at", 0),
+        completed_at=data.get("completed_at", 0),
+        response_time_ms=data.get("response_time_ms", 0),
+        payment_tx=data.get("payment_tx", ""),
+        payment_amount=data.get("payment_amount", "0"),
+        evidence=data.get("evidence", ""),
+        disputed=data.get("disputed", False),
+        dispute_reason=data.get("dispute_reason", ""),
+        resolution=data.get("resolution", ""),
     )
 
     store.save_performance_record(record)
 
+    # 触发信用分重新计算
+    from credit.calculator import SacredCalculator
+    calculator = SacredCalculator()
+    records = store.get_performance_records(agent_id=data["seller_agent_id"])
+    score = calculator.calculate(
+        agent_id=data["seller_agent_id"],
+        wallet=data.get("seller_wallet", data["seller_agent_id"]),
+        records=records,
+    )
+    store.save_score(score)
 
-# ── Voucher 按量计费 API ──
+    return jsonify({
+        "ok": True,
+        "record_id": record.record_id,
+        "credit_score": score.total_score,
+        "credit_grade": score.grade,
+    })
 
-def calculate_voucher_limit(agent_id: str) -> dict:
-    """计算 Voucher 额度上限"""
+
+# ── 信用分应用预览 API ──
+
+@app.route("/api/v1/preview/deposit-discount", methods=["POST"])
+def preview_deposit_discount():
+    """预览押金折扣"""
+    data = request.json or {}
+    agent_id = data.get("agent_id")
+    amount = float(data.get("amount", 1.0))
+
+    if not agent_id:
+        return jsonify({"error": "缺少 Agent ID"}), 400
+
     score_data = store.get_latest_score(agent_id)
 
     if not score_data:
-        return {
+        return jsonify({
+            "agent_id": agent_id,
             "credit_score": 0,
             "credit_grade": "N/A",
-            "multiplier": "1x",
-            "max_limit": 100,
-            "base_limit": 100
-        }
+            "discount_percent": "0%",
+            "required_deposit": amount,
+        })
 
-    # 处理 SacredScore 对象或 dict
     if hasattr(score_data, "total_score"):
         score = score_data.total_score
         grade = score_data.grade
@@ -437,109 +192,146 @@ def calculate_voucher_limit(agent_id: str) -> dict:
         score = score_data.get("total_score", 0)
         grade = score_data.get("grade", "C")
 
-    # 根据等级计算倍数
-    multipliers = {
-        "AAA": 5, "AA": 3, "A": 2, "BBB": 1.5,
-        "BB": 1.2, "B": 1.1
+    # 根据等级计算折扣
+    discounts = {
+        "AAA": 0.30, "AA": 0.20, "A": 0.10,
+        "BBB": 0.05, "BB": 0.00, "B": 0.00
     }
-    multiplier = multipliers.get(grade, 1)
+    discount_rate = discounts.get(grade, 0)
 
-    base_limit = 100
-    max_limit = int(base_limit * multiplier)
-
-    return {
+    return jsonify({
+        "agent_id": agent_id,
         "credit_score": score,
         "credit_grade": grade,
-        "multiplier": f"{multiplier}x",
-        "max_limit": max_limit,
-        "base_limit": base_limit
-    }
+        "discount_percent": f"{int(discount_rate * 100)}%",
+        "required_deposit": round(amount * (1 - discount_rate), 4),
+        "original_deposit": amount,
+        "savings": round(amount * discount_rate, 4),
+    })
 
 
-@app.route("/api/v1/voucher/limit-preview", methods=["POST"])
-def voucher_limit_preview():
-    """预览额度上限"""
+@app.route("/api/v1/preview/voucher-limit", methods=["POST"])
+def preview_voucher_limit():
+    """预览Voucher额度上限"""
     data = request.json or {}
     agent_id = data.get("agent_id")
 
     if not agent_id:
         return jsonify({"error": "缺少 Agent ID"}), 400
 
-    limit_info = calculate_voucher_limit(agent_id)
+    score_data = store.get_latest_score(agent_id)
+
+    if not score_data:
+        return jsonify({
+            "agent_id": agent_id,
+            "credit_score": 0,
+            "credit_grade": "N/A",
+            "multiplier": "1x",
+            "max_limit": 100,
+        })
+
+    if hasattr(score_data, "total_score"):
+        score = score_data.total_score
+        grade = score_data.grade
+    else:
+        score = score_data.get("total_score", 0)
+        grade = score_data.get("grade", "C")
+
+    multipliers = {
+        "AAA": 5, "AA": 3, "A": 2, "BBB": 1.5,
+        "BB": 1.2, "B": 1.1
+    }
+    multiplier = multipliers.get(grade, 1)
 
     return jsonify({
         "agent_id": agent_id,
-        "credit_score": limit_info["credit_score"],
-        "credit_grade": limit_info["credit_grade"],
-        "multiplier": limit_info["multiplier"],
-        "max_limit": limit_info["max_limit"]
+        "credit_score": score,
+        "credit_grade": grade,
+        "multiplier": f"{multiplier}x",
+        "max_limit": 100 * multiplier,
+        "base_limit": 100,
     })
 
 
-@app.route("/api/v1/voucher/create", methods=["POST"])
-def voucher_create():
-    """创建 Voucher"""
+@app.route("/api/v1/preview/arbitration-weight", methods=["POST"])
+def preview_arbitration_weight():
+    """预览仲裁权重"""
     data = request.json or {}
-    issuer = data.get("issuer")
     agent_id = data.get("agent_id")
-    total_units = int(data.get("total_units", 100))
-    unit_price = float(data.get("unit_price", 0.01))
-    escrow_id = data.get("escrow_id", "")
 
-    if not issuer or not agent_id:
-        return jsonify({"error": "缺少发行者或 Agent ID"}), 400
+    if not agent_id:
+        return jsonify({"error": "缺少 Agent ID"}), 400
 
-    import uuid
-    voucher_id = f"voucher_{uuid.uuid4().hex[:12]}"
+    score_data = store.get_latest_score(agent_id)
 
-    voucher = store.create_voucher(
-        voucher_id=voucher_id,
-        issuer=issuer,
-        agent_id=agent_id,
-        total_units=total_units,
-        unit_price=unit_price,
-        escrow_id=escrow_id,
-    )
+    if not score_data:
+        return jsonify({
+            "agent_id": agent_id,
+            "credit_score": 0,
+            "credit_grade": "N/A",
+            "weight_multiplier": 1.0,
+            "effective_weight": 1.0,
+        })
 
-    return jsonify(voucher)
+    if hasattr(score_data, "total_score"):
+        score = score_data.total_score
+        grade = score_data.grade
+    else:
+        score = score_data.get("total_score", 0)
+        grade = score_data.get("grade", "C")
 
-
-@app.route("/api/v1/voucher/<voucher_id>", methods=["GET"])
-def voucher_get(voucher_id):
-    """查询 Voucher"""
-    voucher = store.get_voucher(voucher_id)
-    if not voucher:
-        return jsonify({"error": "Voucher 不存在"}), 404
-    return jsonify(voucher)
-
-
-@app.route("/api/v1/voucher/<voucher_id>/use", methods=["POST"])
-def voucher_use(voucher_id):
-    """使用 Voucher"""
-    data = request.json or {}
-    units = int(data.get("units", 1))
-
-    result = store.use_voucher(voucher_id, units)
-    if not result:
-        return jsonify({"error": "Voucher 不存在"}), 404
-    if result.get("error"):
-        return jsonify({"error": result["error"]}), 400
-
-    return jsonify(result)
-
-
-@app.route("/api/v1/voucher/list", methods=["GET"])
-def voucher_list():
-    """查询 Voucher 列表"""
-    agent_id = request.args.get("agent_id")
-    issuer = request.args.get("issuer")
-
-    vouchers = store.list_vouchers(agent_id=agent_id, issuer=issuer)
+    # 仲裁权重 = 1 + (信用分 / 1000) * 0.7
+    weight_multiplier = 1.0 + (score / 1000) * 0.7
 
     return jsonify({
-        "vouchers": vouchers,
-        "total": len(vouchers)
+        "agent_id": agent_id,
+        "credit_score": score,
+        "credit_grade": grade,
+        "weight_multiplier": round(weight_multiplier, 2),
+        "base_weight": 1.0,
+        "effective_weight": round(weight_multiplier, 2),
     })
+
+
+# ── 信任网络 API ──
+
+@app.route("/api/v1/trust-network", methods=["GET"])
+def trust_network():
+    """获取信任网络数据"""
+    limit = request.args.get("limit", 500, type=int)
+    limit = min(limit, 2000)
+
+    network = store.get_trust_network(limit=limit)
+    return jsonify(network)
+
+
+@app.route("/api/v1/trust-path/<from_agent>/<to_agent>", methods=["GET"])
+def trust_path(from_agent: str, to_agent: str):
+    """查询两个Agent之间的信任路径"""
+    max_depth = request.args.get("max_depth", 4, type=int)
+    max_depth = min(max_depth, 6)
+
+    path = store.find_trust_path(from_agent, to_agent, max_depth=max_depth)
+
+    return jsonify({
+        "from": from_agent,
+        "to": to_agent,
+        "path": path,
+        "found": len(path) > 0,
+    })
+
+
+@app.route("/api/v1/trust-score/<agent_id>", methods=["GET"])
+def trust_score(agent_id: str):
+    """获取Agent的综合信任评分"""
+    from_agent = request.args.get("from")
+
+    result = store.get_agent_trust_score(
+        agent_id=agent_id,
+        from_agent=from_agent,
+    )
+
+    return jsonify(result)
 
 
 # ── 启动 ──
@@ -549,7 +341,7 @@ def start_api(port=None, debug=None):
     port = port or API_PORT
     debug = debug if debug is not None else DEBUG_MODE
 
-    print(f"CryptoMinds API 启动: http://localhost:{port}")
+    print(f"CryptoMinds 信用层 API 启动: http://localhost:{port}")
     print(f"Debug 模式: {debug}")
 
     if not debug:

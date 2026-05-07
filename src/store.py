@@ -1069,3 +1069,241 @@ class UnifiedStore:
             conn.close()
 
         return self.get_voucher(voucher_id)
+
+    # ═════════════════════════════════════════════════════
+    # 信任网络操作
+    # ═════════════════════════════════════════════════════
+
+    def get_trust_network(self, limit: int = 500) -> Dict:
+        """
+        获取信任网络数据
+
+        返回节点(agents)和边(transactions)用于可视化
+        """
+        conn = self._connect()
+        try:
+            # 获取所有履约记录
+            rows = conn.execute(
+                """SELECT buyer_wallet, seller_wallet, seller_agent_id,
+                          amount, success, created_at, status
+                   FROM performance_records
+                   ORDER BY created_at DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+
+            # 构建节点和边
+            nodes = {}  # agent_id -> node info
+            edges = []  # transactions
+
+            for row in rows:
+                buyer = row["buyer_wallet"]
+                seller = row["seller_wallet"]
+                seller_agent = row["seller_agent_id"] or seller
+
+                # 添加节点
+                if buyer not in nodes:
+                    nodes[buyer] = {
+                        "id": buyer,
+                        "type": "buyer",
+                        "transactions": 0,
+                        "volume": 0.0,
+                    }
+                if seller not in nodes:
+                    nodes[seller] = {
+                        "id": seller,
+                        "type": "seller",
+                        "agent_id": seller_agent,
+                        "transactions": 0,
+                        "volume": 0.0,
+                    }
+
+                # 更新统计
+                nodes[buyer]["transactions"] += 1
+                nodes[seller]["transactions"] += 1
+                try:
+                    amount = float(row["amount"])
+                    nodes[buyer]["volume"] += amount
+                    nodes[seller]["volume"] += amount
+                except (ValueError, TypeError):
+                    pass
+
+                # 添加边
+                edges.append({
+                    "source": buyer,
+                    "target": seller,
+                    "amount": row["amount"],
+                    "success": bool(row["success"]),
+                    "timestamp": row["created_at"],
+                })
+
+            # 获取信用分并合并
+            for node_id in nodes:
+                score_data = conn.execute(
+                    """SELECT total_score, grade FROM sacred_scores
+                       WHERE agent_id = ? OR wallet = ?
+                       ORDER BY calculated_at DESC LIMIT 1""",
+                    (node_id, node_id),
+                ).fetchone()
+
+                if score_data:
+                    nodes[node_id]["credit_score"] = score_data["total_score"]
+                    nodes[node_id]["credit_grade"] = score_data["grade"]
+
+            return {
+                "nodes": list(nodes.values()),
+                "edges": edges,
+                "stats": {
+                    "total_nodes": len(nodes),
+                    "total_edges": len(edges),
+                }
+            }
+        finally:
+            conn.close()
+
+    def find_trust_path(
+        self,
+        from_agent: str,
+        to_agent: str,
+        max_depth: int = 4,
+    ) -> List[Dict]:
+        """
+        查找两个Agent之间的信任路径
+
+        使用BFS找到最短信任链
+
+        Args:
+            from_agent: 起始Agent
+            to_agent: 目标Agent
+            max_depth: 最大搜索深度
+
+        Returns:
+            信任路径列表，每项包含 {agent_id, credit_score, grade}
+        """
+        from collections import deque
+
+        conn = self._connect()
+        try:
+            # 构建信任图（只有成功交易的才建立信任边）
+            rows = conn.execute(
+                """SELECT DISTINCT buyer_wallet, seller_wallet
+                   FROM performance_records
+                   WHERE success = 1""",
+            ).fetchall()
+
+            # 构建邻接表
+            graph = {}  # agent -> [trusted_agents]
+            for row in rows:
+                buyer = row["buyer_wallet"]
+                seller = row["seller_wallet"]
+
+                # buyer 信任 seller（成功交易过）
+                if buyer not in graph:
+                    graph[buyer] = set()
+                graph[buyer].add(seller)
+
+            # BFS找最短路径
+            if from_agent not in graph:
+                return []
+
+            visited = {from_agent}
+            queue = deque([(from_agent, [from_agent])])
+
+            while queue:
+                current, path = queue.popleft()
+
+                if len(path) > max_depth:
+                    continue
+
+                if current == to_agent:
+                    # 找到了，构建详细路径
+                    result = []
+                    for agent_id in path:
+                        score_data = conn.execute(
+                            """SELECT total_score, grade FROM sacred_scores
+                               WHERE agent_id = ? OR wallet = ?
+                               ORDER BY calculated_at DESC LIMIT 1""",
+                            (agent_id, agent_id),
+                        ).fetchone()
+                        result.append({
+                            "agent_id": agent_id,
+                            "credit_score": score_data["total_score"] if score_data else None,
+                            "credit_grade": score_data["grade"] if score_data else None,
+                        })
+                    return result
+
+                neighbors = graph.get(current, set())
+                for neighbor in neighbors:
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        queue.append((neighbor, path + [neighbor]))
+
+            return []
+        finally:
+            conn.close()
+
+    def get_agent_trust_score(
+        self,
+        agent_id: str,
+        from_agent: str = None,
+    ) -> Dict:
+        """
+        获取Agent的综合信任评分
+
+        包含直接信任分和间接信任分
+
+        Args:
+            agent_id: 目标Agent
+            from_agent: 查询者（可选，用于计算间接信任）
+
+        Returns:
+            {
+                "direct_score": 直接信任分（信用分）,
+                "trust_path": 信任路径（如果有）,
+                "path_length": 路径长度,
+                "indirect_score": 间接信任分,
+                "combined_score": 综合信任分,
+            }
+        """
+        result = {
+            "agent_id": agent_id,
+            "direct_score": None,
+            "trust_path": [],
+            "path_length": 0,
+            "indirect_score": None,
+            "combined_score": None,
+        }
+
+        # 直接信用分
+        score_data = self.get_latest_score(agent_id)
+        if score_data:
+            result["direct_score"] = score_data.total_score
+
+        # 间接信任路径
+        if from_agent and from_agent != agent_id:
+            path = self.find_trust_path(from_agent, agent_id)
+            result["trust_path"] = path
+            result["path_length"] = len(path)
+
+            # 间接信任分 = 路径上节点的信用分加权平均
+            if path and len(path) > 1:
+                path_scores = [
+                    p["credit_score"] for p in path
+                    if p.get("credit_score")
+                ]
+                if path_scores:
+                    # 路径越长，信任衰减越大
+                    decay = 0.8 ** (len(path) - 1)
+                    result["indirect_score"] = sum(path_scores) / len(path_scores) * decay
+
+        # 综合信任分
+        if result["direct_score"] and result["indirect_score"]:
+            # 直接信任权重更高
+            result["combined_score"] = (
+                result["direct_score"] * 0.6 + result["indirect_score"] * 0.4
+            )
+        elif result["direct_score"]:
+            result["combined_score"] = result["direct_score"]
+        elif result["indirect_score"]:
+            result["combined_score"] = result["indirect_score"]
+
+        return result

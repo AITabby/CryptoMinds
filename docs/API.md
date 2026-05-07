@@ -78,6 +78,118 @@ GET /api/v1/credit/ranking
 
 ---
 
+## 信任网络 API
+
+### 获取信任网络数据
+
+```
+GET /api/v1/trust-network
+```
+
+**参数**:
+- `limit` (query, optional): 返回交易数量，默认 500，最大 2000
+
+**响应**:
+```json
+{
+  "nodes": [
+    {
+      "id": "0x...",
+      "type": "buyer",
+      "transactions": 15,
+      "volume": 12.5,
+      "credit_score": 850,
+      "credit_grade": "AAA"
+    }
+  ],
+  "edges": [
+    {
+      "source": "0x...",
+      "target": "0x...",
+      "amount": "1.0",
+      "success": true,
+      "timestamp": 1715040000
+    }
+  ],
+  "stats": {
+    "total_nodes": 50,
+    "total_edges": 120
+  }
+}
+```
+
+---
+
+### 查询信任路径
+
+```
+GET /api/v1/trust-path/:from_agent/:to_agent
+```
+
+**参数**:
+- `from_agent` (path): 起始 Agent ID
+- `to_agent` (path): 目标 Agent ID
+- `max_depth` (query, optional): 最大搜索深度，默认 4，最大 6
+
+**响应**:
+```json
+{
+  "from": "agent_high_0001",
+  "to": "agent_low_0010",
+  "path": [
+    {"agent_id": "agent_high_0001", "credit_score": 864.6, "credit_grade": "AAA"},
+    {"agent_id": "agent_mid_0005", "credit_score": 720.0, "credit_grade": "A"},
+    {"agent_id": "agent_low_0010", "credit_score": 450.0, "credit_grade": "BB"}
+  ],
+  "found": true
+}
+```
+
+**应用场景**:
+- Agent A 想信任 Agent D，但没直接交易过
+- 如果 A→B→C→D 有成功交易链，A 可间接信任 D
+- 类似 LinkedIn "二度人脉"
+
+---
+
+### 获取综合信任评分
+
+```
+GET /api/v1/trust-score/:agent_id
+```
+
+**参数**:
+- `agent_id` (path): 目标 Agent ID
+- `from` (query, optional): 查询者 Agent ID，用于计算间接信任
+
+**响应**:
+```json
+{
+  "agent_id": "agent_low_0010",
+  "direct_score": 450.0,
+  "trust_path": [
+    {"agent_id": "agent_high_0001", "credit_score": 864.6, "credit_grade": "AAA"},
+    {"agent_id": "agent_mid_0005", "credit_score": 720.0, "credit_grade": "A"}
+  ],
+  "path_length": 2,
+  "indirect_score": 632.4,
+  "combined_score": 578.4
+}
+```
+
+**评分说明**:
+| 字段 | 说明 |
+|------|------|
+| direct_score | 直接信用分（SACRED分数）|
+| indirect_score | 间接信任分（信任路径加权）|
+| combined_score | 综合信任分（直接60% + 间接40%）|
+
+**间接信任计算**:
+- 路径上节点信用分平均值
+- 路径越长，信任衰减越大（0.8^(路径长度-1)）
+
+---
+
 ## 托管 API
 
 ### 预览押金折扣

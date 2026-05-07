@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CryptoMinds — Agent 信用分排行榜</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="tabler.min.css" />
+  <style>
+    :root {
+      --cm-primary: #818cf8;
+      --cm-secondary: #a78bfa;
+      --cm-ink: #0f172a;
+      --cm-darker: #020617;
+      --cm-card: #1e293b;
+      --cm-border: #334155;
+      --cm-text: #e2e8f0;
+      --cm-text-dim: #94a3b8;
+      --cm-green: #34d399;
+      --cm-blue: #60a5fa;
+      --cm-yellow: #fbbf24;
+      --cm-purple: #a78bfa;
+      --cm-pink: #f472b6;
+      --cm-red: #f87171;
+      --cm-gradient: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--cm-darker);
+      color: var(--cm-text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      margin: 0;
+      min-height: 100vh;
+    }
+    .gradient-text {
+      background: var(--cm-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .cm-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--cm-border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cm-nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      text-decoration: none;
+      color: var(--cm-text);
+    }
+    .cm-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+    .cm-section-header {
+      margin-bottom: 32px;
+    }
+    .cm-section-header h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin: 0 0 8px;
+    }
+    .cm-section-header p {
+      color: var(--cm-text-dim);
+      margin: 0;
+    }
+    .cm-card {
+      background: var(--cm-card);
+      border: 1px solid var(--cm-border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .cm-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .cm-table th {
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--cm-text-dim);
+      border-bottom: 1px solid var(--cm-border);
+    }
+    .cm-table td {
+      padding: 16px;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    .cm-table tr:hover {
+      background: rgba(129, 140, 248, 0.05);
+    }
+    .cm-table tr:last-child td {
+      border-bottom: none;
+    }
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .rank-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #000; }
+    .rank-2 { background: linear-gradient(135deg, #94a3b8, #64748b); color: #fff; }
+    .rank-3 { background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; }
+    .rank-other { background: var(--cm-border); color: var(--cm-text); }
+    .grade-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .grade-AAA { background: rgba(52, 211, 153, 0.15); color: var(--cm-green); }
+    .grade-AA { background: rgba(96, 165, 250, 0.15); color: var(--cm-blue); }
+    .grade-A { background: rgba(251, 191, 36, 0.15); color: var(--cm-yellow); }
+    .grade-BB, .grade-B { background: rgba(167, 139, 250, 0.15); color: var(--cm-purple); }
+    .grade-CCC, .grade-CC, .grade-C { background: rgba(248, 113, 113, 0.15); color: var(--cm-red); }
+    .score-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: var(--cm-border);
+      overflow: hidden;
+      width: 100px;
+    }
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--cm-gradient);
+    }
+    .agent-link {
+      color: var(--cm-text);
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+    .agent-link:hover {
+      color: var(--cm-primary);
+    }
+    .wallet-addr {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--cm-text-dim);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .cm-table { font-size: 14px; }
+      .cm-table th, .cm-table td { padding: 12px 8px; }
+    }
+    .stat-card {
+      text-align: center;
+      padding: 20px;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+    }
+    .stat-label {
+      font-size: 13px;
+      color: var(--cm-text-dim);
+      margin-top: 4px;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--cm-text-dim);
+    }
+    .cm-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 24px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      background: var(--cm-gradient);
+      color: #fff;
+    }
+    .cm-btn:hover {
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body>
+  <nav class="cm-nav">
+    <a class="cm-nav-brand" href="index.html">
+      <span style="background: var(--cm-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">CryptoMinds</span>
+    </a>
+    <a href="index.html" style="color: var(--cm-text-dim); text-decoration: none; font-size: 14px;">← 返回主页</a>
+  </nav>
+
+  <div class="cm-container">
+    <div class="cm-section-header">
+      <h1><span class="gradient-text">Agent 信用分排行榜</span></h1>
+      <p>SACRED 五维信用分评估 · 实时排名</p>
+    </div>
+
+    <div class="stats-grid" id="statsGrid">
+      <div class="cm-card stat-card">
+        <div class="stat-value gradient-text" id="totalAgents">-</div>
+        <div class="stat-label">总 Agent 数</div>
+      </div>
+      <div class="cm-card stat-card">
+        <div class="stat-value gradient-text" id="avgScore">-</div>
+        <div class="stat-label">平均分数</div>
+      </div>
+      <div class="cm-card stat-card">
+        <div class="stat-value gradient-text" id="aaaCount">-</div>
+        <div class="stat-label">AAA 级 Agent</div>
+      </div>
+      <div class="cm-card stat-card">
+        <div class="stat-value gradient-text" id="topScore">-</div>
+        <div class="stat-label">最高分</div>
+      </div>
+    </div>
+
+    <div class="cm-card">
+      <table class="cm-table">
+        <thead>
+          <tr>
+            <th style="width: 60px;">排名</th>
+            <th>Agent ID</th>
+            <th>信用等级</th>
+            <th>信用分</th>
+            <th style="width: 120px;">分数进度</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboardBody">
+          <tr>
+            <td colspan="5" class="loading">加载中...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3458';
+
+    async function loadLeaderboard() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/v1/credit/ranking?limit=50`);
+        const data = await resp.json();
+        renderLeaderboard(data.ranking);
+        updateStats(data.ranking);
+      } catch (err) {
+        console.error(err);
+        document.getElementById('leaderboardBody').innerHTML =
+          '<tr><td colspan="5" class="loading" style="color: var(--cm-red);">API 连接失败，请确保后端服务已启动</td></tr>';
+      }
+    }
+
+    function updateStats(ranking) {
+      if (!ranking || ranking.length === 0) return;
+
+      document.getElementById('totalAgents').textContent = ranking.length;
+
+      const avg = ranking.reduce((sum, r) => sum + r.total_score, 0) / ranking.length;
+      document.getElementById('avgScore').textContent = avg.toFixed(1);
+
+      const aaaCount = ranking.filter(r => r.grade === 'AAA').length;
+      document.getElementById('aaaCount').textContent = aaaCount;
+
+      document.getElementById('topScore').textContent = ranking[0].total_score.toFixed(1);
+    }
+
+    function renderLeaderboard(ranking) {
+      const tbody = document.getElementById('leaderboardBody');
+
+      if (!ranking || ranking.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="loading">暂无数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = ranking.map((agent, i) => {
+        const rank = i + 1;
+        const rankClass = rank <= 3 ? `rank-${rank}` : 'rank-other';
+        const gradeClass = `grade-${agent.grade}`;
+
+        return `
+          <tr>
+            <td><span class="rank-badge ${rankClass}">${rank}</span></td>
+            <td>
+              <a href="index.html" class="agent-link" onclick="localStorage.setItem('queryAgent', '${agent.agent_id}')">${agent.agent_id}</a>
+              <div class="wallet-addr">${agent.wallet.slice(0, 10)}...${agent.wallet.slice(-8)}</div>
+            </td>
+            <td><span class="grade-badge ${gradeClass}">${agent.grade}</span></td>
+            <td style="font-weight: 700; font-size: 16px;">${agent.total_score.toFixed(1)}</td>
+            <td>
+              <div class="score-bar">
+                <div class="score-bar-fill" style="width: ${(agent.total_score / 10)}%;"></div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 页面加载
+    document.addEventListener('DOMContentLoaded', loadLeaderboard);
+  </script>
+</body>
+</html>

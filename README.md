@@ -1,27 +1,19 @@
-# CryptoMinds
+# CryptoMinds Credit Layer
 
-**AI Agent 信任基础设施**
+**AI Agent 信用分基础设施**
 
-为 AI Agent 提供信用评估、资金托管、争议仲裁的开放 API。
-
-[![BSC Testnet](https://img.shields.io/badge/BSC-Testnet-green?logo=binance)](https://testnet.bscscan.com/address/0xe9C878845F7299C00Ff6465B02f43De2a1b49b62)
-[![License](https://img.shields.io/badge/license-MIT-blue)]()
-
----
+为 AI Agent 提供 SACRED 五维信用分评估服务。
 
 ## 定位
 
-CryptoMinds 是 **API 基础设施提供商**，为 AI Agent 平台提供信用评估和交易保障服务。
+这是 CryptoMinds 的**信用层**，独立于交易层运行。
 
-我们不是 Agent 市场，而是 Agent 经济的**信任层**——类似 Agent 版的芝麻信用 + 支付宝托管。
+- **交易层** (cryptominds-market): Agent雇佣Agent买币
+- **信用层** (cryptominds): 提供信用分查询和履约记录管理
 
----
+## 核心功能
 
-## 核心产品
-
-### SACRED 信用分
-
-Agent 版的"芝麻信用"，五维模型评估 Agent 可信度：
+### SACRED 五维信用分
 
 | 维度 | 含义 | 评估内容 |
 |------|------|----------|
@@ -37,173 +29,70 @@ Agent 版的"芝麻信用"，五维模型评估 Agent 可信度：
 
 | 应用 | 说明 |
 |------|------|
-| 押金折扣 | AAA 级省 30%，AA 级省 20% |
-| 额度提升 | AAA 级 5x Voucher 额度上限 |
-| 仲裁权重 | 高信用 Agent 投票权重更大 |
+| 押金折扣 | AAA 级省 30% |
+| Voucher额度 | AAA 级 5x 上限 |
+| 仲裁权重 | 高信用 Agent 权重更大 |
 
-### 托管层 (Escrow)
+## API 端点
 
-链上资金安全保障：
+### 信用分查询
 
-- **ServiceEscrow.sol** — BSC 链上合约
-- 11 态状态机：创建 → 托管 → 交付 → 确认/争议 → 仲裁
-- 多链支持：BSC · Solana · Polygon
+```
+GET /api/v1/credit/:agent_id           # 查询信用分
+GET /api/v1/credit/ranking             # 排行榜
+POST /api/v1/credit/:agent_id/refresh  # 刷新信用分
+```
 
-### 仲裁层 (Arbitration)
+### 履约记录上报（交易层调用）
 
-争议解决机制：
+```
+POST /api/v1/records                   # 上报履约记录
+```
 
-- 信誉加权仲裁：信用分高的 Agent 权重更大
-- Seller slashing：恶意行为自动惩罚
-- 三分支验证：自动验证 / 争议仲裁 / 超时处理
+### 信用分应用预览
 
----
+```
+POST /api/v1/preview/deposit-discount  # 预览押金折扣
+POST /api/v1/preview/voucher-limit     # 预览额度上限
+POST /api/v1/preview/arbitration-weight # 预览仲裁权重
+```
 
-## 信任模型
+### 信任网络
 
-### 当前阶段：管理层信任
+```
+GET /api/v1/trust-network              # 获取信任网络
+GET /api/v1/trust-path/:from/:to       # 查询信任路径
+GET /api/v1/trust-score/:agent_id      # 综合信任评分
+```
 
-- 平台负责计算信用分（类似芝麻信用）
-- 用户信任平台，专注产品价值
-- 低成本、快速迭代
+## 对接交易层
 
-### 未来演进：去中心化信任
+交易层调用信用层API：
 
-- 算法上链，可验证
-- 透明公开，社区治理
-- 跨平台信用互通
+```python
+import requests
 
-**路径**：先证明价值，再去中心化
+# 查询信用分
+resp = requests.get("http://localhost:3458/api/v1/credit/agent_001")
+score = resp.json()
 
----
+# 上报履约记录
+resp = requests.post("http://localhost:3458/api/v1/records", json={
+    "record_id": "rec_001",
+    "seller_agent_id": "agent_001",
+    "success": True,
+    "amount": "1.5",
+})
+```
 
 ## 快速开始
 
-### 安装 SDK
-
 ```bash
-pip install cryptominds
-```
-
-### 查询信用分
-
-```python
-from cryptominds import CreditClient
-
-client = CreditClient()
-score = client.get_score("agent_high_0001")
-print(score)
-# {"total_score": 864.6, "grade": "AAA", "dimensions": {...}}
-```
-
-### 预览押金折扣
-
-```python
-from cryptominds import EscrowClient
-
-escrow = EscrowClient()
-discount = escrow.preview_discount(
-    seller="agent_high_0001",
-    amount=1.0
-)
-print(discount)
-# {"discount_percent": "30%", "required_deposit": 0.7}
-```
-
----
-
-## API 文档
-
-### 信用分 API
-
-```
-GET /api/v1/credit/:agent_id        # 查询信用分
-GET /api/v1/credit/ranking          # 排行榜
-POST /api/v1/voucher/limit-preview  # 预览额度上限
-```
-
-### 托管 API
-
-```
-POST /api/v1/escrow/create           # 创建托管
-POST /api/v1/escrow/discount-preview # 预览折扣
-GET  /api/v1/escrow/:id              # 查询状态
-POST /api/v1/escrow/:id/release      # 释放资金
-```
-
-### 仲裁 API
-
-```
-POST /api/v1/arbitrate/submit        # 提交争议
-POST /api/v1/arbitrate/weight-preview # 预览仲裁权重
-GET  /api/v1/arbitrate/:id           # 查询状态
-```
-
----
-
-## 路线图
-
-### Q2 2026 (当前)
-- [x] SACRED 信用分算法
-- [x] 托管状态机 (11态)
-- [x] 信誉加权仲裁
-- [x] REST API
-- [x] Python/JS SDK
-- [x] BSC 测试网部署
-- [ ] Solana Hackathon 提交
-- [ ] BNB Grant 提交
-
-### Q3 2026
-- [ ] 首个 Pilot 合作伙伴
-- [ ] 生产环境部署
-- [ ] Dashboard 优化
-
-### Q4 2026
-- [ ] 多链扩展
-- [ ] API 合作伙伴
-
-### 2027+
-- [ ] 链上信用分（阶段2）
-- [ ] 去中心化治理
-- [ ] 跨平台信用互通
-
----
-
-## 架构
-
-```
-┌─────────────────────────────────────┐
-│         Agent 平台层                │
-│   (ClawIntelligence, OptimAI...)    │
-├─────────────────────────────────────┤
-│         信任基础设施层              │
-│   ┌─────────┬─────────┬─────────┐   │
-│   │ 信誉层  │ 托管层  │ 仲裁层  │   │
-│   │ (SACRED)│ (Escrow)│(Arbitra)│   │
-│   └─────────┴─────────┴─────────┘   │
-│          CryptoMinds                │
-├─────────────────────────────────────┤
-│         区块链层                    │
-│         (BSC, ETH, SOL)             │
-└─────────────────────────────────────┘
-```
-
----
-
-## 开发
-
-```bash
-# 安装依赖
 pip install -r requirements.txt
-
-# 运行 API 服务
 python src/api_server.py
-
-# 运行测试
-pytest tests/
 ```
 
----
+服务启动在 http://localhost:3458
 
 ## 文档
 
@@ -212,10 +101,6 @@ pytest tests/
 | [白皮书](docs/WHITEPAPER.md) | 产品定位 + 信任模型演进 |
 | [信用分说明](docs/SACRED.md) | 五维模型 + 应用场景 |
 | [API 文档](docs/API.md) | 端点说明 + 示例 |
-| [快速开始](docs/QUICKSTART.md) | SDK 使用指南 |
-| [部署指南](docs/DEPLOYMENT.md) | 环境配置 + 生产部署 |
-
----
 
 ## License
 
