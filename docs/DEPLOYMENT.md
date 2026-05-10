@@ -1,161 +1,288 @@
-# 部署指南
+# CryptoMinds 部署指南
 
-## 环境要求
+## 快速部署（5分钟）
 
-- Python 3.10+
-- SQLite 3
-- （可选）Node.js 18+（Express 网关）
+### 1. 服务器要求
 
-## 快速启动
+**最低配置：**
+- CPU: 1核
+- RAM: 1GB
+- 存储: 10GB
+- 系统: Ubuntu 20.04+
 
-### 1. 克隆项目
+**推荐配置：**
+- CPU: 2核
+- RAM: 2GB
+- 存储: 20GB
+- 带宽: 10Mbps
+
+### 2. 域名和SSL
 
 ```bash
+# 购买域名（推荐）
+api.cryptominds.io
+
+# 配置DNS A记录
+A    api    <服务器IP>
+A    www    <服务器IP>
+```
+
+### 3. 一键部署脚本
+
+```bash
+# 下载部署脚本
+curl -O https://raw.githubusercontent.com/AITabby/CryptoMinds/main/deploy/deploy.sh
+chmod +x deploy.sh
+
+# 运行部署
+./deploy.sh
+```
+
+## 详细部署步骤
+
+### Step 1: 准备服务器
+
+```bash
+# 更新系统
+sudo apt update && sudo apt upgrade -y
+
+# 安装依赖
+sudo apt install -y python3 python3-pip python3-venv nginx certbot python3-certbot-nginx git
+
+# 创建用户
+sudo useradd -m -s /bin/bash cryptominds
+sudo su - cryptominds
+```
+
+### Step 2: 克隆代码
+
+```bash
+# 克隆仓库
 git clone https://github.com/AITabby/CryptoMinds.git
 cd CryptoMinds
-```
 
-### 2. 配置环境变量
+# 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate
 
-```bash
-cp .env.example .env
-```
-
-编辑 `.env` 文件，设置必要的环境变量：
-
-| 变量 | 必填 | 说明 |
-|------|------|------|
-| `CRYPTOMINDS_ENV` | 否 | 环境：dev/staging/prod |
-| `BSC_RPC` | 是 | BSC RPC 端点 |
-| `BSC_CHAIN_ID` | 是 | 链 ID（测试网=97，主网=56） |
-| `ESCROW_CONTRACT_ADDRESS` | 是 | 合约地址 |
-| `ADMIN_SECRET` | 是 | 管理员密钥 |
-| `CRYPTOMINDS_INTERNAL_TOKEN` | 是 | API 内部认证 |
-
-### 3. 安装依赖
-
-```bash
+# 安装依赖
 pip install -r requirements.txt
 ```
 
-### 4. 启动服务
+### Step 3: 配置环境
 
 ```bash
-python src/api_server.py
+# 创建配置文件
+cat > .env << 'ENVEOF'
+# API配置
+CRYPTOMINDS_API_PORT=3458
+CRYPTOMINDS_REQUIRE_AUTH=true
+CRYPTOMINDS_API_KEY=replace-with-a-long-random-key
+
+# 数据库配置
+CRYPTOMINDS_DB_PATH=/home/cryptominds/data/cryptominds.db
+
+# 日志配置
+LOG_LEVEL=INFO
+LOG_PATH=/home/cryptominds/logs
+
+# 监控配置
+ENABLE_METRICS=true
+METRICS_PORT=9090
+ENVEOF
+
+# 创建目录
+mkdir -p /home/cryptominds/data
+mkdir -p /home/cryptominds/logs
 ```
 
-服务将在 `http://localhost:3458` 启动。
-
-## 生产部署
-
-### Docker
+### Step 4: 配置Systemd服务
 
 ```bash
-# 构建镜像
-docker build -t cryptominds-api .
+# 创建服务文件
+sudo tee /etc/systemd/system/cryptominds.service > /dev/null << 'SVCEOF'
+[Unit]
+Description=CryptoMinds API Service
+After=network.target
 
-# 运行容器
-docker run -d \
-  -p 3458:3458 \
-  -e CRYPTOMINDS_ENV=prod \
-  -e BSC_RPC=https://bsc-dataseed1.binance.org \
-  -e BSC_CHAIN_ID=56 \
-  -v $(pwd)/data:/app/data \
-  cryptominds-api
+[Service]
+Type=simple
+User=cryptominds
+WorkingDirectory=/home/cryptominds/CryptoMinds
+Environment="PATH=/home/cryptominds/CryptoMinds/venv/bin"
+EnvironmentFile=/home/cryptominds/CryptoMinds/.env
+ExecStart=/home/cryptominds/CryptoMinds/venv/bin/python src/api_server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+# 启动服务
+sudo systemctl daemon-reload
+sudo systemctl enable cryptominds
+sudo systemctl start cryptominds
+
+# 检查状态
+sudo systemctl status cryptominds
 ```
 
-### Gunicorn
+### Step 5: 配置Nginx反向代理
 
 ```bash
-gunicorn -w 4 -b 0.0.0.0:3458 src.api_server:app
+# 创建Nginx配置
+sudo tee /etc/nginx/sites-available/cryptominds > /dev/null << 'NGXEOF'
+server {
+    listen 80;
+    server_name api.cryptominds.io;
+
+    location / {
+        proxy_pass http://127.0.0.1:3458;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 健康检查
+    location /health {
+        proxy_pass http://127.0.0.1:3458/health;
+        access_log off;
+    }
+}
+NGXEOF
+
+# 启用配置
+sudo ln -s /etc/nginx/sites-available/cryptominds /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
-## 智能合约部署
-
-### BSC 测试网
+### Step 6: 配置SSL证书
 
 ```bash
-# 使用 Hardhat 或 Remix 部署 contracts/ServiceEscrow.sol
-# 记录合约地址到 .env
-ESCROW_CONTRACT_ADDRESS=0x...
+# 自动获取Let's Encrypt证书
+sudo certbot --nginx -d api.cryptominds.io
+
+# 自动续期
+sudo certbot renew --dry-run
 ```
 
-### 合约验证
+### Step 7: 配置防火墙
 
 ```bash
-# BSCScan 验证
-npx hardhat verify --network bsc_testnet <CONTRACT_ADDRESS>
+# 允许HTTP/HTTPS
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 22/tcp
+sudo ufw enable
 ```
 
-## 数据库
-
-项目使用 SQLite，数据库文件位于 `cryptominds.db`。
-
-### 备份
+### Step 8: 验证部署
 
 ```bash
-# 创建备份
-cp cryptominds.db cryptominds.db.backup
+# 测试API
+curl https://api.cryptominds.io/health
 
-# 或使用 SQLite 导出
-sqlite3 cryptominds.db ".backup 'cryptominds.db.backup'"
+# 测试信用分查询
+curl https://api.cryptominds.io/api/v1/credit/test_agent_001
 ```
 
-## 监控
+## 监控和日志
 
-### 健康检查
+### 日志查看
 
 ```bash
-curl http://localhost:3458/health
-# {"service":"cryptominds-api","status":"ok"}
+# 查看服务日志
+sudo journalctl -u cryptominds -f
+
+# 查看应用日志
+tail -f /home/cryptominds/logs/api.log
+
+# 查看Nginx日志
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
 ```
 
-### Prometheus 指标
-
-访问 `http://localhost:3458/metrics` 获取 Prometheus 指标。
-
-## 安全检查清单
-
-- [ ] `.env` 文件未被提交到 Git
-- [ ] `ADMIN_SECRET` 使用强随机值（生产环境必须轮换）
-- [ ] `CRYPTOMINDS_INTERNAL_TOKEN` 使用强随机值（生产环境必须轮换）
-- [ ] 生产环境设置 `DEMO_MODE=false`
-- [ ] 生产环境设置 `CRYPTOMINDS_DEBUG=false`
-- [ ] 配置 HTTPS（Nginx 反向代理）
-- [ ] 配置 CORS 白名单
-- [ ] 启用 Rate Limiting
-
-### 生成安全密钥
+### 数据库备份
 
 ```bash
-# 生成 ADMIN_SECRET
-openssl rand -base64 48
+# 创建备份脚本
+cat > /home/cryptominds/backup.sh << 'BKEOF'
+#!/bin/bash
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR=/home/cryptominds/backups
+mkdir -p $BACKUP_DIR
 
-# 生成 INTERNAL_TOKEN
-openssl rand -base64 48
+# 备份数据库
+sqlite3 /home/cryptominds/data/cryptominds.db ".backup '$BACKUP_DIR/cryptominds_$DATE.db'"
+
+# 删除30天前的备份
+find $BACKUP_DIR -name "cryptominds_*.db" -mtime +30 -delete
+
+echo "Backup completed: cryptominds_$DATE.db"
+BKEOF
+
+chmod +x /home/cryptominds/backup.sh
+
+# 添加到crontab（每天凌晨2点备份）
+(crontab -l 2>/dev/null; echo "0 2 * * * /home/cryptominds/backup.sh") | crontab -
 ```
 
-⚠️ **重要**: 生产环境必须使用新生成的密钥，不要使用开发环境的密钥！
+## 成本估算
 
-## 常见问题
+### 云服务器（月费）
 
-### Q: 启动报错 "address already in use"
+| 提供商 | 配置 | 价格 |
+|--------|------|------|
+| DigitalOcean | 1GB RAM, 1 CPU | $6/月 |
+| Linode | 2GB RAM, 1 CPU | $12/月 |
+| AWS Lightsail | 1GB RAM, 1 CPU | $5/月 |
+| Vultr | 1GB RAM, 1 CPU | $6/月 |
+
+### 域名（年费）
+
+- .io域名：$30-50/年
+- .com域名：$10-15/年
+
+### SSL证书
+
+- Let's Encrypt：免费
+- 商业证书：$50-200/年
+
+**总成本：$72-144/年（最低配置）**
+
+## 故障排查
+
+### 服务无法启动
 
 ```bash
-# 查找占用端口的进程
-lsof -i :3458
+# 检查日志
+sudo journalctl -u cryptominds -n 50
 
-# 终止进程
-kill -9 <PID>
+# 检查端口占用
+sudo lsof -i :3458
+
+# 检查权限
+ls -la /home/cryptominds/data
+ls -la /home/cryptominds/logs
 ```
 
-### Q: 数据库锁定错误
+### 数据库锁定
 
-确保只有一个进程访问数据库，或考虑迁移到 PostgreSQL。
+```bash
+# 检查WAL模式
+sqlite3 /home/cryptominds/data/cryptominds.db "PRAGMA journal_mode;"
 
-### Q: 合约交互失败
+# 应该返回 "wal"
+# 如果不是，执行：
+sqlite3 /home/cryptominds/data/cryptominds.db "PRAGMA journal_mode=WAL;"
+```
 
-检查：
-1. `BSC_RPC` 是否正确
-2. `BSC_CHAIN_ID` 是否匹配合约所在链
-3. 合约地址是否正确
+## 联系支持
+
+遇到问题？
+- Email: aitabbyspace@gmail.com
+- GitHub Issues: github.com/AITabby/CryptoMinds/issues
+- Twitter: @aitabby

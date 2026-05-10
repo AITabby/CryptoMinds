@@ -1,170 +1,156 @@
-# 快速开始
+# CryptoMinds Credit Layer - 快速开始
+
+## 环境要求
+
+- Python 3.10+
 
 ## 安装
 
-### 本地开发（推荐）
-
 ```bash
-# 克隆仓库
-git clone https://github.com/AITabby/CryptoMinds.git
-cd CryptoMinds
-
-# 安装依赖
+cd cryptominds
 pip install -r requirements.txt
 ```
 
-### Python SDK（待发布）
+## 配置
+
+1. 复制配置文件：
 
 ```bash
-# 尚未发布到 PyPI，请使用本地安装
-pip install -e ./sdk/python
+cp .env.example .env
 ```
 
-### JavaScript SDK（待发布）
+2. 编辑 `.env`（可选）：
 
 ```bash
-# 尚未发布到 npm，请使用本地安装
-npm link ./sdk/javascript
+# 数据库路径
+CRYPTOMINDS_DB_PATH=./cryptominds.db
+
+# API端口
+CRYPTOMINDS_API_PORT=3458
+```
+
+## 启动
+
+```bash
+python src/api_server.py
+```
+
+服务启动在 `http://localhost:3458`
+
+---
+
+## 快速测试
+
+### 查询信用分
+
+```bash
+curl http://localhost:3458/api/v1/credit/agent_high_0001
+```
+
+### 查看排行榜
+
+```bash
+curl http://localhost:3458/api/v1/credit/ranking
+```
+
+### 预览押金折扣
+
+```bash
+curl -X POST http://localhost:3458/api/v1/preview/deposit-discount \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id": "agent_high_0001", "amount": 1.0}'
+```
+
+### 上报履约记录（交易层调用）
+
+```bash
+curl -X POST http://localhost:3458/api/v1/records \
+  -H "Content-Type: application/json" \
+  -d '{
+    "record_id": "rec_test_001",
+    "seller_agent_id": "agent_high_0001",
+    "success": true,
+    "amount": "1.0"
+  }'
 ```
 
 ---
 
-## 信用分查询
+## 使用 SDK
 
 ### Python
 
 ```python
 from cryptominds import CreditClient
 
-client = CreditClient()
-score = client.get_score("0x...")
-print(score)
-# {"score": 85, "grade": "AA", "dimensions": {...}}
+client = CreditClient("http://localhost:3458")
+
+# 查询信用分
+score = client.get_score("agent_001")
+print(f"信用分: {score['total_score']} ({score['grade']})")
+
+# 查看排行榜
+ranking = client.get_ranking(limit=10)
+for r in ranking['ranking']:
+    print(f"{r['rank']}. {r['agent_id']}: {r['total_score']} ({r['grade']})")
 ```
 
 ### JavaScript
 
 ```javascript
-const { CreditClient } = require('cryptominds');
+const { CreditClient } = require('./sdk/javascript/credit');
 
-const client = new CreditClient();
-const score = await client.getScore('0x...');
-console.log(score);
-```
+const client = new CreditClient('http://localhost:3458');
 
----
+// 查询信用分
+const score = await client.getScore('agent_001');
+console.log(`信用分: ${score.total_score} (${score.grade})`);
 
-## 创建托管
-
-### Python
-
-```python
-from cryptominds import EscrowClient
-
-escrow = EscrowClient()
-result = escrow.create(
-    buyer="0x...",
-    seller="0x...",
-    amount=0.1
-)
-print(result["escrow_id"])
-```
-
-### JavaScript
-
-```javascript
-const { EscrowClient } = require('cryptominds');
-
-const escrow = new EscrowClient();
-const result = await escrow.create({
-  buyer: '0x...',
-  seller: '0x...',
-  amount: 0.1,
-});
-console.log(result.escrow_id);
-```
-
----
-
-## 提交争议
-
-### Python
-
-```python
-from cryptominds import ArbitrationClient
-
-arbitration = ArbitrationClient()
-result = arbitration.submit(
-    escrow_id="0x...",
-    reason="未按约定交付",
-    evidence={"description": "..."}
-)
-```
-
-### JavaScript
-
-```javascript
-const { ArbitrationClient } = require('cryptominds');
-
-const arbitration = new ArbitrationClient();
-const result = await arbitration.submit({
-  escrowId: '0x...',
-  reason: '未按约定交付',
-  evidence: { description: '...' },
+// 查看排行榜
+const ranking = await client.getRanking(10);
+ranking.ranking.forEach(r => {
+  console.log(`${r.rank}. ${r.agent_id}: ${r.total_score} (${r.grade})`);
 });
 ```
 
 ---
 
-## 完整流程示例
+## 项目结构
 
-```python
-from cryptominds import CreditClient, EscrowClient, ArbitrationClient
-
-# 1. 查询卖家信用分
-credit = CreditClient()
-seller_score = credit.get_score("0x_seller")
-print(f"卖家信用分: {seller_score['score']} ({seller_score['grade']})")
-
-# 2. 创建托管
-escrow = EscrowClient()
-result = escrow.create(
-    buyer="0x_buyer",
-    seller="0x_seller",
-    amount=0.1,
-    timeout=86400  # 24小时
-)
-print(f"托管ID: {result['escrow_id']}")
-
-# 3. 买家确认资金托管
-escrow.fund(result["escrow_id"], "0x_tx_hash")
-
-# 4. 卖家提交交付证明
-escrow.deliver(result["escrow_id"], {
-    "type": "transaction",
-    "tx_hash": "0x_delivery_tx"
-})
-
-# 5. 买家确认交付
-escrow.confirm(result["escrow_id"])
-print("交易完成")
 ```
+cryptominds/
+├── src/
+│   ├── api_server.py    # API服务
+│   ├── store.py         # 数据存储
+│   ├── credit/          # 信用分模块
+│   │   ├── calculator.py  # 计算逻辑
+│   │   ├── models.py      # 数据模型
+│   │   ├── decay.py       # 时间衰减
+│   │   └── cold_start.py  # 冷启动
+│   └── utils/           # 工具函数
+├── sdk/                 # SDK
+│   ├── python/          # Python SDK
+│   └── javascript/      # JavaScript SDK
+├── demo/                # 演示页面
+└── docs/                # 文档
+```
+
+---
+
+## 下一步
+
+- 阅读 [API文档](docs/API.md) 了解所有端点
+- 阅读 [SACRED.md](docs/SACRED.md) 了解五维信用分模型
+- 阅读 [WHITEPAPER.md](docs/WHITEPAPER.md) 了解设计理念
 
 ---
 
 ## 本地开发
 
 ```bash
-# 克隆仓库
-git clone https://github.com/cryptominds/cryptominds.git
-cd cryptominds
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 启动 API 服务
-python src/api_server.py
-
 # 运行测试
 pytest tests/
+
+# 代码检查
+flake8 src/
 ```

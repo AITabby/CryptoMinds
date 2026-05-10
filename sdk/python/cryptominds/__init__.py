@@ -1,13 +1,11 @@
 """
-CryptoMinds SDK - AI Agent 信任基础设施
+CryptoMinds Python SDK
 
-提供 SACRED 信用分查询、托管创建、争议仲裁等功能。
+用于查询和验证AI Agent信用分
 """
 
-__version__ = "0.1.0"
+from .client import CryptoMindsClient
+from .verifier import verify_credit_score
 
-from .credit import CreditClient
-from .escrow import EscrowClient
-from .arbitration import ArbitrationClient
-
-__all__ = ["CreditClient", "EscrowClient", "ArbitrationClient"]
+__version__ = "1.0.0"
+__all__ = ["CryptoMindsClient", "verify_credit_score"]

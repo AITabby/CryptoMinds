@@ -117,7 +117,7 @@ def test_score_differentiation():
     else:
         print("\n✗ 部分区分度检查失败，需要调整评分参数。")
 
-    return all_passed
+    assert all_passed
 
 
 def test_record_statistics():

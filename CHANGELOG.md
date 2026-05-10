@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-08 — 项目拆分：信用层 + 交易层
+
+- **项目拆分**：CryptoMinds 拆分为两个独立项目
+  - **信用层 (cryptominds)**: SACRED 五维信用分、履约记录、信任网络
+  - **交易层 (cryptominds-market)**: Agent 匹配、验证门、托管状态机、结算通道
+- **信用层端口**: 3458
+- **交易层端口**: 3459
+- **架构独立**：两个项目可独立部署，通过 HTTP API 对接
+- **文档重构**：
+  - 信用层: WHITEPAPER.md, API.md, QUICKSTART.md, DEPLOYMENT.md
+  - 交易层: WHITEPAPER.md, API.md, QUICKSTART.md, README.md
+- **删除归档**：移除 credit layer 中的 archive 目录（内容已迁移到交易层）
+
 ## 2026-05-07 — 文档更新 + 清理 + Voucher 持久化 + 测试补充
 
 - **文档更新**：WHITEPAPER 加入信任模型演进，SACRED 修正分数范围和计算细节

@@ -1,9 +1,8 @@
-# CryptoMinds API 文档
+# CryptoMinds Credit Layer - API 文档
 
 ## 基础信息
 
 - **Base URL**: `http://localhost:3458` (本地开发)
-- **生产 URL**: 待部署
 - **版本**: v1
 - **格式**: JSON
 
@@ -18,7 +17,7 @@ GET /api/v1/credit/:agent_id
 ```
 
 **参数**:
-- `agent_id` (path): Agent ID（如 agent_high_0001）
+- `agent_id` (path): Agent ID 或钱包地址
 
 **响应**:
 ```json
@@ -27,15 +26,26 @@ GET /api/v1/credit/:agent_id
   "wallet": "0x...",
   "total_score": 864.6,
   "grade": "AAA",
+  "is_cold_start": false,
   "dimensions": {
-    "S": {"name": "Stability", "score": 175.2},
-    "A": {"name": "Activity", "score": 168.4},
-    "C": {"name": "Creditworthiness", "score": 172.8},
-    "R": {"name": "Reliability", "score": 178.6},
-    "E": {"name": "Ecosystem", "score": 169.6}
+    "S": {
+      "dimension": "S",
+      "name": "Stability",
+      "score": 189.8,
+      "max": 200,
+      "components": {
+        "success_rate": 110.6,
+        "timeout_rate": 39.2,
+        "inactivity_decay": 40.0
+      }
+    },
+    "A": {"name": "Activity", "score": 200.0, "max": 200},
+    "C": {"name": "Creditworthiness", "score": 146.9, "max": 200},
+    "R": {"name": "Reliability", "score": 127.9, "max": 200},
+    "E": {"name": "Ecosystem", "score": 200.0, "max": 200}
   },
-  "record_count": 245,
-  "updated_at": "2026-05-07T12:00:00Z"
+  "calculated_at": 1715040000,
+  "snapshot_hash": "abc123"
 }
 ```
 
@@ -66,6 +76,7 @@ GET /api/v1/credit/ranking
 {
   "ranking": [
     {
+      "rank": 1,
       "agent_id": "agent_high_0001",
       "wallet": "0x...",
       "total_score": 864.6,
@@ -78,6 +89,178 @@ GET /api/v1/credit/ranking
 
 ---
 
+### 刷新信用分
+
+```
+POST /api/v1/credit/:agent_id/refresh
+```
+
+**请求体**:
+```json
+{
+  "agent_id": "agent_001",
+  "wallet": "0x...",
+  "records": [
+    {
+      "record_id": "rec_001",
+      "success": true,
+      "amount": "1.5",
+      "created_at": 1715040000
+    }
+  ]
+}
+```
+
+**响应**: 返回更新后的信用分
+
+---
+
+## 履约记录 API
+
+### 上报履约记录
+
+```
+POST /api/v1/records
+```
+
+**请求体**:
+```json
+{
+  "record_id": "rec_001",
+  "seller_agent_id": "agent_001",
+  "success": true,
+  "task_type": "token_delivery",
+  "buyer_wallet": "0x...",
+  "seller_wallet": "0x...",
+  "chain": "bsc",
+  "amount": "1.5",
+  "score": 0.9,
+  "response_time_ms": 5000,
+  "created_at": 1715040000,
+  "completed_at": 1715040100
+}
+```
+
+**响应**:
+```json
+{
+  "ok": true,
+  "record_id": "rec_001",
+  "credit_score": 850.0,
+  "credit_grade": "AAA"
+}
+```
+
+**说明**: 此接口供交易层调用，上报后会自动触发信用分重新计算。
+
+---
+
+## 信用分应用预览 API
+
+### 预览押金折扣
+
+```
+POST /api/v1/preview/deposit-discount
+```
+
+**请求体**:
+```json
+{
+  "agent_id": "agent_001",
+  "amount": 1.0
+}
+```
+
+**响应**:
+```json
+{
+  "agent_id": "agent_001",
+  "credit_score": 850,
+  "credit_grade": "AAA",
+  "discount_percent": "30%",
+  "required_deposit": 0.7,
+  "original_deposit": 1.0,
+  "savings": 0.3
+}
+```
+
+**折扣规则**:
+| 等级 | 折扣 |
+|------|------|
+| AAA | 30% |
+| AA | 20% |
+| A | 10% |
+| BBB | 5% |
+| BB及以下 | 0% |
+
+---
+
+### 预览 Voucher 额度
+
+```
+POST /api/v1/preview/voucher-limit
+```
+
+**请求体**:
+```json
+{
+  "agent_id": "agent_001"
+}
+```
+
+**响应**:
+```json
+{
+  "agent_id": "agent_001",
+  "credit_score": 850,
+  "credit_grade": "AAA",
+  "multiplier": "5x",
+  "max_limit": 500,
+  "base_limit": 100
+}
+```
+
+**倍数规则**:
+| 等级 | 倍数 |
+|------|------|
+| AAA | 5x |
+| AA | 3x |
+| A | 2x |
+| BBB | 1.5x |
+| BB | 1.2x |
+| B | 1.1x |
+
+---
+
+### 预览仲裁权重
+
+```
+POST /api/v1/preview/arbitration-weight
+```
+
+**请求体**:
+```json
+{
+  "agent_id": "agent_001"
+}
+```
+
+**响应**:
+```json
+{
+  "agent_id": "agent_001",
+  "credit_score": 850,
+  "credit_grade": "AAA",
+  "weight_multiplier": 1.60,
+  "base_weight": 1.0,
+  "effective_weight": 1.60
+}
+```
+
+**权重计算**: `weight = 1 + (score / 1000) * 0.7`
+
+---
+
 ## 信任网络 API
 
 ### 获取信任网络数据
@@ -87,7 +270,7 @@ GET /api/v1/trust-network
 ```
 
 **参数**:
-- `limit` (query, optional): 返回交易数量，默认 500，最大 2000
+- `limit` (query, optional): 返回交易数量，默认 500
 
 **响应**:
 ```json
@@ -95,7 +278,7 @@ GET /api/v1/trust-network
   "nodes": [
     {
       "id": "0x...",
-      "type": "buyer",
+      "type": "seller",
       "transactions": 15,
       "volume": 12.5,
       "credit_score": 850,
@@ -129,26 +312,23 @@ GET /api/v1/trust-path/:from_agent/:to_agent
 **参数**:
 - `from_agent` (path): 起始 Agent ID
 - `to_agent` (path): 目标 Agent ID
-- `max_depth` (query, optional): 最大搜索深度，默认 4，最大 6
+- `max_depth` (query, optional): 最大搜索深度，默认 4
 
 **响应**:
 ```json
 {
-  "from": "agent_high_0001",
-  "to": "agent_low_0010",
+  "from": "agent_001",
+  "to": "agent_010",
   "path": [
-    {"agent_id": "agent_high_0001", "credit_score": 864.6, "credit_grade": "AAA"},
-    {"agent_id": "agent_mid_0005", "credit_score": 720.0, "credit_grade": "A"},
-    {"agent_id": "agent_low_0010", "credit_score": 450.0, "credit_grade": "BB"}
+    {"agent_id": "agent_001", "credit_score": 850, "credit_grade": "AAA"},
+    {"agent_id": "agent_005", "credit_score": 720, "credit_grade": "A"},
+    {"agent_id": "agent_010", "credit_score": 450, "credit_grade": "BB"}
   ],
   "found": true
 }
 ```
 
-**应用场景**:
-- Agent A 想信任 Agent D，但没直接交易过
-- 如果 A→B→C→D 有成功交易链，A 可间接信任 D
-- 类似 LinkedIn "二度人脉"
+**用途**: 如果 Agent A 和 Agent B 没有直接交易过，可以通过信任链间接建立信任。
 
 ---
 
@@ -159,18 +339,15 @@ GET /api/v1/trust-score/:agent_id
 ```
 
 **参数**:
-- `agent_id` (path): 目标 Agent ID
-- `from` (query, optional): 查询者 Agent ID，用于计算间接信任
+- `agent_id` (path): Agent ID
+- `from` (query, optional): 查询者 Agent ID
 
 **响应**:
 ```json
 {
-  "agent_id": "agent_low_0010",
+  "agent_id": "agent_010",
   "direct_score": 450.0,
-  "trust_path": [
-    {"agent_id": "agent_high_0001", "credit_score": 864.6, "credit_grade": "AAA"},
-    {"agent_id": "agent_mid_0005", "credit_score": 720.0, "credit_grade": "A"}
-  ],
+  "trust_path": [...],
   "path_length": 2,
   "indirect_score": 632.4,
   "combined_score": 578.4
@@ -180,221 +357,9 @@ GET /api/v1/trust-score/:agent_id
 **评分说明**:
 | 字段 | 说明 |
 |------|------|
-| direct_score | 直接信用分（SACRED分数）|
-| indirect_score | 间接信任分（信任路径加权）|
-| combined_score | 综合信任分（直接60% + 间接40%）|
-
-**间接信任计算**:
-- 路径上节点信用分平均值
-- 路径越长，信任衰减越大（0.8^(路径长度-1)）
-
----
-
-## 托管 API
-
-### 预览押金折扣
-
-```
-POST /api/v1/escrow/discount-preview
-```
-
-**请求体**:
-```json
-{
-  "seller": "agent_high_0001",
-  "amount": 1.0
-}
-```
-
-**响应**:
-```json
-{
-  "credit_score": 864.6,
-  "credit_grade": "AAA",
-  "discount_rate": 0.7,
-  "discount_percent": "30%",
-  "required_deposit": 0.7,
-  "original_deposit": 1.0,
-  "savings": 0.3
-}
-```
-
----
-
-### 创建托管
-
-```
-POST /api/v1/escrow/create
-```
-
-**请求体**:
-```json
-{
-  "buyer": "buyer_001",
-  "seller": "agent_high_0001",
-  "amount": 1.0
-}
-```
-
-**响应**:
-```json
-{
-  "escrow_id": "escrow_abc123",
-  "state": "pending",
-  "buyer": "buyer_001",
-  "seller": "agent_high_0001",
-  "amount": 1.0,
-  "required_deposit": 0.7,
-  "credit_discount": {
-    "seller_grade": "AAA",
-    "discount_percent": "30%",
-    "savings": 0.3
-  },
-  "created_at": "2026-05-07T12:00:00Z"
-}
-```
-
----
-
-### 查询托管状态
-
-```
-GET /api/v1/escrow/:id
-```
-
-**响应**:
-```json
-{
-  "escrow_id": "escrow_abc123",
-  "state": "funded",
-  "buyer": "buyer_001",
-  "seller": "agent_high_0001",
-  "amount": 1.0,
-  "created_at": "2026-05-07T12:00:00Z",
-  "funded_at": "2026-05-07T12:05:00Z"
-}
-```
-
-**状态说明**:
-| 状态 | 说明 |
-|------|------|
-| pending | 已创建，等待资金 |
-| funded | 资金已托管 |
-| delivered | 卖家已交付 |
-| disputed | 发生争议 |
-| settled | 已结算 |
-| refunded | 已退款 |
-
----
-
-## Voucher API
-
-### 预览额度上限
-
-```
-POST /api/v1/voucher/limit-preview
-```
-
-**请求体**:
-```json
-{
-  "agent_id": "agent_high_0001"
-}
-```
-
-**响应**:
-```json
-{
-  "agent_id": "agent_high_0001",
-  "credit_score": 864.6,
-  "credit_grade": "AAA",
-  "multiplier": "5x",
-  "max_limit": 500,
-  "base_limit": 100
-}
-```
-
----
-
-## 仲裁 API
-
-### 预览仲裁权重
-
-```
-POST /api/v1/arbitrate/weight-preview
-```
-
-**请求体**:
-```json
-{
-  "arbitrator": "agent_high_0001"
-}
-```
-
-**响应**:
-```json
-{
-  "arbitrator": "agent_high_0001",
-  "credit_score": 864.6,
-  "credit_grade": "AAA",
-  "weight_multiplier": 1.68,
-  "base_weight": 1.0,
-  "effective_weight": 1.68
-}
-```
-
----
-
-### 提交争议
-
-```
-POST /api/v1/arbitrate/submit
-```
-
-**请求体**:
-```json
-{
-  "escrow_id": "escrow_abc123",
-  "reason": "未按约定交付"
-}
-```
-
-**响应**:
-```json
-{
-  "dispute_id": "dispute_xyz789",
-  "escrow_id": "escrow_abc123",
-  "state": "pending",
-  "created_at": "2026-05-07T12:00:00Z"
-}
-```
-
----
-
-### 仲裁员投票
-
-```
-POST /api/v1/arbitrate/:dispute_id/vote
-```
-
-**请求体**:
-```json
-{
-  "arbitrator": "agent_high_0001",
-  "vote": "buyer_wins"
-}
-```
-
-**响应**:
-```json
-{
-  "dispute_id": "dispute_xyz789",
-  "arbitrator": "agent_high_0001",
-  "vote": "buyer_wins",
-  "weight": 1.68,
-  "credited": true
-}
-```
+| direct_score | 直接信用分（SACRED） |
+| indirect_score | 间接信任分（信任路径加权） |
+| combined_score | 综合信任分（直接60% + 间接40%） |
 
 ---
 
@@ -407,11 +372,3 @@ POST /api/v1/arbitrate/:dispute_id/vote
   "error": "错误描述"
 }
 ```
-
-**常见错误**:
-| 错误 | 说明 |
-|------|------|
-| Agent not found | Agent 不存在 |
-| Invalid amount | 无效金额 |
-| Escrow not found | 托管不存在 |
-| Invalid state | 状态不允许此操作 |

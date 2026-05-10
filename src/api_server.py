@@ -10,11 +10,14 @@ AI Agent 信用分基础设施
 import os
 import sys
 import hashlib
+import json
+import time
+import uuid
 
 # 添加 src 目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from flask import Flask, jsonify, request, g  # noqa: E402
+from flask import Flask, jsonify, request, g, send_from_directory  # noqa: E402
 from flask_limiter import Limiter  # noqa: E402
 from flask_limiter.util import get_remote_address  # noqa: E402
 
@@ -24,16 +27,24 @@ from store import UnifiedStore  # noqa: E402
 # 创建 Flask 应用
 app = Flask(__name__)
 
-# 速率限制
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
-)
-
-# 配置
+# 配置 (必须在 limiter 之前)
 DEBUG_MODE = os.getenv("CRYPTOMINDS_DEBUG", "false").lower() in ("1", "true", "yes")
 API_PORT = int(os.getenv("CRYPTOMINDS_API_PORT", "3458"))
+
+# 速率限制 (开发模式下禁用)
+if DEBUG_MODE:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=[],
+        enabled=False
+    )
+else:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["200 per day", "50 per hour"]
+    )
 
 # API 认证配置
 API_KEY = os.getenv("CRYPTOMINDS_API_KEY", "")
@@ -75,12 +86,45 @@ def check_auth():
 @app.before_request
 def before_request():
     """请求前中间件"""
-    if request.path in ("/health", "/api/v1/info"):
+    if request.path in ("/", "/health", "/api/v1/info") or request.path.startswith("/demo"):
         return None
     return check_auth()
 
 
+# ── Demo 页面 ─────────────────────────────────────
+
+@app.route("/demo/")
+@app.route("/demo/<path:filename>")
+def demo(filename=""):
+    """Demo 静态页面"""
+    demo_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "demo")
+    if filename == "" or filename == "/":
+        filename = "index.html"
+    return send_from_directory(demo_dir, filename.lstrip("/"))
+
+
 # ── 健康检查 ──
+
+@app.route("/")
+def index():
+    """根路径 - 服务信息"""
+    return jsonify({
+        "service": "cryptominds-credit",
+        "version": "1.0.0",
+        "description": "AI Agent 信用分基础设施",
+        "endpoints": {
+            "credit": "/api/v1/credit/<agent_id>",
+            "ranking": "/api/v1/credit/ranking",
+            "records": "/api/v1/records",
+            "trust_network": "/api/v1/trust-network",
+            "preview_deposit": "/api/v1/preview/deposit-discount",
+            "preview_voucher": "/api/v1/preview/voucher-limit",
+            "preview_arbitration": "/api/v1/preview/arbitration-weight",
+            "health": "/health"
+        },
+        "market_layer": "http://localhost:3459"
+    })
+
 
 @app.route("/health")
 def health():
@@ -90,7 +134,7 @@ def health():
 @app.route("/api/v1/info")
 def info():
     return jsonify({
-        "name": "CryptoMinds Credit Layer",
+        "name": "CryptoMinds",
         "version": "1.0.0",
         "description": "AI Agent 信用分基础设施",
         "features": ["sacred_credit", "trust_network", "performance_records"]
@@ -111,7 +155,7 @@ def create_record():
 
     交易层调用此接口上报任务完成情况，用于更新信用分
     """
-    data = request.json
+    data = request.json or {}
     required = ["record_id", "seller_agent_id", "success"]
     if not all(k in data for k in required):
         return jsonify({"error": "缺少必要参数"}), 400
@@ -160,6 +204,250 @@ def create_record():
         "credit_score": score.total_score,
         "credit_grade": score.grade,
     })
+
+
+# ── 托管 API（交易层参考实现）──
+
+@app.route("/api/v1/escrow/create", methods=["POST"])
+def create_escrow():
+    data = request.json or {}
+    required = ["buyer", "seller", "amount"]
+    if not all(k in data for k in required):
+        return jsonify({"error": "缺少必要参数"}), 400
+
+    escrow = store.create_escrow(
+        buyer=data["buyer"],
+        seller=data["seller"],
+        amount=data["amount"],
+        token=data.get("token", "BNB"),
+        timeout=int(data.get("timeout", 86400)),
+        metadata=data.get("metadata", {}),
+    )
+    return jsonify(escrow)
+
+
+@app.route("/api/v1/escrow/<escrow_id>", methods=["GET"])
+def get_escrow(escrow_id: str):
+    escrow = store.get_escrow(escrow_id)
+    if not escrow:
+        return jsonify({"error": "托管不存在"}), 404
+    return jsonify(escrow)
+
+
+@app.route("/api/v1/escrow/<escrow_id>/fund", methods=["POST"])
+def fund_escrow(escrow_id: str):
+    escrow = store.get_escrow(escrow_id)
+    if not escrow:
+        return jsonify({"error": "托管不存在"}), 404
+    if escrow["status"] != "pending":
+        return jsonify({"error": "当前状态不允许托管资金"}), 400
+
+    data = request.json or {}
+    updated = store.update_escrow_status(
+        escrow_id,
+        "funded",
+        fund_tx=data.get("tx_hash", data.get("fund_tx", "")),
+        funded_at=int(time.time()),
+    )
+    return jsonify(updated)
+
+
+@app.route("/api/v1/escrow/<escrow_id>/deliver", methods=["POST"])
+def deliver_escrow(escrow_id: str):
+    escrow = store.get_escrow(escrow_id)
+    if not escrow:
+        return jsonify({"error": "托管不存在"}), 404
+    if escrow["status"] != "funded":
+        return jsonify({"error": "当前状态不允许交付"}), 400
+
+    data = request.json or {}
+    updated = store.update_escrow_status(
+        escrow_id,
+        "delivered",
+        delivery_proof=json.dumps(data.get("proof", {}), sort_keys=True),
+        delivered_at=int(time.time()),
+    )
+    return jsonify(updated)
+
+
+@app.route("/api/v1/escrow/<escrow_id>/release", methods=["POST"])
+def release_escrow(escrow_id: str):
+    escrow = store.get_escrow(escrow_id)
+    if not escrow:
+        return jsonify({"error": "托管不存在"}), 404
+    if escrow["status"] != "delivered":
+        return jsonify({"error": "当前状态不允许释放"}), 400
+
+    updated = store.update_escrow_status(
+        escrow_id,
+        "settled",
+        completed_at=int(time.time()),
+        resolution="seller_wins",
+    )
+    return jsonify(updated)
+
+
+@app.route("/api/v1/escrow/<escrow_id>/refund", methods=["POST"])
+def refund_escrow(escrow_id: str):
+    escrow = store.get_escrow(escrow_id)
+    if not escrow:
+        return jsonify({"error": "托管不存在"}), 404
+    if escrow["status"] not in ("pending", "funded", "delivered", "disputed"):
+        return jsonify({"error": "当前状态不允许退款"}), 400
+
+    updated = store.update_escrow_status(
+        escrow_id,
+        "refunded",
+        completed_at=int(time.time()),
+        resolution="buyer_wins",
+    )
+    return jsonify(updated)
+
+
+# ── 争议仲裁 API（交易层参考实现）──
+
+@app.route("/api/v1/arbitrate/submit", methods=["POST"])
+def submit_dispute():
+    data = request.json or {}
+    escrow_id = data.get("escrow_id")
+    reason = data.get("reason")
+    if not escrow_id or not reason:
+        return jsonify({"error": "缺少必要参数"}), 400
+
+    escrow = store.get_escrow(escrow_id)
+    if not escrow:
+        return jsonify({"error": "托管不存在"}), 404
+
+    dispute = store.create_dispute(
+        escrow_id=escrow_id,
+        reason=reason,
+        evidence=data.get("evidence", {}),
+    )
+    store.update_escrow_status(
+        escrow_id,
+        "disputed",
+        disputed=True,
+        dispute_reason=reason,
+    )
+    return jsonify(dispute)
+
+
+@app.route("/api/v1/arbitrate/<dispute_id>", methods=["GET"])
+def get_dispute(dispute_id: str):
+    dispute = store.get_dispute(dispute_id)
+    if not dispute:
+        return jsonify({"error": "争议不存在"}), 404
+    return jsonify(dispute)
+
+
+@app.route("/api/v1/arbitrate/<dispute_id>/evidence", methods=["POST"])
+def add_dispute_evidence(dispute_id: str):
+    dispute = store.add_dispute_evidence(dispute_id, request.json or {})
+    if not dispute:
+        return jsonify({"error": "争议不存在"}), 404
+    return jsonify(dispute)
+
+
+@app.route("/api/v1/arbitrate/<dispute_id>/arbitrators", methods=["GET"])
+def get_arbitrators(dispute_id: str):
+    dispute = store.get_dispute(dispute_id)
+    if not dispute:
+        return jsonify({"error": "争议不存在"}), 404
+    arbitrators = dispute.get("arbitrators") or [
+        {"agent_id": "arb_default_1", "weight": 1.0},
+        {"agent_id": "arb_default_2", "weight": 1.0},
+        {"agent_id": "arb_default_3", "weight": 1.0},
+    ]
+    return jsonify({"dispute_id": dispute_id, "arbitrators": arbitrators})
+
+
+@app.route("/api/v1/arbitrate/<dispute_id>/vote", methods=["POST"])
+def vote_dispute(dispute_id: str):
+    data = request.json or {}
+    if not data.get("arbitrator") or not data.get("vote"):
+        return jsonify({"error": "缺少必要参数"}), 400
+    dispute = store.add_vote(
+        dispute_id=dispute_id,
+        arbitrator=data["arbitrator"],
+        vote=data["vote"],
+        weight=float(data.get("weight", 1.0)),
+    )
+    if not dispute:
+        return jsonify({"error": "争议不存在"}), 404
+    return jsonify(dispute)
+
+
+@app.route("/api/v1/arbitrate/<dispute_id>/resolve", methods=["POST"])
+def resolve_dispute(dispute_id: str):
+    data = request.json or {}
+    result = data.get("result")
+    if not result:
+        return jsonify({"error": "缺少必要参数"}), 400
+    dispute = store.resolve_dispute(
+        dispute_id=dispute_id,
+        result=result,
+        reason=data.get("reason", ""),
+    )
+    if not dispute:
+        return jsonify({"error": "争议不存在"}), 404
+    return jsonify(dispute)
+
+
+# ── Voucher API（信用应用参考实现）──
+
+@app.route("/api/v1/voucher/limit-preview", methods=["POST"])
+def voucher_limit_preview():
+    return preview_voucher_limit()
+
+
+@app.route("/api/v1/voucher/create", methods=["POST"])
+def create_voucher():
+    data = request.json or {}
+    required = ["issuer", "agent_id", "total_units"]
+    if not all(k in data for k in required):
+        return jsonify({"error": "缺少必要参数"}), 400
+
+    unit_price = float(data.get("unit_price", 0.01))
+    voucher = store.create_voucher(
+        voucher_id=data.get("voucher_id", f"voucher_{uuid.uuid4().hex[:12]}"),
+        issuer=data["issuer"],
+        agent_id=data["agent_id"],
+        total_units=int(data["total_units"]),
+        unit_price=unit_price,
+        escrow_id=data.get("escrow_id", ""),
+    )
+    return jsonify(voucher)
+
+
+@app.route("/api/v1/voucher/list", methods=["GET"])
+def list_vouchers():
+    vouchers = store.list_vouchers(
+        agent_id=request.args.get("agent_id"),
+        issuer=request.args.get("issuer"),
+    )
+    return jsonify({"vouchers": vouchers, "total": len(vouchers)})
+
+
+@app.route("/api/v1/voucher/<voucher_id>", methods=["GET"])
+def get_voucher(voucher_id: str):
+    voucher = store.get_voucher(voucher_id)
+    if not voucher:
+        return jsonify({"error": "Voucher 不存在"}), 404
+    return jsonify(voucher)
+
+
+@app.route("/api/v1/voucher/<voucher_id>/use", methods=["POST"])
+def use_voucher(voucher_id: str):
+    data = request.json or {}
+    units = int(data.get("units", 0))
+    if units <= 0:
+        return jsonify({"error": "使用单位必须大于0"}), 400
+    voucher = store.use_voucher(voucher_id, units)
+    if not voucher:
+        return jsonify({"error": "Voucher 不存在"}), 404
+    if voucher.get("error"):
+        return jsonify(voucher), 400
+    return jsonify(voucher)
 
 
 # ── 信用分应用预览 API ──

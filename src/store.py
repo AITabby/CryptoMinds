@@ -649,7 +649,7 @@ class UnifiedStore:
         conn = self._connect()
         try:
             conn.execute(
-                """INSERT INTO sacred_scores
+                """INSERT OR REPLACE INTO sacred_scores
                    (agent_id, wallet, total_score, grade,
                     stability_score, activity_score, creditworthiness_score,
                     reliability_score, ecosystem_score,
@@ -663,6 +663,11 @@ class UnifiedStore:
                     1 if score.is_cold_start else 0,
                     score.snapshot_hash, score.calculated_at,
                 ),
+            )
+
+            conn.execute(
+                "DELETE FROM dimension_details WHERE agent_id = ? AND calculated_at = ?",
+                (score.agent_id, score.calculated_at),
             )
 
             # 保存五维明细
